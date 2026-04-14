@@ -58,3 +58,4 @@ npm run build
 ## License
 
 Private project - AFF Video Production
+# TikTok-Affiliate-Video-Prompt-Generator
