@@ -304,10 +304,11 @@ function generateKeyframePrompts(
   const locations = KEYFRAME_LOCATIONS_MAP[contentType]
   const actions = KEYFRAME_ACTIONS_MAP[contentType]
   const lightings = KEYFRAME_LIGHTING_MAP[contentType]
+  const localLocationIdx = 0
 
   for (let i = 0; i < keyframeCount; i++) {
     const timestamp = `${Math.round(i * sceneInterval)}s`
-    const locIdx = i % locations.length
+    const locIdx = localLocationIdx
     const actIdx = i % actions.length
     const camIdx = i % CAMERA_SETUPS.length
 
@@ -412,6 +413,8 @@ CRITICAL RULES:
 3. Character identity must be PERFECTLY CONSISTENT across all keyframes (use Character DNA)
 4. Product/garment must be EXACTLY preserved from reference image
 5. Follow TikTok viral structure: Hook (0-3s) → Value → Proof → CTA
+6. Infer location, lighting, camera mood, and styling directly from the provided reference images (face + garment) instead of generic preset randomness
+7. Keep scene context coherent across the timeline; only change location when there is a clear narrative transition
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -518,14 +521,30 @@ Output as JSON with this exact structure:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
+    const templateKeyframes = generateKeyframePrompts(
+      keyframeCount,
+      duration,
+      aspectRatio,
+      notes,
+      contentType
+    )
+    const templateScenes = generateScenePrompts(
+      templateKeyframes,
+      sceneCount,
+      duration,
+      aspectRatio,
+      contentType
+    )
+
     // Build full prompts for each keyframe and scene
     const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
+      const template = templateKeyframes[i]
       const subject = toSafeString(kf.subject, '[facePreservation from reference]')
-      const action = toSafeString(kf.action, KEYFRAME_ACTIONS_MAP[contentType][i % KEYFRAME_ACTIONS_MAP[contentType].length])
-      const location = toSafeString(kf.location, KEYFRAME_LOCATIONS_MAP[contentType][i % KEYFRAME_LOCATIONS_MAP[contentType].length])
-      const camera = toSafeString(kf.camera, `${CAMERA_SETUPS[i % CAMERA_SETUPS.length].shot}, ${CAMERA_SETUPS[i % CAMERA_SETUPS.length].lens} lens`)
-      const lighting = toSafeString(kf.lighting, KEYFRAME_LIGHTING_MAP[contentType][i % KEYFRAME_LIGHTING_MAP[contentType].length])
-      const style = toSafeString(kf.style, 'Professional fashion editorial')
+      const action = toSafeString(kf.action, template?.action || KEYFRAME_ACTIONS_MAP[contentType][i % KEYFRAME_ACTIONS_MAP[contentType].length])
+      const location = toSafeString(kf.location, template?.location || KEYFRAME_LOCATIONS_MAP[contentType][0])
+      const camera = toSafeString(kf.camera, template?.camera || `${CAMERA_SETUPS[i % CAMERA_SETUPS.length].shot}, ${CAMERA_SETUPS[i % CAMERA_SETUPS.length].lens} lens`)
+      const lighting = toSafeString(kf.lighting, template?.lighting || KEYFRAME_LIGHTING_MAP[contentType][0])
+      const style = toSafeString(kf.style, template?.style || 'Professional fashion editorial')
 
       return {
         index: i,
@@ -547,17 +566,18 @@ ASPECT RATIO: ${aspectRatio}`,
     })
 
     const scenes: ScenePrompt[] = rawScenes.map((sc: any, i: number) => {
+      const template = templateScenes[i]
       const startSec = Math.round((i * duration) / sceneCount)
       const endSec = Math.round(((i + 1) * duration) / sceneCount)
       const startPose = keyframes[i]?.action || toSafeString(sc.startPose, '')
       const endPose = keyframes[i + 1]?.action || toSafeString(sc.endPose, '')
       const narrative = toSafeString(
         sc.narrative,
-        `${SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].name}. The model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
+        template?.narrative || `${SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].name}. The model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
       )
       const cameraMovement = toSafeString(
         sc.cameraMovement,
-        SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].cameraHint
+        template?.cameraMovement || SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].cameraHint
       )
 
       return {
@@ -583,12 +603,7 @@ FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
       scenes,
     }
   } catch (error: any) {
-    console.warn('Gemini API failed, falling back to local generation:', error.message)
-    // Fallback to local generation
-    const masterDNA = buildCharacterDNA(notes, contentType)
-    const keyframes = generateKeyframePrompts(keyframeCount, duration, aspectRatio, notes, contentType)
-    const scenes = generateScenePrompts(keyframes, sceneCount, duration, aspectRatio, contentType)
-    return { masterDNA, keyframes, scenes }
+    throw new Error(error?.message || 'Gemini generation failed')
   }
 }
 
@@ -799,7 +814,7 @@ export default function App() {
 
   // Derived
   const durationInfo = DURATIONS.find(d => d.value === duration)!
-  const canGenerate = true
+  const canGenerate = apiKey.trim().length > 0
 
   // Generate handler
   const handleGenerate = async () => {
@@ -808,22 +823,15 @@ export default function App() {
     setResult(null)
 
     try {
-      if (apiKey.trim()) {
-        // Use Gemini API
-        const res = await generateWithGemini(
-          apiKey, model, faceImage, productImage, duration, aspectRatio, notes, contentType
-        )
-        // Add create image prompt
-        res.createImagePrompt = buildCreateImagePrompt(contentType, notes)
-        setResult(res)
-      } else {
-        // Local-only generation (no API key)
-        const masterDNA = buildCharacterDNA(notes, contentType)
-        const keyframes = generateKeyframePrompts(durationInfo.keyframes, duration, aspectRatio, notes, contentType)
-        const scenes = generateScenePrompts(keyframes, durationInfo.scenes, duration, aspectRatio, contentType)
-        const createImagePrompt = buildCreateImagePrompt(contentType, notes)
-        setResult({ masterDNA, keyframes, scenes, createImagePrompt })
+      if (!apiKey.trim()) {
+        throw new Error('Vui long nhap Gemini API Key de AI phan tich anh va tao boi canh')
       }
+
+      const res = await generateWithGemini(
+        apiKey, model, faceImage, productImage, duration, aspectRatio, notes, contentType
+      )
+      res.createImagePrompt = buildCreateImagePrompt(contentType, notes)
+      setResult(res)
     } catch (err: any) {
       setError(err.message || 'Failed to generate prompts')
     } finally {
