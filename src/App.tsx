@@ -193,6 +193,8 @@ CRITICAL RULES:
 5. Follow TikTok viral structure: Hook (0-3s) → Value → Proof → CTA
 6. Infer location, lighting, camera mood, and styling directly from the provided reference images (face + garment) instead of generic preset randomness
 7. Keep scene context coherent across the timeline; only change location when there is a clear narrative transition
+8. NEVER use background, location, props, or lighting from the FACE reference image. The face image is identity-only and must not influence scene context.
+9. Infer scene context primarily from garment/product characteristics, content type, and user notes.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -234,7 +236,7 @@ Output as JSON with this exact structure:
         data: base64,
       }
     })
-    parts.push({ text: 'This is the FACE REFERENCE image. Preserve this exact face in all keyframes.' })
+    parts.push({ text: 'This is the FACE REFERENCE image. Use it ONLY for face identity preservation (facial features, skin tone, hairstyle). Ignore its background, location, props, and lighting.' })
   }
 
   if (productImage) {
