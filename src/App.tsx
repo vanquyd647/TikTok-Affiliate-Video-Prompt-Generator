@@ -201,16 +201,45 @@ const CAMERA_SETUPS = [
   { lens: '85mm', shot: 'Portrait close-up', angle: 'Eye level, shallow depth of field', movement: 'Gentle orbit around subject' },
 ]
 
-// TikTok-realistic lighting setups
-const LIGHTING_SETUPS = [
-  'Natural window light from left side, soft shadows on right cheek, fabric colors appear true-to-life',
-  'Ring light at camera position creating even, shadowless face lighting — classic TikTok setup',
-  'Golden hour backlight creating warm hair halo and glowing fabric edges, face lit by bounce',
-  'Soft overcast daylight outdoors — even, flattering, no harsh shadows, perfect for fabric detail',
-  'Warm LED strip accent from behind + key light from 45° front left, creating depth and dimension',
-  'Neon ambient light mixed with warm key light — moody, editorial, trending cinematic TikTok aesthetic',
-  'Dappled sunlight through tree canopy, natural light-shadow patterns across outfit and face',
-]
+// Lighting is aligned by location index to avoid indoor/outdoor mismatch.
+const KEYFRAME_LIGHTING_MAP: Record<ContentType, string[]> = {
+  ootd: [
+    'Warm window key light from coffee shop side windows, subtle amber practicals from pendant lights, clean skin tones and true garment color',
+    'Natural daylight from bedroom window, soft fill bounce from white walls, low-contrast flattering portrait look',
+    'Golden-hour side backlight outdoors with gentle reflector fill on face, vivid but realistic fabric color separation',
+    'Studio ring light as frontal key with soft top fill, clean neutral shadows for an indoor lookbook frame',
+    'Sunset rim light on rooftop with warm front-left key fill, city ambient glow adding depth to silhouette',
+    'Soft boutique ambient lighting with diffused key from fitting-room mirror, texture-friendly highlights on fabric',
+    'Daylight filtered through glass lobby facade with balanced indoor fill from floor reflections, crisp modern fashion tone',
+  ],
+  grwm: [
+    'Vanity LED mirror used as soft key, gentle warm fill reducing under-eye shadows while preserving natural skin texture',
+    'Morning sunlight through sheer curtains as side key, cozy low-contrast fill for intimate bedroom atmosphere',
+    'Warm wardrobe strip lights mixed with neutral overhead fill, accurate color rendering for outfit choices',
+    'Ring light as centered key with soft ambient pink bounce, clean beauty-vlog look without harsh shadows',
+    'Natural daylight near floor mirror with subtle bounce fill from wall, realistic full-look skin and fabric tones',
+    'Warm candle practicals in background with soft key from front-left, elegant getting-ready mood and depth',
+    'Diffused bathroom daylight with marble bounce fill, even complexion and clear garment texture detail',
+  ],
+  fyp: [
+    'High-contrast warehouse shafts of sunlight with atmospheric haze, dramatic highlights and cinematic shadow falloff',
+    'Neon cyan-magenta ambient from alley signs with controlled warm key on face, moody but readable fashion details',
+    'Golden-hour field backlight with gentle frontal bounce, dreamy bloom while preserving silhouette definition',
+    'Single hard spotlight in black studio with negative fill, crisp editorial contrast and sculpted facial planes',
+    'Cool blue corridor practicals with mirrored edge reflections, controlled highlights for futuristic depth layering',
+    'Twilight lantern practicals as warm key sources with soft ambient night fill, rich orange cinematic glow',
+    'Natural skylight from museum ceiling with soft side fill, elegant tonal separation and architectural depth',
+  ],
+  review: [
+    'Soft daylight from desk-side window with neutral bounce card fill, accurate product color and texture fidelity',
+    'Even living-room window light with low-contrast fill, trustworthy natural review look for face and garment',
+    'Clean two-softbox white backdrop setup, shadow-controlled and detail-focused for unboxing clarity',
+    'Bedside window daylight with gentle top fill, cozy editorial review tone while retaining material detail',
+    'Consistent fitting-room fluorescent key balanced with neutral fill, stable true-to-product color rendering',
+    'Ring light key with soft side fill in home studio, clear eye contact and reliable fabric detail visibility',
+    'Open-shade outdoor daylight with subtle front reflector, natural skin tones and honest product presentation',
+  ],
+}
 
 function buildCharacterDNA(notes: string, contentType: ContentType): string {
   const styleMap: Record<ContentType, string> = {
@@ -274,20 +303,20 @@ function generateKeyframePrompts(
   const sceneInterval = durationSec / (keyframeCount - 1)
   const locations = KEYFRAME_LOCATIONS_MAP[contentType]
   const actions = KEYFRAME_ACTIONS_MAP[contentType]
+  const lightings = KEYFRAME_LIGHTING_MAP[contentType]
 
   for (let i = 0; i < keyframeCount; i++) {
     const timestamp = `${Math.round(i * sceneInterval)}s`
     const locIdx = i % locations.length
     const actIdx = i % actions.length
     const camIdx = i % CAMERA_SETUPS.length
-    const lightIdx = i % LIGHTING_SETUPS.length
 
     const cam = CAMERA_SETUPS[camIdx]
     const subject = `[facePreservation from reference]`
     const action = actions[actIdx]
     const location = locations[locIdx]
     const camera = `${cam.shot}, ${cam.lens} lens, ${cam.angle}. Movement: ${cam.movement}`
-    const lighting = LIGHTING_SETUPS[lightIdx]
+    const lighting = lightings[locIdx % lightings.length]
     const style = 'Professional fashion editorial'
 
     const fullPrompt = `SUBJECT: ${subject}. ACTION: ${action}. LOCATION: ${location}. CAMERA: ${camera}. LIGHTING: ${lighting}. STYLE: ${style}. ASPECT RATIO: ${aspectRatio}. ${notes ? `NOTES: ${notes}` : ''}`
@@ -474,30 +503,79 @@ Output as JSON with this exact structure:
 
     const parsed = JSON.parse(jsonMatch[0])
 
-    // Build full prompts for each keyframe and scene
-    const keyframes: KeyframePrompt[] = (parsed.keyframes || []).map((kf: any, i: number) => ({
-      ...kf,
-      index: i,
-      fullPrompt: `SUBJECT: ${kf.subject}
-ACTION: ${kf.action}
-LOCATION: ${kf.location}
-CAMERA: ${kf.camera}
-LIGHTING: ${kf.lighting}
-STYLE: ${kf.style}
-ASPECT RATIO: ${aspectRatio}`
-    }))
+    const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
+    const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : []
 
-    const scenes: ScenePrompt[] = (parsed.scenes || []).map((sc: any, i: number) => ({
-      ...sc,
-      index: i,
-      fullPrompt: `${sc.narrative}
-START_POSE [KF${i + 1}]: ${sc.startPose}
-END_POSE [KF${i + 2}]: ${sc.endPose}
-CAMERA: ${sc.cameraMovement}
+    if (rawKeyframes.length !== keyframeCount || rawScenes.length !== sceneCount) {
+      throw new Error(
+        `Gemini returned unsynchronized package (keyframes: ${rawKeyframes.length}/${keyframeCount}, scenes: ${rawScenes.length}/${sceneCount})`
+      )
+    }
+
+    const toSafeString = (value: unknown, fallback: string) => {
+      if (typeof value !== 'string') return fallback
+      const trimmed = value.trim()
+      return trimmed.length > 0 ? trimmed : fallback
+    }
+
+    // Build full prompts for each keyframe and scene
+    const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
+      const subject = toSafeString(kf.subject, '[facePreservation from reference]')
+      const action = toSafeString(kf.action, KEYFRAME_ACTIONS_MAP[contentType][i % KEYFRAME_ACTIONS_MAP[contentType].length])
+      const location = toSafeString(kf.location, KEYFRAME_LOCATIONS_MAP[contentType][i % KEYFRAME_LOCATIONS_MAP[contentType].length])
+      const camera = toSafeString(kf.camera, `${CAMERA_SETUPS[i % CAMERA_SETUPS.length].shot}, ${CAMERA_SETUPS[i % CAMERA_SETUPS.length].lens} lens`)
+      const lighting = toSafeString(kf.lighting, KEYFRAME_LIGHTING_MAP[contentType][i % KEYFRAME_LIGHTING_MAP[contentType].length])
+      const style = toSafeString(kf.style, 'Professional fashion editorial')
+
+      return {
+        index: i,
+        timestamp: `${Math.round((i * duration) / (keyframeCount - 1))}s`,
+        subject,
+        action,
+        location,
+        camera,
+        lighting,
+        style,
+        fullPrompt: `SUBJECT: ${subject}
+ACTION: ${action}
+LOCATION: ${location}
+CAMERA: ${camera}
+LIGHTING: ${lighting}
+STYLE: ${style}
+ASPECT RATIO: ${aspectRatio}`,
+      }
+    })
+
+    const scenes: ScenePrompt[] = rawScenes.map((sc: any, i: number) => {
+      const startSec = Math.round((i * duration) / sceneCount)
+      const endSec = Math.round(((i + 1) * duration) / sceneCount)
+      const startPose = keyframes[i]?.action || toSafeString(sc.startPose, '')
+      const endPose = keyframes[i + 1]?.action || toSafeString(sc.endPose, '')
+      const narrative = toSafeString(
+        sc.narrative,
+        `${SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].name}. The model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
+      )
+      const cameraMovement = toSafeString(
+        sc.cameraMovement,
+        SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].cameraHint
+      )
+
+      return {
+        index: i,
+        timeRange: `${startSec}s-${endSec}s`,
+        narrative,
+        startPose,
+        endPose,
+        cameraMovement,
+        fullPrompt: `${narrative}
+START_POSE [KF${i + 1}]: ${startPose}
+END_POSE [KF${i + 2}]: ${endPose}
+CAMERA: ${cameraMovement}
 ASPECT_RATIO: ${aspectRatio}
 DURATION: 8 seconds
-FORMAT: Veo 3.1 first-frame → last-frame interpolation`
-    }))
+FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
+      }
+    })
 
     return {
       masterDNA: parsed.masterDNA || buildCharacterDNA(notes, contentType),
@@ -575,11 +653,15 @@ function ImageUploader({
   label,
   image,
   onImageChange,
+  isPasteTarget,
+  onActivatePasteTarget,
   icon: Icon,
 }: {
   label: string
   image: string | null
   onImageChange: (img: string | null) => void
+  isPasteTarget: boolean
+  onActivatePasteTarget: () => void
   icon: React.ElementType
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -599,11 +681,13 @@ function ImageUploader({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
+    onActivatePasteTarget()
     const file = e.dataTransfer.files[0]
     if (file) handleFile(file)
-  }, [handleFile])
+  }, [handleFile, onActivatePasteTarget])
 
   const handlePaste = useCallback((e: ClipboardEvent) => {
+    if (!isPasteTarget) return
     const items = e.clipboardData?.items
     if (!items) return
     for (const item of items) {
@@ -613,7 +697,7 @@ function ImageUploader({
         break
       }
     }
-  }, [handleFile])
+  }, [handleFile, isPasteTarget])
 
   useEffect(() => {
     document.addEventListener('paste', handlePaste)
@@ -625,7 +709,7 @@ function ImageUploader({
       <label className="input-label">{label}</label>
       <div
         className={`image-upload-zone ${dragging ? 'dragging' : ''} ${image ? 'has-image' : ''}`}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => { onActivatePasteTarget(); inputRef.current?.click() }}
         onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
@@ -654,6 +738,7 @@ function ImageUploader({
         accept="image/*"
         style={{ display: 'none' }}
         onChange={(e) => {
+          onActivatePasteTarget()
           const file = e.target.files?.[0]
           if (file) handleFile(file)
           e.target.value = ''
@@ -698,6 +783,7 @@ export default function App() {
   const [model, setModel] = useState(() => localStorage.getItem('aff_model') || 'gemini-2.5-flash')
   const [faceImage, setFaceImage] = useState<string | null>(null)
   const [productImage, setProductImage] = useState<string | null>(null)
+  const [pasteTarget, setPasteTarget] = useState<'face' | 'product'>('face')
   const [duration, setDuration] = useState(24)
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16')
   const [contentType, setContentType] = useState<ContentType>('ootd')
@@ -713,7 +799,7 @@ export default function App() {
 
   // Derived
   const durationInfo = DURATIONS.find(d => d.value === duration)!
-  const canGenerate = apiKey.trim().length > 0
+  const canGenerate = true
 
   // Generate handler
   const handleGenerate = async () => {
@@ -762,6 +848,9 @@ export default function App() {
       '',
       '── SCENE PROMPTS (Veo 3.1) ──',
       ...result.scenes.map(sc => `\n${sc.fullPrompt}`),
+      ...(result.createImagePrompt
+        ? ['', '── CREATE IMAGE PROMPT ──', result.createImagePrompt]
+        : []),
     ]
     const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
@@ -778,6 +867,7 @@ export default function App() {
       'CHARACTER DNA:', result.masterDNA, '',
       'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => kf.fullPrompt), '',
       'SCENE PROMPTS:', ...result.scenes.map(sc => sc.fullPrompt),
+      ...(result.createImagePrompt ? ['', 'CREATE IMAGE PROMPT:', result.createImagePrompt] : []),
     ]
     try {
       await navigator.clipboard.writeText(lines.join('\n\n'))
@@ -859,12 +949,16 @@ export default function App() {
                 label="Ảnh Face Model"
                 image={faceImage}
                 onImageChange={setFaceImage}
+                isPasteTarget={pasteTarget === 'face'}
+                onActivatePasteTarget={() => setPasteTarget('face')}
                 icon={ImageIcon}
               />
               <ImageUploader
                 label="Ảnh Sản phẩm (Model mặc sản phẩm)"
                 image={productImage}
                 onImageChange={setProductImage}
+                isPasteTarget={pasteTarget === 'product'}
+                onActivatePasteTarget={() => setPasteTarget('product')}
                 icon={Upload}
               />
             </div>
