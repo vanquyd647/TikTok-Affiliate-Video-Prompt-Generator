@@ -110,137 +110,6 @@ const SCENE_BEATS_MAP: Record<ContentType, Array<{ name: string; emoji: string; 
   ],
 }
 
-// Content-type-specific location sets (based on TikTok VN/global trends)
-const KEYFRAME_LOCATIONS_MAP: Record<ContentType, string[]> = {
-  ootd: [
-    'Trendy Saigon coffee shop with industrial brick walls and warm pendant lights',
-    'Clean white apartment bedroom with full-length mirror and soft window light',
-    'Vibrant urban sidewalk with graffiti murals and leafy street trees at golden hour',
-    'Minimalist studio with neutral backdrop, soft ring light, and polished concrete floor',
-    'Rooftop terrace bar overlooking city skyline at sunset',
-    'Fashion boutique dressing room with soft ambient lighting and clothing racks',
-    'Modern co-working lobby with glass walls and tropical indoor plants',
-  ],
-  grwm: [
-    'Bright bathroom vanity with round LED mirror and organized skincare bottles',
-    'Cozy bedroom with messy white sheets, warm morning sunlight through sheer curtains',
-    'Walk-in closet with organized clothing racks and shoe shelves, warm LED strip lights',
-    'Vanity table with ring light, makeup palettes spread out, soft pink ambient glow',
-    'Floor-length mirror in a minimalist bedroom, natural daylight flooding in',
-    'Elegant dressing table with flowers, perfume bottles, and warm candlelight',
-    'Modern bathroom with marble countertop, plant decor, and soft diffused lighting',
-  ],
-  fyp: [
-    'Dramatic abandoned warehouse with dusty sunbeams cutting through high windows',
-    'Neon-lit Saigon alley at night with rain-wet reflections and moody atmosphere',
-    'Dreamy lavender field at golden hour with soft bokeh and lens flare',
-    'Sleek black studio with single spotlight creating dramatic chiaroscuro',
-    'Futuristic mirrored corridor with infinite reflections and cool blue tones',
-    'Iconic Hoi An lantern street at twilight, warm orange glow from lanterns',
-    'Art museum staircase with geometric patterns and natural skylight',
-  ],
-  review: [
-    'Clean desk setup with product packaging, camera gear, and soft daylight',
-    'Bright living room with neutral sofa, natural window light for true color',
-    'Simple white backdrop studio for product-focused unboxing content',
-    'Cozy bed flat-lay setup with the product, accessories, and styled props',
-    'Well-lit fitting room with neutral walls and consistent fluorescent lighting',
-    'Home studio with ring light, camera on tripod, clean background',
-    'Outdoor park bench in soft shade for natural, authentic feeling',
-  ],
-}
-
-// Content-type-specific actions (based on real TikTok viral poses/transitions)
-const KEYFRAME_ACTIONS_MAP: Record<ContentType, string[]> = {
-  ootd: [
-    'Standing with weight on back foot, one hand on hip, chin slightly raised — confident "outfit check" pose',
-    'Mid-stride runway walk toward camera, arms swinging naturally, eyes looking straight ahead with attitude',
-    'Slow 360° spin showing all outfit angles, arms slightly extended, fabric flowing with movement',
-    'Leaning against wall with crossed ankles, one hand adjusting collar, relaxed cool-girl energy',
-    'Hand reaching toward camera covering the lens — transition pose for outfit change magic',
-    'Power stance facing camera, feet shoulder-width apart, hands adjusting belt/waistband to show fit',
-    'Walking away from camera showing back view, head turned over shoulder with half-smile glance',
-  ],
-  grwm: [
-    'Sitting at vanity, both hands patting skincare product onto cheeks, eyes closed peacefully',
-    'Leaning toward mirror applying lip gloss, concentrated expression, soft morning light on face',
-    'Standing in front of open closet, holding two hangers comparing outfits, playful thinking expression',
-    'Pulling on the garment over head/stepping into skirt — authentic dressing moment',
-    'Adjusting hair in mirror, tucking strand behind ear, checking final look from multiple angles',
-    'Final confident pose at door — bag in hand, looking back at camera with "ready to go" smile',
-    'Close-up hands buttoning shirt or clasping necklace — detail-focused getting ready moment',
-  ],
-  fyp: [
-    'Dramatic slow-motion hair flip with wind effect, face emerging from shadow into light',
-    'Snap fingers triggering instant outfit transformation — frozen mid-snap with sparks energy',
-    'Ethereal floating pose with arms gently raised, fabric billowing, dreamy soft-focus atmosphere',
-    'Sharp head turn from profile to front-facing, intense eye contact, editorial fierceness',
-    'Backward lean against wind, coat flying open revealing outfit underneath, cinematic tension',
-    'Dance-inspired body roll from head to toe, each section highlighting a different outfit element',
-    'Jump freeze-frame at peak height, hair suspended, outfit details visible in mid-air',
-  ],
-  review: [
-    'Hands carefully opening product packaging, pulling tissue paper aside to reveal garment',
-    'Holding garment up next to face for size reference, genuine surprised/excited expression',
-    'Close-up hands stretching fabric to show quality, turning garment to display stitching details',
-    'Full body front-facing try-on, smoothing down the garment, adjusting fit naturally',
-    'Turning to show side profile in the garment, pointing to specific features like pocket or cut',
-    'Talking Head — facing camera at eye level, gesturing while giving honest review/verdict',
-    'Happy final pose in the product, double thumbs-up or heart gesture, genuine recommendation smile',
-  ],
-}
-
-// TikTok-optimized camera setups
-const CAMERA_SETUPS = [
-  { lens: '35mm', shot: 'Full body shot', angle: 'Slightly low angle (makes model look taller)', movement: 'Slow push-in' },
-  { lens: '50mm', shot: 'Medium shot waist-up', angle: 'Eye level, intimate framing', movement: 'Smooth lateral tracking' },
-  { lens: '85mm', shot: 'Detail close-up', angle: 'Slight high angle for accessories/fabric', movement: 'Slow pan from shoes to head' },
-  { lens: '35mm', shot: 'Full body shot', angle: 'Low angle, hero perspective', movement: 'Camera walking backward as model approaches' },
-  { lens: '50mm', shot: 'Medium full shot', angle: 'Eye level, centered composition', movement: 'Static on tripod, subject moves' },
-  { lens: '24mm', shot: 'Wide environmental shot', angle: 'Eye level, showing full backdrop', movement: 'Slow dolly out revealing location' },
-  { lens: '85mm', shot: 'Portrait close-up', angle: 'Eye level, shallow depth of field', movement: 'Gentle orbit around subject' },
-]
-
-// Lighting is aligned by location index to avoid indoor/outdoor mismatch.
-const KEYFRAME_LIGHTING_MAP: Record<ContentType, string[]> = {
-  ootd: [
-    'Warm window key light from coffee shop side windows, subtle amber practicals from pendant lights, clean skin tones and true garment color',
-    'Natural daylight from bedroom window, soft fill bounce from white walls, low-contrast flattering portrait look',
-    'Golden-hour side backlight outdoors with gentle reflector fill on face, vivid but realistic fabric color separation',
-    'Studio ring light as frontal key with soft top fill, clean neutral shadows for an indoor lookbook frame',
-    'Sunset rim light on rooftop with warm front-left key fill, city ambient glow adding depth to silhouette',
-    'Soft boutique ambient lighting with diffused key from fitting-room mirror, texture-friendly highlights on fabric',
-    'Daylight filtered through glass lobby facade with balanced indoor fill from floor reflections, crisp modern fashion tone',
-  ],
-  grwm: [
-    'Vanity LED mirror used as soft key, gentle warm fill reducing under-eye shadows while preserving natural skin texture',
-    'Morning sunlight through sheer curtains as side key, cozy low-contrast fill for intimate bedroom atmosphere',
-    'Warm wardrobe strip lights mixed with neutral overhead fill, accurate color rendering for outfit choices',
-    'Ring light as centered key with soft ambient pink bounce, clean beauty-vlog look without harsh shadows',
-    'Natural daylight near floor mirror with subtle bounce fill from wall, realistic full-look skin and fabric tones',
-    'Warm candle practicals in background with soft key from front-left, elegant getting-ready mood and depth',
-    'Diffused bathroom daylight with marble bounce fill, even complexion and clear garment texture detail',
-  ],
-  fyp: [
-    'High-contrast warehouse shafts of sunlight with atmospheric haze, dramatic highlights and cinematic shadow falloff',
-    'Neon cyan-magenta ambient from alley signs with controlled warm key on face, moody but readable fashion details',
-    'Golden-hour field backlight with gentle frontal bounce, dreamy bloom while preserving silhouette definition',
-    'Single hard spotlight in black studio with negative fill, crisp editorial contrast and sculpted facial planes',
-    'Cool blue corridor practicals with mirrored edge reflections, controlled highlights for futuristic depth layering',
-    'Twilight lantern practicals as warm key sources with soft ambient night fill, rich orange cinematic glow',
-    'Natural skylight from museum ceiling with soft side fill, elegant tonal separation and architectural depth',
-  ],
-  review: [
-    'Soft daylight from desk-side window with neutral bounce card fill, accurate product color and texture fidelity',
-    'Even living-room window light with low-contrast fill, trustworthy natural review look for face and garment',
-    'Clean two-softbox white backdrop setup, shadow-controlled and detail-focused for unboxing clarity',
-    'Bedside window daylight with gentle top fill, cozy editorial review tone while retaining material detail',
-    'Consistent fitting-room fluorescent key balanced with neutral fill, stable true-to-product color rendering',
-    'Ring light key with soft side fill in home studio, clear eye contact and reliable fabric detail visibility',
-    'Open-shade outdoor daylight with subtle front reflector, natural skin tones and honest product presentation',
-  ],
-}
-
 function buildCharacterDNA(notes: string, contentType: ContentType): string {
   const styleMap: Record<ContentType, string> = {
     ootd: 'Professional fashion editorial, OOTD TikTok, cinematic quality',
@@ -290,97 +159,6 @@ function buildCreateImagePrompt(contentType: ContentType, notes: string): string
 ${notes ? `[CUSTOM NOTES]: ${notes}` : ''}
 
 CRITICAL: This image will be used as a reference for Veo 3.1 video generation. Ensure consistent proportions and realistic rendering suitable for frame-by-frame animation.`
-}
-
-function generateKeyframePrompts(
-  keyframeCount: number,
-  durationSec: number,
-  aspectRatio: string,
-  notes: string,
-  contentType: ContentType = 'ootd'
-): KeyframePrompt[] {
-  const keyframes: KeyframePrompt[] = []
-  const sceneInterval = durationSec / (keyframeCount - 1)
-  const locations = KEYFRAME_LOCATIONS_MAP[contentType]
-  const actions = KEYFRAME_ACTIONS_MAP[contentType]
-  const lightings = KEYFRAME_LIGHTING_MAP[contentType]
-  const localLocationIdx = 0
-
-  for (let i = 0; i < keyframeCount; i++) {
-    const timestamp = `${Math.round(i * sceneInterval)}s`
-    const locIdx = localLocationIdx
-    const actIdx = i % actions.length
-    const camIdx = i % CAMERA_SETUPS.length
-
-    const cam = CAMERA_SETUPS[camIdx]
-    const subject = `[facePreservation from reference]`
-    const action = actions[actIdx]
-    const location = locations[locIdx]
-    const camera = `${cam.shot}, ${cam.lens} lens, ${cam.angle}. Movement: ${cam.movement}`
-    const lighting = lightings[locIdx % lightings.length]
-    const style = 'Professional fashion editorial'
-
-    const fullPrompt = `SUBJECT: ${subject}. ACTION: ${action}. LOCATION: ${location}. CAMERA: ${camera}. LIGHTING: ${lighting}. STYLE: ${style}. ASPECT RATIO: ${aspectRatio}. ${notes ? `NOTES: ${notes}` : ''}`
-
-    keyframes.push({
-      index: i,
-      timestamp,
-      subject,
-      action,
-      location,
-      camera,
-      lighting,
-      style,
-      fullPrompt,
-    })
-  }
-
-  return keyframes
-}
-
-function generateScenePrompts(
-  keyframes: KeyframePrompt[],
-  sceneCount: number,
-  durationSec: number,
-  aspectRatio: string,
-  contentType: ContentType = 'ootd'
-): ScenePrompt[] {
-  const scenes: ScenePrompt[] = []
-  const sceneDuration = durationSec / sceneCount
-  const beats = SCENE_BEATS_MAP[contentType]
-
-  for (let i = 0; i < sceneCount; i++) {
-    const startSec = Math.round(i * sceneDuration)
-    const endSec = Math.round((i + 1) * sceneDuration)
-    const timeRange = `${startSec}s-${endSec}s`
-
-    const beat = beats[i % beats.length]
-    const startKF = keyframes[i]
-    const endKF = keyframes[i + 1]
-
-    const narrative = `${beat.name}. ${beat.cameraHint}. The model transitions smoothly from the starting pose to the ending pose over ${endSec - startSec} seconds. Consistent warm cinematic lighting maintained throughout. Fashion garment stays in focus with fabric physics visible during movement.`
-
-    const fullPrompt = `${beat.emoji} ${narrative}
-START_POSE [KF${i + 1}]: ${startKF.action}
-END_POSE [KF${i + 2}]: ${endKF.action}
-CAMERA: ${beat.cameraHint}
-ASPECT_RATIO: ${aspectRatio}
-CONTENT_TYPE: ${contentType.toUpperCase()}
-DURATION: 8 seconds
-FORMAT: Veo 3.1 first-frame → last-frame interpolation`
-
-    scenes.push({
-      index: i,
-      timeRange,
-      narrative,
-      startPose: startKF.action,
-      endPose: endKF.action,
-      cameraMovement: beat.cameraHint,
-      fullPrompt,
-    })
-  }
-
-  return scenes
 }
 
 // ═══════════════════════════════════════════════
@@ -553,34 +331,37 @@ Output as JSON with this exact structure:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
-    const templateKeyframes = generateKeyframePrompts(
-      keyframeCount,
-      duration,
-      aspectRatio,
-      notes,
-      contentType
-    )
-    const templateScenes = generateScenePrompts(
-      templateKeyframes,
-      sceneCount,
-      duration,
-      aspectRatio,
-      contentType
-    )
+    const fallbackActionByType: Record<ContentType, string> = {
+      ootd: 'Confident outfit showcase pose and movement tailored for OOTD storytelling',
+      grwm: 'Natural getting-ready movement that highlights styling steps and final look',
+      fyp: 'Scroll-stopping fashion movement with dynamic pose transition',
+      review: 'Authentic product demonstration pose emphasizing fit and material quality',
+    }
+
+    const fallbackStyleByType: Record<ContentType, string> = {
+      ootd: 'Professional fashion editorial, OOTD TikTok aesthetic',
+      grwm: 'Warm lifestyle GRWM visual style, intimate and clean',
+      fyp: 'Viral cinematic fashion style with bold visual energy',
+      review: 'Trustworthy product review style with high material clarity',
+    }
+
+    const inferredLocationFallback = 'Location inferred from garment style and reference images'
+    const inferredCameraFallback = 'AI-selected framing, lens, and movement optimized for fashion storytelling'
+    const inferredLightingFallback = 'Lighting inferred from scene mood and garment texture visibility'
 
     // Build full prompts for each keyframe and scene
     const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
-      const template = templateKeyframes[i]
       const subject = toSafeString(kf.subject, '[facePreservation from reference]')
-      const action = toSafeString(kf.action, template?.action || KEYFRAME_ACTIONS_MAP[contentType][i % KEYFRAME_ACTIONS_MAP[contentType].length])
-      const location = toSafeString(kf.location, template?.location || KEYFRAME_LOCATIONS_MAP[contentType][0])
-      const camera = toSafeString(kf.camera, template?.camera || `${CAMERA_SETUPS[i % CAMERA_SETUPS.length].shot}, ${CAMERA_SETUPS[i % CAMERA_SETUPS.length].lens} lens`)
-      const lighting = toSafeString(kf.lighting, template?.lighting || KEYFRAME_LIGHTING_MAP[contentType][0])
-      const style = toSafeString(kf.style, template?.style || 'Professional fashion editorial')
+      const action = toSafeString(kf.action, fallbackActionByType[contentType])
+      const location = toSafeString(kf.location, inferredLocationFallback)
+      const camera = toSafeString(kf.camera, inferredCameraFallback)
+      const lighting = toSafeString(kf.lighting, inferredLightingFallback)
+      const style = toSafeString(kf.style, fallbackStyleByType[contentType])
+      const timestamp = toSafeString(kf.timestamp, `${Math.round((i * duration) / (keyframeCount - 1))}s`)
 
       return {
         index: i,
-        timestamp: `${Math.round((i * duration) / (keyframeCount - 1))}s`,
+        timestamp,
         subject,
         action,
         location,
@@ -598,23 +379,23 @@ ASPECT RATIO: ${aspectRatio}`,
     })
 
     const scenes: ScenePrompt[] = rawScenes.map((sc: any, i: number) => {
-      const template = templateScenes[i]
       const startSec = Math.round((i * duration) / sceneCount)
       const endSec = Math.round(((i + 1) * duration) / sceneCount)
       const startPose = keyframes[i]?.action || toSafeString(sc.startPose, '')
       const endPose = keyframes[i + 1]?.action || toSafeString(sc.endPose, '')
       const narrative = toSafeString(
         sc.narrative,
-        template?.narrative || `${SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].name}. The model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
+        `${SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].name}. The model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
       )
       const cameraMovement = toSafeString(
         sc.cameraMovement,
-        template?.cameraMovement || SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].cameraHint
+        SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].cameraHint
       )
+      const timeRange = toSafeString(sc.timeRange, `${startSec}s-${endSec}s`)
 
       return {
         index: i,
-        timeRange: `${startSec}s-${endSec}s`,
+        timeRange,
         narrative,
         startPose,
         endPose,
