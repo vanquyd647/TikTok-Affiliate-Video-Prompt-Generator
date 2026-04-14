@@ -496,15 +496,47 @@ Output as JSON with this exact structure:
     }
 
     const data = await response.json()
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ''
+    const candidateParts = data?.candidates?.[0]?.content?.parts
+    const textParts = Array.isArray(candidateParts)
+      ? candidateParts
+        .filter((part: any) => typeof part?.text === 'string' && part.text.trim().length > 0)
+        .map((part: any) => part.text.trim())
+      : []
 
-    // Try to parse JSON from the response
-    const jsonMatch = text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('Could not parse JSON from Gemini response')
+    const mergedText = textParts.join('\n').trim()
+    if (!mergedText) {
+      throw new Error('Gemini returned empty content')
     }
 
-    const parsed = JSON.parse(jsonMatch[0])
+    const parseJsonFromText = (raw: string) => {
+      const stripCodeFence = raw
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim()
+
+      const tryParse = (value: string) => {
+        try {
+          return JSON.parse(value)
+        } catch {
+          return null
+        }
+      }
+
+      const direct = tryParse(stripCodeFence)
+      if (direct && typeof direct === 'object') return direct
+
+      const start = stripCodeFence.indexOf('{')
+      const end = stripCodeFence.lastIndexOf('}')
+      if (start >= 0 && end > start) {
+        const extracted = stripCodeFence.slice(start, end + 1)
+        const extractedParsed = tryParse(extracted)
+        if (extractedParsed && typeof extractedParsed === 'object') return extractedParsed
+      }
+
+      throw new Error(`Could not parse JSON from Gemini response: ${stripCodeFence.slice(0, 240)}`)
+    }
+
+    const parsed = parseJsonFromText(mergedText)
 
     const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
     const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : []
