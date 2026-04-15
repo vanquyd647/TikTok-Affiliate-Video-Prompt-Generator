@@ -88,10 +88,13 @@ const CONTENT_TYPES = [
 
 type ContentType = typeof CONTENT_TYPES[number]['value']
 type ResolvedContentType = Exclude<ContentType, 'auto'>
+type ProductLocationHistoryMap = Record<string, string[]>
 
 const AFF_STORAGE_DB_NAME = 'aff_prompt_storage'
 const AFF_STORAGE_DB_VERSION = 1
 const AFF_STORAGE_STORE = 'recent_local_images'
+const PRODUCT_LOCATION_HISTORY_STORAGE_KEY = 'aff_product_location_history_v1'
+const MAX_LOCATION_HISTORY_PER_PRODUCT = 40
 
 // ═══════════════════════════════════════════════
 // PROMPT ENGINE — N+1 Algorithm
@@ -230,6 +233,65 @@ ${notes ? `[CUSTOM NOTES]: ${notes}` : ''}
 CRITICAL: This image will be used as a reference for Veo 3.1 video generation. Ensure consistent proportions and realistic rendering suitable for frame-by-frame animation.`
 }
 
+function normalizeLocationKey(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function createProductImageId(dataUrl: string): string {
+  const normalized = dataUrl.trim()
+  const sample = normalized.length > 12000
+    ? `${normalized.slice(0, 6000)}${normalized.slice(-6000)}`
+    : normalized
+
+  let hash = 5381
+  for (let i = 0; i < sample.length; i++) {
+    hash = ((hash << 5) + hash) ^ sample.charCodeAt(i)
+  }
+
+  return `prod-${(hash >>> 0).toString(36)}-${sample.length.toString(36)}`
+}
+
+function loadProductLocationHistory(): ProductLocationHistoryMap {
+  try {
+    const raw = localStorage.getItem(PRODUCT_LOCATION_HISTORY_STORAGE_KEY)
+    if (!raw) return {}
+
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+
+    const normalized: ProductLocationHistoryMap = {}
+    for (const [productImageId, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!Array.isArray(value)) continue
+
+      const locations = value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+
+      if (locations.length > 0) {
+        normalized[productImageId] = Array.from(new Set(locations)).slice(0, MAX_LOCATION_HISTORY_PER_PRODUCT)
+      }
+    }
+
+    return normalized
+  } catch {
+    return {}
+  }
+}
+
+function saveProductLocationHistory(history: ProductLocationHistoryMap): void {
+  try {
+    localStorage.setItem(PRODUCT_LOCATION_HISTORY_STORAGE_KEY, JSON.stringify(history))
+  } catch {
+    // no-op if quota exceeded
+  }
+}
+
 // ═══════════════════════════════════════════════
 // AI-ENHANCED GENERATION (via Gemini API)
 // ═══════════════════════════════════════════════
@@ -241,7 +303,8 @@ async function generateWithGemini(
   duration: number,
   aspectRatio: string,
   notes: string,
-  contentType: ContentType = 'ootd'
+  contentType: ContentType = 'ootd',
+  usedLocationsForProduct: string[] = []
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const { scenes: sceneCount, keyframes: keyframeCount } = durationInfo
@@ -250,6 +313,17 @@ async function generateWithGemini(
   const isAuto = contentType === 'auto'
   const contentTypeForPrompt = isAuto ? '(AI will automatically determine the best type)' : contentType.toUpperCase()
   const diversitySeed = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+  const normalizedUsedLocations = Array.from(
+    new Set(
+      usedLocationsForProduct
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    )
+  )
+  const usedLocationsPrompt = normalizedUsedLocations.length > 0
+    ? normalizedUsedLocations.map((location, index) => `${index + 1}. ${location}`).join('\n')
+    : 'None yet for this product image ID'
 
   // Build the master prompt for Gemini
   const systemPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos (OOTD, FYP). 
@@ -268,6 +342,9 @@ ${isAuto ? `Since content type is set to AUTO, you MUST first analyze the provid
 Valid types: ootd, grwm, fyp, review, athleisure, haul, styling, luxury
 Include your recommended type in the JSON response as "recommendedContentType".` : ''}
 
+LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
+${usedLocationsPrompt}
+
 CRITICAL RULES:
 1. Each scene is exactly 8 seconds, using Veo 3.1's first-frame + last-frame interpolation
 2. Keyframe images must be SEAMLESSLY CONNECTED: the last frame of scene N = first frame of scene N+1
@@ -281,6 +358,7 @@ CRITICAL RULES:
 10. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Select authentic, recognizable real locations (cafes, streets, parks, urban spaces, shopping districts, studios) NOT CGI, digital backgrounds, or artificial environments. Include specific venue characteristics that make the scene feel authentic and photogenic.
 11. **LOCATION COUNTRY LOCK = VIETNAM ONLY** — Every location MUST be in Vietnam. Use specific Vietnamese city/province and venue details (e.g., Hanoi Old Quarter, Nguyen Hue Walking Street in Ho Chi Minh City, Da Nang beachside boulevard, Hoi An ancient town streets, Da Lat hill cafe district).
 12. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed above to generate a fresh concept each run. Do not repeat template wording. Ensure ACTION, LOCATION, CAMERA, and NARRATIVE fields are not duplicated across keyframes/scenes in the same output.
+13. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID** — Do NOT use any location from the provided "LOCATIONS ALREADY USED" list. Pick different real venues in Vietnam.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -440,11 +518,35 @@ Output as JSON with this exact structure:
       'Nha Trang beachfront walking street, Khanh Hoa, Vietnam (real seaside venue)',
       'Ninh Kieu Wharf riverside, Can Tho, Vietnam (real Mekong urban venue)',
       'Bui Vien pedestrian street, Ho Chi Minh City, Vietnam (real nightlife venue)',
+      'Pham Ngu Lao area street cafe zone, Ho Chi Minh City, Vietnam (real urban venue)',
+      'West Lake promenade near Truc Bach, Hanoi, Vietnam (real urban-lake venue)',
+      'Bach Dang riverfront walkway, Da Nang, Vietnam (real city riverfront venue)',
+      'Vo Thi Sau street cafe strip, Da Lat, Vietnam (real hill-city venue)',
+      'Tran Hung Dao riverside route, Can Tho, Vietnam (real Mekong venue)',
+      'Le Loi boulevard central district, Hue, Vietnam (real heritage city venue)',
+      'Duong Dong night market surroundings, Phu Quoc, Vietnam (real island town venue)',
     ]
     const vietnamLocationOffset = Math.floor(Math.random() * vietnamLocationPool.length)
-    const pickVietnamLocationFallback = (index: number) => (
-      vietnamLocationPool[(index + vietnamLocationOffset) % vietnamLocationPool.length]
-    )
+    const blockedLocationKeys = new Set(normalizedUsedLocations.map((location) => normalizeLocationKey(location)))
+    const usedLocationKeysInRun = new Set<string>()
+
+    const markLocationUsed = (location: string) => {
+      usedLocationKeysInRun.add(normalizeLocationKey(location))
+      return location
+    }
+
+    const pickVietnamLocationFallback = (index: number) => {
+      for (let cursor = 0; cursor < vietnamLocationPool.length; cursor++) {
+        const candidate = vietnamLocationPool[(index + vietnamLocationOffset + cursor) % vietnamLocationPool.length]
+        const candidateKey = normalizeLocationKey(candidate)
+        if (!blockedLocationKeys.has(candidateKey) && !usedLocationKeysInRun.has(candidateKey)) {
+          return markLocationUsed(candidate)
+        }
+      }
+
+      const fallback = vietnamLocationPool[(index + vietnamLocationOffset) % vietnamLocationPool.length]
+      return markLocationUsed(fallback)
+    }
 
     const hasVietnamReference = (value: string) => (
       /(viet\s?nam|vietnam|ha\s?noi|hanoi|ho\s?chi\s?minh|sai\s?gon|saigon|da\s?nang|hoi\s?an|da\s?lat|nha\s?trang|can\s?tho|ha\s?long|hue|phu\s?quoc)/i.test(value)
@@ -453,7 +555,10 @@ Output as JSON with this exact structure:
     const ensureVietnamLocation = (value: unknown, index: number) => {
       const candidate = toSafeString(value, '')
       if (candidate.length > 0 && hasVietnamReference(candidate)) {
-        return candidate
+        const candidateKey = normalizeLocationKey(candidate)
+        if (!blockedLocationKeys.has(candidateKey) && !usedLocationKeysInRun.has(candidateKey)) {
+          return markLocationUsed(candidate)
+        }
       }
       return pickVietnamLocationFallback(index)
     }
@@ -1088,10 +1193,12 @@ export default function App() {
   const [result, setResult] = useState<GenerateResult | null>(null)
   const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image'>('keyframes')
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('auto')
+  const [productLocationHistory, setProductLocationHistory] = useState<ProductLocationHistoryMap>(() => loadProductLocationHistory())
 
   // Persist settings
   useEffect(() => { localStorage.setItem('aff_api_key', apiKey) }, [apiKey])
   useEffect(() => { localStorage.setItem('aff_model', model) }, [model])
+  useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
 
   // Derived
   const durationInfo = DURATIONS.find(d => d.value === duration)!
@@ -1108,8 +1215,13 @@ export default function App() {
         throw new Error('Vui long nhap Gemini API Key de AI phan tich anh va tao boi canh')
       }
 
+      const currentProductImageId = productImage ? createProductImageId(productImage) : null
+      const usedLocationsForProduct = currentProductImageId
+        ? (productLocationHistory[currentProductImageId] || [])
+        : []
+
       const res = await generateWithGemini(
-        apiKey, model, faceImage, productImage, duration, aspectRatio, notes, contentType
+        apiKey, model, faceImage, productImage, duration, aspectRatio, notes, contentType, usedLocationsForProduct
       )
       
       // Track which content type was used (for auto mode, this comes from Gemini's recommendation)
@@ -1124,6 +1236,27 @@ export default function App() {
       res.createImagePrompt = buildCreateImagePrompt(usedType !== 'auto' ? usedType : 'ootd', notes)
       setResult(res)
       setSelectedContentType(usedType)
+
+      if (currentProductImageId) {
+        const generatedLocations = Array.from(
+          new Set(
+            res.keyframes
+              .map((keyframe) => keyframe.location.trim())
+              .filter((location) => location.length > 0)
+          )
+        )
+
+        if (generatedLocations.length > 0) {
+          setProductLocationHistory((prev) => {
+            const existing = prev[currentProductImageId] || []
+            const merged = Array.from(new Set([...generatedLocations, ...existing]))
+            return {
+              ...prev,
+              [currentProductImageId]: merged.slice(0, MAX_LOCATION_HISTORY_PER_PRODUCT),
+            }
+          })
+        }
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to generate prompts')
     } finally {
