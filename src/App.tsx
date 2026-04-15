@@ -2344,7 +2344,7 @@ export default function App() {
                           <div className="prompt-card-body">
                             <CopyButton text={kf.fullPrompt} />
                             <div className="prompt-text">
-                              <strong>SUBJECT:</strong> {kf.subject}
+                              {/* <strong>SUBJECT:</strong> {kf.subject} */}
                               {'\n'}<strong>ACTION:</strong> {kf.action}
                               {'\n'}<strong>LOCATION:</strong> {kf.location}
                               {'\n'}<strong>CAMERA:</strong> {kf.camera}
