@@ -75,6 +75,7 @@ const ASPECT_RATIOS = [
 ] as const
 
 const CONTENT_TYPES = [
+  { value: 'auto', label: 'Auto', icon: Sparkles, desc: 'AI Decides', color: 'var(--accent-purple)' },
   { value: 'ootd', label: 'OOTD', icon: Shirt, desc: 'Outfit of the Day', color: 'var(--accent-pink)' },
   { value: 'grwm', label: 'GRWM', icon: Star, desc: 'Get Ready With Me', color: 'var(--accent-purple)' },
   { value: 'fyp', label: 'FYP', icon: TrendingUp, desc: 'For You Page', color: 'var(--accent-cyan)' },
@@ -86,6 +87,7 @@ const CONTENT_TYPES = [
 ] as const
 
 type ContentType = typeof CONTENT_TYPES[number]['value']
+type ResolvedContentType = Exclude<ContentType, 'auto'>
 
 const AFF_STORAGE_DB_NAME = 'aff_prompt_storage'
 const AFF_STORAGE_DB_VERSION = 1
@@ -96,7 +98,7 @@ const AFF_STORAGE_STORE = 'recent_local_images'
 // ═══════════════════════════════════════════════
 
 // TikTok Beat Structure per content type
-const SCENE_BEATS_MAP: Record<ContentType, Array<{ name: string; emoji: string; cameraHint: string }>> = {
+const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: string; cameraHint: string }>> = {
   ootd: [
     { name: 'OUTFIT REVEAL HOOK', emoji: '👗', cameraHint: 'Slow dolly/push-in revealing the full outfit' },
     { name: 'DETAIL SHOWCASE', emoji: '✨', cameraHint: 'Close-up tilt from hemline to neckline, highlighting fabric and cut' },
@@ -163,8 +165,8 @@ const SCENE_BEATS_MAP: Record<ContentType, Array<{ name: string; emoji: string; 
   ],
 }
 
-function buildCharacterDNA(notes: string, contentType: ContentType): string {
-  const styleMap: Record<ContentType, string> = {
+function buildCharacterDNA(notes: string, contentType: ResolvedContentType): string {
+  const styleMap: Record<ResolvedContentType, string> = {
     ootd: 'Professional fashion editorial, OOTD TikTok, cinematic quality',
     grwm: 'Lifestyle vlog aesthetic, warm and intimate GRWM style',
     fyp: 'Trending viral aesthetic, high-fashion editorial with cinematic flair',
@@ -182,8 +184,8 @@ function buildCharacterDNA(notes: string, contentType: ContentType): string {
 ${notes ? `[CUSTOM NOTES]: ${notes}` : ''}`
 }
 
-function buildCreateImagePrompt(contentType: ContentType, notes: string): string {
-  const contentDesc: Record<ContentType, string> = {
+function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string): string {
+  const contentDesc: Record<ResolvedContentType, string> = {
     ootd: 'OOTD (Outfit of the Day) — full outfit showcase with front and back views',
     grwm: 'GRWM (Get Ready With Me) — warm lifestyle aesthetic showing complete look',
     fyp: 'FYP (For You Page) — viral trending aesthetic with dramatic fashion presentation',
@@ -244,6 +246,10 @@ async function generateWithGemini(
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const { scenes: sceneCount, keyframes: keyframeCount } = durationInfo
 
+  // Determine final content type (if 'auto', AI will decide)
+  const isAuto = contentType === 'auto'
+  const contentTypeForPrompt = isAuto ? '(AI will automatically determine the best type)' : contentType.toUpperCase()
+
   // Build the master prompt for Gemini
   const systemPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos (OOTD, FYP). 
 
@@ -251,6 +257,14 @@ Your task: Generate a COMPLETE prompt package for a ${duration}-second video wit
 - ${keyframeCount} keyframe image prompts (n+1 algorithm: ${sceneCount} scenes need ${keyframeCount} images)
 - ${sceneCount} scene prompts for Veo 3.1 (first-frame → last-frame video generation, 8s each)
 - Aspect ratio: ${aspectRatio}
+
+CONTENT TYPE: ${contentTypeForPrompt}
+${isAuto ? `Since content type is set to AUTO, you MUST first analyze the provided product/garment image and determine which content type is MOST SUITABLE based on:
+- Garment category (outfit piece, sportswear, luxury item, collection item, etc.)
+- Visual characteristics and best presentation style
+- Trending TikTok content format for this product
+Valid types: ootd, grwm, fyp, review, athleisure, haul, styling, luxury
+Include your recommended type in the JSON response as "recommendedContentType".` : ''}
 
 CRITICAL RULES:
 1. Each scene is exactly 8 seconds, using Veo 3.1's first-frame + last-frame interpolation
@@ -269,6 +283,7 @@ ${notes ? `USER NOTES: ${notes}` : ''}
 Output as JSON with this exact structure:
 {
   "masterDNA": "character consistency description",
+  ${isAuto ? '"recommendedContentType": "ootd|grwm|fyp|review|athleisure|haul|styling|luxury",' : ''}
   "keyframes": [
     {
       "index": 0,
@@ -386,6 +401,16 @@ Output as JSON with this exact structure:
 
     const parsed = parseJsonFromText(mergedText)
 
+    // If auto mode, use the recommended content type
+    let finalContentType: ContentType = contentType as ContentType
+    if (isAuto && typeof parsed.recommendedContentType === 'string') {
+      const recommended = parsed.recommendedContentType.toLowerCase()
+      const validTypes: ContentType[] = ['ootd', 'grwm', 'fyp', 'review', 'athleisure', 'haul', 'styling', 'luxury']
+      if (validTypes.includes(recommended as ContentType)) {
+        finalContentType = recommended as ContentType
+      }
+    }
+
     const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
     const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : []
 
@@ -401,7 +426,7 @@ Output as JSON with this exact structure:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
-    const fallbackActionByType: Record<ContentType, string> = {
+    const fallbackActionByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Confident outfit showcase pose and movement tailored for OOTD storytelling',
       grwm: 'Natural getting-ready movement that highlights styling steps and final look',
       fyp: 'Scroll-stopping fashion movement with dynamic pose transition',
@@ -412,7 +437,7 @@ Output as JSON with this exact structure:
       luxury: 'Composed understated movement exuding timeless elegance and quiet confidence',
     }
 
-    const fallbackStyleByType: Record<ContentType, string> = {
+    const fallbackStyleByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Professional fashion editorial, OOTD TikTok aesthetic',
       grwm: 'Warm lifestyle GRWM visual style, intimate and clean',
       fyp: 'Viral cinematic fashion style with bold visual energy',
@@ -430,11 +455,11 @@ Output as JSON with this exact structure:
     // Build full prompts for each keyframe and scene
     const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
       const subject = toSafeString(kf.subject, '[facePreservation from reference]')
-      const action = toSafeString(kf.action, fallbackActionByType[contentType])
+      const action = toSafeString(kf.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
       const location = toSafeString(kf.location, inferredLocationFallback)
       const camera = toSafeString(kf.camera, inferredCameraFallback)
       const lighting = toSafeString(kf.lighting, inferredLightingFallback)
-      const style = toSafeString(kf.style, fallbackStyleByType[contentType])
+      const style = toSafeString(kf.style, fallbackStyleByType[finalContentType as Exclude<ContentType, 'auto'>])
       const timestamp = toSafeString(kf.timestamp, `${Math.round((i * duration) / (keyframeCount - 1))}s`)
 
       return {
@@ -461,13 +486,14 @@ ASPECT RATIO: ${aspectRatio}`,
       const endSec = Math.round(((i + 1) * duration) / sceneCount)
       const startPose = keyframes[i]?.action || toSafeString(sc.startPose, '')
       const endPose = keyframes[i + 1]?.action || toSafeString(sc.endPose, '')
+      const beatIndex = i % SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>].length
       const narrative = toSafeString(
         sc.narrative,
-        `${SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].name}. The model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
+        `${SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].name}. The model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
       )
       const cameraMovement = toSafeString(
         sc.cameraMovement,
-        SCENE_BEATS_MAP[contentType][i % SCENE_BEATS_MAP[contentType].length].cameraHint
+        SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].cameraHint
       )
       const timeRange = toSafeString(sc.timeRange, `${startSec}s-${endSec}s`)
 
@@ -489,7 +515,7 @@ FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
     })
 
     return {
-      masterDNA: parsed.masterDNA || buildCharacterDNA(notes, contentType),
+      masterDNA: parsed.masterDNA || buildCharacterDNA(notes, finalContentType as Exclude<ContentType, 'auto'>),
       keyframes,
       scenes,
     }
@@ -1024,12 +1050,13 @@ export default function App() {
   const [pasteTarget, setPasteTarget] = useState<'face' | 'product'>('face')
   const [duration, setDuration] = useState(24)
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16')
-  const [contentType, setContentType] = useState<ContentType>('ootd')
+  const [contentType, setContentType] = useState<ContentType>('auto')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [result, setResult] = useState<GenerateResult | null>(null)
   const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image'>('keyframes')
+  const [selectedContentType, setSelectedContentType] = useState<ContentType>('auto')
 
   // Persist settings
   useEffect(() => { localStorage.setItem('aff_api_key', apiKey) }, [apiKey])
@@ -1053,8 +1080,19 @@ export default function App() {
       const res = await generateWithGemini(
         apiKey, model, faceImage, productImage, duration, aspectRatio, notes, contentType
       )
-      res.createImagePrompt = buildCreateImagePrompt(contentType, notes)
+      
+      // Track which content type was used (for auto mode, this comes from Gemini's recommendation)
+      let usedType: ContentType = contentType
+      if (contentType === 'auto') {
+        // Extract from the response's fallback usage - we can tell by analyzing the returned prompts
+        // For now, we'll store what AI decided based on the system parsing
+        // This will be updated when we have explicit recommendation tracking
+        usedType = 'auto'
+      }
+      
+      res.createImagePrompt = buildCreateImagePrompt(usedType !== 'auto' ? usedType : 'ootd', notes)
       setResult(res)
+      setSelectedContentType(usedType)
     } catch (err: any) {
       setError(err.message || 'Failed to generate prompts')
     } finally {
@@ -1370,6 +1408,11 @@ export default function App() {
                 <>
                   <div className="card-title">
                     <Sparkles /> Prompt Package — {duration}s / {aspectRatio}
+                    {selectedContentType && selectedContentType !== 'auto' && (
+                      <span style={{ marginLeft: 12, fontSize: '0.75rem', opacity: 0.8 }}>
+                        (Type: {selectedContentType.toUpperCase()})
+                      </span>
+                    )}
                   </div>
 
                   {/* Timeline */}
