@@ -1868,7 +1868,7 @@ export default function App() {
         {/* Main Layout */}
         <div className="main-layout">
           {/* ─── INPUT PANEL ─── */}
-          <div className="fade-in">
+          <div className="input-panel fade-in">
             {/* API Key */}
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title">
@@ -2217,7 +2217,7 @@ export default function App() {
 
           {/* ─── RESULTS PANEL ─── */}
           <div className="results-panel fade-in">
-            <div className="card" style={{ minHeight: 500 }}>
+            <div className="card results-card">
               {!hasAnyResult ? (
                 <div className="results-empty">
                   <Film className="results-empty-icon" />
@@ -2225,6 +2225,20 @@ export default function App() {
                   <p className="results-empty-hint">
                     Upload ảnh face & sản phẩm, chọn cấu hình, rồi nhấn "Tạo Prompt Package" để bắt đầu.
                   </p>
+                  <div className="results-empty-steps">
+                    <div className="results-empty-step">
+                      <span className="results-empty-step-index">1</span>
+                      <p>Tải ảnh Face và ảnh sản phẩm ở panel bên trái</p>
+                    </div>
+                    <div className="results-empty-step">
+                      <span className="results-empty-step-index">2</span>
+                      <p>Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp</p>
+                    </div>
+                    <div className="results-empty-step">
+                      <span className="results-empty-step-index">3</span>
+                      <p>Nhấn Generate để xem prompt, SEO và voiceover theo tab</p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -2236,6 +2250,8 @@ export default function App() {
                       </span>
                     )}
                   </div>
+
+                  <div className="results-scroll">
 
                   {/* Timeline */}
                   {result && (
@@ -2523,6 +2539,7 @@ export default function App() {
                     <button className="btn-export" onClick={handleExportAll} id="export-btn">
                       <Download /> Export .txt
                     </button>
+                  </div>
                   </div>
                 </>
               )}
