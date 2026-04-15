@@ -2345,6 +2345,7 @@ export default function App() {
                             <CopyButton text={kf.fullPrompt} />
                             <div className="prompt-text">
                               {/* <strong>SUBJECT:</strong> {kf.subject} */}
+                              {'\n'}<strong>Create image 9:16 no split...Faithful character face and body outfit likeness image reference.. </strong> 
                               {'\n'}<strong>ACTION:</strong> {kf.action}
                               {'\n'}<strong>LOCATION:</strong> {kf.location}
                               {'\n'}<strong>CAMERA:</strong> {kf.camera}
