@@ -699,6 +699,29 @@ body {
   color: var(--text-secondary);
 }
 
+.btn-generate-secondary {
+  background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+}
+
+.btn-generate-secondary:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.35);
+}
+
+.btn-generate-tertiary {
+  background: linear-gradient(135deg, #f59e0b 0%, #ec4899 100%);
+}
+
+.btn-generate-tertiary:hover:not(:disabled) {
+  box-shadow: 0 0 24px rgba(245, 158, 11, 0.35);
+}
+
+.ai-task-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: var(--space-md);
+}
+
 /* Loading spinner */
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -754,6 +777,7 @@ body {
 .tabs {
   display: flex;
   gap: 2px;
+  flex-wrap: wrap;
   background: rgba(24, 24, 30, 0.5);
   padding: 3px;
   border-radius: var(--radius-md);
@@ -761,7 +785,7 @@ body {
 }
 
 .tab {
-  flex: 1;
+  flex: 1 1 140px;
   padding: 8px 12px;
   border: none;
   background: transparent;
@@ -826,6 +850,35 @@ body {
 .prompt-card:nth-child(5) { animation-delay: 240ms; }
 .prompt-card:nth-child(6) { animation-delay: 300ms; }
 .prompt-card:nth-child(7) { animation-delay: 360ms; }
+
+.seo-variant-card.selected {
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
+}
+
+.seo-select-btn {
+  border: 1px solid var(--border-default);
+  background: var(--bg-glass);
+  color: var(--text-secondary);
+  border-radius: var(--radius-full);
+  padding: 5px 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.seo-select-btn:hover {
+  border-color: rgba(16, 185, 129, 0.45);
+  color: var(--text-primary);
+  background: rgba(16, 185, 129, 0.12);
+}
+
+.seo-select-btn.active {
+  border-color: var(--accent-emerald);
+  color: var(--accent-emerald);
+  background: rgba(16, 185, 129, 0.15);
+}
 
 .prompt-card-header {
   display: flex;

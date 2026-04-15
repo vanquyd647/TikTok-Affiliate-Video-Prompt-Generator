@@ -39,6 +39,38 @@ interface GenerateResult {
   createImagePrompt?: string
 }
 
+interface SeoVariant {
+  index: number
+  title: string
+  tags: string[]
+  hook: string
+  cta: string
+}
+
+interface VoiceoverLine {
+  timeRange: string
+  line: string
+}
+
+interface VoiceoverScript {
+  style: string
+  durationSec: number
+  script: string
+  lines: VoiceoverLine[]
+}
+
+interface SeoTaskResult {
+  productName: string
+  seoVariants: SeoVariant[]
+  generatedAt: number
+}
+
+interface VoiceoverTaskResult {
+  productName: string
+  voiceover: VoiceoverScript
+  generatedAt: number
+}
+
 interface RecentLocalImage {
   id: string
   name: string
@@ -660,6 +692,335 @@ FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
   }
 }
 
+function parseGeminiJsonFromText(raw: string): Record<string, unknown> {
+  const stripCodeFence = raw
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim()
+
+  const tryParse = (value: string) => {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return null
+    }
+  }
+
+  const direct = tryParse(stripCodeFence)
+  if (direct && typeof direct === 'object') return direct as Record<string, unknown>
+
+  const start = stripCodeFence.indexOf('{')
+  const end = stripCodeFence.lastIndexOf('}')
+  if (start >= 0 && end > start) {
+    const extracted = stripCodeFence.slice(start, end + 1)
+    const extractedParsed = tryParse(extracted)
+    if (extractedParsed && typeof extractedParsed === 'object') {
+      return extractedParsed as Record<string, unknown>
+    }
+  }
+
+  throw new Error(`Could not parse JSON from Gemini response: ${stripCodeFence.slice(0, 240)}`)
+}
+
+async function requestGeminiJson(
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  temperature = 0.9,
+  maxOutputTokens = 4096
+): Promise<Record<string, unknown>> {
+  const parts: Array<{ text: string }> = [{ text: systemPrompt }]
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          temperature,
+          topP: 0.95,
+          maxOutputTokens,
+          responseMimeType: 'application/json',
+        },
+      }),
+    }
+  )
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Gemini API error (${response.status}): ${errorText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  const candidateParts = data?.candidates?.[0]?.content?.parts
+  const textParts = Array.isArray(candidateParts)
+    ? candidateParts
+      .filter((part: any) => typeof part?.text === 'string' && part.text.trim().length > 0)
+      .map((part: any) => part.text.trim())
+    : []
+
+  const mergedText = textParts.join('\n').trim()
+  if (!mergedText) {
+    throw new Error('Gemini returned empty content')
+  }
+
+  return parseGeminiJsonFromText(mergedText)
+}
+
+async function generateSeoWithGemini(
+  apiKey: string,
+  model: string,
+  productName: string,
+  extraNotes: string,
+  contentType: ContentType
+): Promise<SeoTaskResult> {
+  const trimmedProductName = productName.trim()
+  const trimmedNotes = extraNotes.trim()
+  const contentHint = contentType === 'auto' ? 'AUTO' : contentType.toUpperCase()
+
+  const systemPrompt = `You are a senior TikTok Shop content strategist and copywriter.
+
+INPUT:
+- Product name: ${trimmedProductName}
+- Preferred content type: ${contentHint}
+${trimmedNotes ? `- Additional notes: ${trimmedNotes}` : '- Additional notes: none'}
+
+TASK:
+- Create exactly 3 DISTINCT SEO variants for TikTok Shop.
+- For each variant return:
+  1) "title": Vietnamese TikTok SEO title, natural and persuasive, around 60-95 characters.
+  2) "tags": exactly 5 hashtags, each starts with #, no duplicates.
+  3) "hook": one short hook sentence.
+  4) "cta": one short call-to-action sentence.
+- Title must include product intent and buying motivation, avoid spammy overclaims.
+
+Return JSON only with this exact schema:
+{
+  "seoVariants": [
+    {
+      "index": 1,
+      "title": "...",
+      "tags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5"],
+      "hook": "...",
+      "cta": "..."
+    }
+  ]
+}`
+
+  try {
+    const parsed = await requestGeminiJson(apiKey, model, systemPrompt, 0.9, 3072)
+
+    const toSafeString = (value: unknown, fallback: string) => {
+      if (typeof value !== 'string') return fallback
+      const trimmed = value.trim()
+      return trimmed.length > 0 ? trimmed : fallback
+    }
+
+    const normalizeTag = (rawTag: string): string => {
+      const compact = rawTag.trim().replace(/\s+/g, '')
+      if (!compact) return ''
+      if (compact.startsWith('#')) return compact
+      return `#${compact.replace(/^#+/, '')}`
+    }
+
+    const fallbackKeyword = trimmedProductName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '')
+      .slice(0, 24)
+
+    const defaultTagPool = [
+      '#tiktokshop',
+      '#reviewsanpham',
+      '#xuhuong',
+      '#dealhot',
+      '#muangay',
+      '#fyp',
+      '#hangdep',
+      '#giare',
+    ]
+
+    if (fallbackKeyword.length > 0) {
+      defaultTagPool.unshift(`#${fallbackKeyword}`)
+    }
+
+    const normalizeTags = (value: unknown): string[] => {
+      const base = Array.isArray(value)
+        ? value.filter((tag): tag is string => typeof tag === 'string').map(normalizeTag).filter((tag) => tag.length > 0)
+        : []
+
+      const unique = Array.from(new Set(base))
+      for (const seed of defaultTagPool) {
+        if (unique.length >= 5) break
+        if (!unique.includes(seed)) unique.push(seed)
+      }
+
+      return unique.slice(0, 5)
+    }
+
+    const fallbackVariants: SeoVariant[] = [
+      {
+        index: 1,
+        title: `${trimmedProductName} dang hot tren TikTok Shop, len form dep va de phoi do moi ngay`,
+        tags: normalizeTags(['#tiktokshop', '#reviewsanpham', '#xuhuong', '#dealhot', '#muangay']),
+        hook: `Dang tim ${trimmedProductName} de mac dep ma de dung?`,
+        cta: 'Bam gio hang de nhan uu dai va xem gia tot hom nay.',
+      },
+      {
+        index: 2,
+        title: `Review ${trimmedProductName}: chat lieu on, ton dang va dang duoc san don nhieu`,
+        tags: normalizeTags(['#review', '#tiktokshop', '#fyp', '#hangdep', '#muangay']),
+        hook: `${trimmedProductName} co thuc su ngon trong tam gia nay khong?`,
+        cta: 'Luu video va dat mua som truoc khi het size hot.',
+      },
+      {
+        index: 3,
+        title: `${trimmedProductName} cho outfit di choi, di lam va di cafe trong mot mon`,
+        tags: normalizeTags(['#phoido', '#tiktokshop', '#xuhuong', '#dealhot', '#giare']),
+        hook: 'Mot mon de phoi, mac duoc nhieu tinh huong trong ngay.',
+        cta: 'Xem ngay link san pham va chon mau ban thich.',
+      },
+    ]
+
+    const rawVariants = Array.isArray((parsed as Record<string, unknown>).seoVariants)
+      ? (parsed as Record<string, any>).seoVariants
+      : []
+
+    const seoVariants: SeoVariant[] = [0, 1, 2].map((offset) => {
+      const fallback = fallbackVariants[offset]
+      const candidate = rawVariants[offset]
+
+      if (!candidate || typeof candidate !== 'object') {
+        return fallback
+      }
+
+      const record = candidate as Record<string, unknown>
+
+      return {
+        index: offset + 1,
+        title: toSafeString(record.title, fallback.title),
+        tags: normalizeTags(record.tags),
+        hook: toSafeString(record.hook, fallback.hook),
+        cta: toSafeString(record.cta, fallback.cta),
+      }
+    })
+
+    return {
+      productName: trimmedProductName,
+      seoVariants,
+      generatedAt: Date.now(),
+    }
+  } catch (error: any) {
+    throw new Error(error?.message || 'Gemini SEO generation failed')
+  }
+}
+
+async function generateVoiceoverWithGemini(
+  apiKey: string,
+  model: string,
+  productName: string,
+  extraNotes: string,
+  contentType: ContentType
+): Promise<VoiceoverTaskResult> {
+  const trimmedProductName = productName.trim()
+  const trimmedNotes = extraNotes.trim()
+  const contentHint = contentType === 'auto' ? 'AUTO' : contentType.toUpperCase()
+
+  const systemPrompt = `You are a senior TikTok Shop video script writer.
+
+INPUT:
+- Product name: ${trimmedProductName}
+- Preferred content type: ${contentHint}
+${trimmedNotes ? `- Additional notes: ${trimmedNotes}` : '- Additional notes: none'}
+
+TASK:
+- Create one Vietnamese sample voiceover script for a short product video.
+- Target duration 25-35 seconds.
+- Return timeline beats:
+  * 0-3s: hook
+  * 3-15s: key benefits
+  * 15-24s: social proof / usage context
+  * 24-30s: CTA
+- Tone must be natural, trust-building, and conversion-friendly.
+
+Return JSON only with this exact schema:
+{
+  "voiceover": {
+    "style": "...",
+    "durationSec": 30,
+    "script": "full script text",
+    "lines": [
+      { "timeRange": "0-3s", "line": "..." },
+      { "timeRange": "3-15s", "line": "..." },
+      { "timeRange": "15-24s", "line": "..." },
+      { "timeRange": "24-30s", "line": "..." }
+    ]
+  }
+}`
+
+  try {
+    const parsed = await requestGeminiJson(apiKey, model, systemPrompt, 0.92, 3072)
+
+    const toSafeString = (value: unknown, fallback: string) => {
+      if (typeof value !== 'string') return fallback
+      const trimmed = value.trim()
+      return trimmed.length > 0 ? trimmed : fallback
+    }
+
+    const rawVoiceover = (parsed as Record<string, unknown>).voiceover && typeof (parsed as Record<string, unknown>).voiceover === 'object'
+      ? (parsed as Record<string, unknown>).voiceover as Record<string, unknown>
+      : {}
+
+    const fallbackLines: VoiceoverLine[] = [
+      { timeRange: '0-3s', line: `${trimmedProductName} dang duoc nhieu ban tim mua vi de mac va de phoi.` },
+      { timeRange: '3-15s', line: 'Chat lieu mem, len form gon va ton dang, mac thoai mai suot ngay ma van dep.' },
+      { timeRange: '15-24s', line: 'Minh da thu trong nhieu boi canh di lam, di choi, di cafe va deu de dung.' },
+      { timeRange: '24-30s', line: 'Neu ban dang can mot mon mac nhieu dip, bam link de xem gia va dat ngay.' },
+    ]
+
+    const rawLines = Array.isArray(rawVoiceover.lines)
+      ? rawVoiceover.lines
+      : []
+
+    const lines = rawLines
+      .map((item, index): VoiceoverLine | null => {
+        if (!item || typeof item !== 'object') return null
+        const candidate = item as Record<string, unknown>
+
+        const timeRange = toSafeString(candidate.timeRange, fallbackLines[index]?.timeRange || `${index * 7}-${index * 7 + 7}s`)
+        const line = toSafeString(candidate.line, fallbackLines[index]?.line || '')
+        if (!line) return null
+
+        return { timeRange, line }
+      })
+      .filter((item): item is VoiceoverLine => item !== null)
+
+    const normalizedLines = lines.length > 0 ? lines : fallbackLines
+    const computedScript = normalizedLines
+      .map((line) => `${line.timeRange}: ${line.line}`)
+      .join('\n')
+
+    const durationRaw = Number(rawVoiceover.durationSec)
+    const durationSec = Number.isFinite(durationRaw)
+      ? Math.max(20, Math.min(60, Math.round(durationRaw)))
+      : 30
+
+    return {
+      productName: trimmedProductName,
+      voiceover: {
+        style: toSafeString(rawVoiceover.style, 'Than thien, thuyet phuc, sat voi ngu canh TikTok ban hang'),
+        durationSec,
+        script: toSafeString(rawVoiceover.script, computedScript),
+        lines: normalizedLines,
+      },
+      generatedAt: Date.now(),
+    }
+  } catch (error: any) {
+    throw new Error(error?.message || 'Gemini voiceover generation failed')
+  }
+}
+
 // ═══════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════
@@ -1189,10 +1550,21 @@ export default function App() {
   const [contentType, setContentType] = useState<ContentType>('auto')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
+  const [seoLoading, setSeoLoading] = useState(false)
+  const [voiceoverLoading, setVoiceoverLoading] = useState(false)
   const [error, setError] = useState('')
+  const [seoError, setSeoError] = useState('')
+  const [voiceoverError, setVoiceoverError] = useState('')
   const [result, setResult] = useState<GenerateResult | null>(null)
-  const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image'>('keyframes')
+  const [seoResult, setSeoResult] = useState<SeoTaskResult | null>(null)
+  const [voiceoverResult, setVoiceoverResult] = useState<VoiceoverTaskResult | null>(null)
+  const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image' | 'seo' | 'voiceover'>('keyframes')
   const [selectedContentType, setSelectedContentType] = useState<ContentType>('auto')
+  const [seoProductName, setSeoProductName] = useState('')
+  const [seoNotes, setSeoNotes] = useState('')
+  const [voiceoverProductName, setVoiceoverProductName] = useState('')
+  const [voiceoverNotes, setVoiceoverNotes] = useState('')
+  const [selectedSeoVariantIndex, setSelectedSeoVariantIndex] = useState(0)
   const [productLocationHistory, setProductLocationHistory] = useState<ProductLocationHistoryMap>(() => loadProductLocationHistory())
 
   // Persist settings
@@ -1203,6 +1575,20 @@ export default function App() {
   // Derived
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const canGenerate = apiKey.trim().length > 0
+  const canGenerateSeo = canGenerate && seoProductName.trim().length > 0
+  const canGenerateVoiceover = canGenerate && voiceoverProductName.trim().length > 0
+  const hasPromptResult = result !== null
+  const hasSeoResult = seoResult !== null
+  const hasVoiceoverResult = voiceoverResult !== null
+  const hasAnyResult = hasPromptResult || hasSeoResult || hasVoiceoverResult
+  const selectedSeoVariant = seoResult
+    ? seoResult.seoVariants[Math.min(selectedSeoVariantIndex, seoResult.seoVariants.length - 1)]
+    : null
+  const resultsHeader = result
+    ? `Prompt Package — ${duration}s / ${aspectRatio}`
+    : activeTab === 'voiceover'
+      ? 'Nhiệm vụ 2 — Kịch bản lồng tiếng'
+      : 'Nhiệm vụ 1 — SEO TikTok'
 
   // Generate handler
   const handleGenerate = async () => {
@@ -1236,6 +1622,7 @@ export default function App() {
       res.createImagePrompt = buildCreateImagePrompt(usedType !== 'auto' ? usedType : 'ootd', notes)
       setResult(res)
       setSelectedContentType(usedType)
+      setActiveTab('keyframes')
 
       if (currentProductImageId) {
         const generatedLocations = Array.from(
@@ -1264,44 +1651,181 @@ export default function App() {
     }
   }
 
+  const handleGenerateSeo = async () => {
+    setSeoLoading(true)
+    setSeoError('')
+
+    try {
+      if (!apiKey.trim()) {
+        throw new Error('Vui long nhap Gemini API Key de tao bien the SEO')
+      }
+
+      const trimmedProductName = seoProductName.trim()
+      if (!trimmedProductName) {
+        throw new Error('Vui long nhap ten san pham truoc khi tao noi dung SEO')
+      }
+
+      const generated = await generateSeoWithGemini(
+        apiKey,
+        model,
+        trimmedProductName,
+        seoNotes.trim(),
+        contentType
+      )
+
+      setSeoResult(generated)
+      setSelectedSeoVariantIndex(0)
+      setActiveTab('seo')
+    } catch (err: any) {
+      setSeoError(err?.message || 'Failed to generate SEO variants')
+    } finally {
+      setSeoLoading(false)
+    }
+  }
+
+  const handleGenerateVoiceover = async () => {
+    setVoiceoverLoading(true)
+    setVoiceoverError('')
+
+    try {
+      if (!apiKey.trim()) {
+        throw new Error('Vui long nhap Gemini API Key de tao kich ban long tieng')
+      }
+
+      const trimmedProductName = voiceoverProductName.trim()
+      if (!trimmedProductName) {
+        throw new Error('Vui long nhap ten san pham truoc khi tao kich ban long tieng')
+      }
+
+      const generated = await generateVoiceoverWithGemini(
+        apiKey,
+        model,
+        trimmedProductName,
+        voiceoverNotes.trim(),
+        contentType
+      )
+
+      setVoiceoverResult(generated)
+      setActiveTab('voiceover')
+    } catch (err: any) {
+      setVoiceoverError(err?.message || 'Failed to generate voiceover script')
+    } finally {
+      setVoiceoverLoading(false)
+    }
+  }
+
   // Export All
   const handleExportAll = () => {
-    if (!result) return
+    if (!hasAnyResult) return
     const lines = [
       '═══════════════════════════════════════',
-      'AFF VIDEO PROMPT PACKAGE',
-      `Duration: ${duration}s | Ratio: ${aspectRatio} | Model: ${model}`,
+      'AFF AI CONTENT PACKAGE',
+      `Model: ${model}`,
       '═══════════════════════════════════════',
-      '',
-      '── CHARACTER DNA ──',
-      result.masterDNA,
-      '',
-      '── KEYFRAME IMAGE PROMPTS ──',
-      ...result.keyframes.map(kf => `\n${kf.fullPrompt}`),
-      '',
-      '── SCENE PROMPTS (Veo 3.1) ──',
-      ...result.scenes.map(sc => `\n${sc.fullPrompt}`),
-      ...(result.createImagePrompt
-        ? ['', '── CREATE IMAGE PROMPT ──', result.createImagePrompt]
-        : []),
     ]
+
+    if (result) {
+      lines.push(
+        '',
+        '── VIDEO PROMPT PACKAGE ──',
+        `Duration: ${duration}s | Ratio: ${aspectRatio}`,
+        '',
+        '── CHARACTER DNA ──',
+        result.masterDNA,
+        '',
+        '── KEYFRAME IMAGE PROMPTS ──',
+        ...result.keyframes.map(kf => `\n${kf.fullPrompt}`),
+        '',
+        '── SCENE PROMPTS (Veo 3.1) ──',
+        ...result.scenes.map(sc => `\n${sc.fullPrompt}`),
+        ...(result.createImagePrompt
+          ? ['', '── CREATE IMAGE PROMPT ──', result.createImagePrompt]
+          : []),
+      )
+    }
+
+    if (seoResult) {
+      lines.push(
+        '',
+        '── SEO PACKAGE ──',
+        `Product: ${seoResult.productName}`,
+      )
+
+      for (const variant of seoResult.seoVariants) {
+        lines.push(
+          '',
+          `SEO VARIANT ${variant.index}`,
+          `Title: ${variant.title}`,
+          `Hook: ${variant.hook}`,
+          `CTA: ${variant.cta}`,
+          `Tags: ${variant.tags.join(' ')}`,
+        )
+      }
+    }
+
+    if (voiceoverResult) {
+      lines.push(
+        '',
+        '── VOICEOVER PACKAGE ──',
+        `Product: ${voiceoverResult.productName}`,
+        '',
+        'VOICEOVER SCRIPT',
+        `Style: ${voiceoverResult.voiceover.style}`,
+        `Duration: ~${voiceoverResult.voiceover.durationSec}s`,
+        voiceoverResult.voiceover.script,
+      )
+
+    }
+
     const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `aff_prompts_${duration}s_${Date.now()}.txt`
+    a.download = `aff_ai_package_${Date.now()}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   const handleCopyAll = async () => {
-    if (!result) return
-    const lines = [
-      'CHARACTER DNA:', result.masterDNA, '',
-      'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => kf.fullPrompt), '',
-      'SCENE PROMPTS:', ...result.scenes.map(sc => sc.fullPrompt),
-      ...(result.createImagePrompt ? ['', 'CREATE IMAGE PROMPT:', result.createImagePrompt] : []),
-    ]
+    if (!hasAnyResult) return
+
+    const lines: string[] = []
+
+    if (result) {
+      lines.push(
+        'CHARACTER DNA:', result.masterDNA, '',
+        'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => kf.fullPrompt), '',
+        'SCENE PROMPTS:', ...result.scenes.map(sc => sc.fullPrompt),
+        ...(result.createImagePrompt ? ['', 'CREATE IMAGE PROMPT:', result.createImagePrompt] : []),
+      )
+    }
+
+    if (seoResult) {
+      lines.push('', `SEO (${seoResult.productName}):`)
+
+      for (const variant of seoResult.seoVariants) {
+        lines.push(
+          `\nSEO VARIANT ${variant.index}`,
+          `TITLE: ${variant.title}`,
+          `HOOK: ${variant.hook}`,
+          `CTA: ${variant.cta}`,
+          `TAGS: ${variant.tags.join(' ')}`,
+        )
+      }
+    }
+
+    if (voiceoverResult) {
+      lines.push(
+        '',
+        `VOICEOVER (${voiceoverResult.productName}):`,
+        `VOICEOVER STYLE: ${voiceoverResult.voiceover.style}`,
+        `VOICEOVER DURATION: ~${voiceoverResult.voiceover.durationSec}s`,
+        'VOICEOVER SCRIPT:',
+        voiceoverResult.voiceover.script,
+      )
+
+    }
+
     try {
       await navigator.clipboard.writeText(lines.join('\n\n'))
     } catch {
@@ -1503,6 +2027,140 @@ export default function App() {
               </div>
             </div>
 
+            {/* Task 1: SEO */}
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-title">
+                <MessageSquare /> Nhiệm vụ 1 — SEO TikTok
+              </div>
+              <p className="ai-task-hint">
+                Nhập tên sản phẩm để tạo riêng 3 biến thể tiêu đề chuẩn SEO TikTok, mỗi biến thể có 5 hashtag.
+              </p>
+
+              <div className="input-group">
+                <label className="input-label" htmlFor="seo-product-name">Tên sản phẩm</label>
+                <input
+                  id="seo-product-name"
+                  type="text"
+                  className="input-field"
+                  value={seoProductName}
+                  onChange={(e) => setSeoProductName(e.target.value)}
+                  placeholder="Ví dụ: Áo sơ mi lụa nữ cổ V"
+                />
+              </div>
+
+              <div className="input-group" style={{ marginBottom: 12 }}>
+                <label className="input-label" htmlFor="seo-notes">Yêu cầu thêm (tuỳ chọn)</label>
+                <textarea
+                  id="seo-notes"
+                  className="input-field"
+                  value={seoNotes}
+                  onChange={(e) => setSeoNotes(e.target.value)}
+                  placeholder="Ví dụ: nhấn mạnh form tôn dáng, dễ phối đồ, hợp đi làm"
+                  rows={3}
+                />
+              </div>
+
+              <button
+                id="generate-seo-btn"
+                className={`btn-generate btn-generate-secondary ${seoLoading ? 'loading' : ''}`}
+                onClick={handleGenerateSeo}
+                disabled={seoLoading || !canGenerateSeo}
+              >
+                {seoLoading ? (
+                  <>
+                    <div className="spinner" />
+                    Đang tạo 3 biến thể SEO...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={18} />
+                    Tạo 3 biến thể SEO + 5 tag
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+
+              {seoLoading && (
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: '68%' }} />
+                </div>
+              )}
+
+              {seoError && (
+                <div className="error-message">
+                  <AlertCircle size={16} />
+                  {seoError}
+                </div>
+              )}
+            </div>
+
+            {/* Task 2: Voiceover */}
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-title">
+                <FileText /> Nhiệm vụ 2 — Kịch bản lồng tiếng
+              </div>
+              <p className="ai-task-hint">
+                Tạo riêng văn mẫu kịch bản lồng tiếng cho video sản phẩm, có cấu trúc theo timeline ngắn.
+              </p>
+
+              <div className="input-group">
+                <label className="input-label" htmlFor="voiceover-product-name">Tên sản phẩm</label>
+                <input
+                  id="voiceover-product-name"
+                  type="text"
+                  className="input-field"
+                  value={voiceoverProductName}
+                  onChange={(e) => setVoiceoverProductName(e.target.value)}
+                  placeholder="Ví dụ: Đầm suông cổ vuông nữ"
+                />
+              </div>
+
+              <div className="input-group" style={{ marginBottom: 12 }}>
+                <label className="input-label" htmlFor="voiceover-notes">Tone/ý chính (tuỳ chọn)</label>
+                <textarea
+                  id="voiceover-notes"
+                  className="input-field"
+                  value={voiceoverNotes}
+                  onChange={(e) => setVoiceoverNotes(e.target.value)}
+                  placeholder="Ví dụ: giọng thân thiện, nhấn vào chất liệu mát và mặc thoải mái"
+                  rows={3}
+                />
+              </div>
+
+              <button
+                id="generate-voiceover-btn"
+                className={`btn-generate btn-generate-tertiary ${voiceoverLoading ? 'loading' : ''}`}
+                onClick={handleGenerateVoiceover}
+                disabled={voiceoverLoading || !canGenerateVoiceover}
+              >
+                {voiceoverLoading ? (
+                  <>
+                    <div className="spinner" />
+                    Đang tạo kịch bản lồng tiếng...
+                  </>
+                ) : (
+                  <>
+                    <FileText size={18} />
+                    Tạo văn mẫu lồng tiếng
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+
+              {voiceoverLoading && (
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: '70%' }} />
+                </div>
+              )}
+
+              {voiceoverError && (
+                <div className="error-message">
+                  <AlertCircle size={16} />
+                  {voiceoverError}
+                </div>
+              )}
+            </div>
+
             {/* Algorithm Info */}
             <div className="card" style={{
               marginBottom: 16,
@@ -1560,7 +2218,7 @@ export default function App() {
           {/* ─── RESULTS PANEL ─── */}
           <div className="results-panel fade-in">
             <div className="card" style={{ minHeight: 500 }}>
-              {!result ? (
+              {!hasAnyResult ? (
                 <div className="results-empty">
                   <Film className="results-empty-icon" />
                   <p className="results-empty-text">Chưa có prompt nào</p>
@@ -1571,8 +2229,8 @@ export default function App() {
               ) : (
                 <>
                   <div className="card-title">
-                    <Sparkles /> Prompt Package — {duration}s / {aspectRatio}
-                    {selectedContentType && selectedContentType !== 'auto' && (
+                    <Sparkles /> {resultsHeader}
+                    {result && selectedContentType && selectedContentType !== 'auto' && (
                       <span style={{ marginLeft: 12, fontSize: '0.75rem', opacity: 0.8 }}>
                         (Type: {selectedContentType.toUpperCase()})
                       </span>
@@ -1580,50 +2238,78 @@ export default function App() {
                   </div>
 
                   {/* Timeline */}
-                  <Timeline
-                    keyframeCount={durationInfo.keyframes}
-                    sceneCount={durationInfo.scenes}
-                  />
+                  {result && (
+                    <Timeline
+                      keyframeCount={durationInfo.keyframes}
+                      sceneCount={durationInfo.scenes}
+                    />
+                  )}
 
                   {/* Character DNA */}
-                  <div className="dna-section">
-                    <div className="dna-title">
-                      <Wand2 size={13} /> Character DNA
-                      <CopyButton text={result.masterDNA} />
+                  {result && (
+                    <div className="dna-section">
+                      <div className="dna-title">
+                        <Wand2 size={13} /> Character DNA
+                        <CopyButton text={result.masterDNA} />
+                      </div>
+                      <p className="dna-text">{result.masterDNA}</p>
                     </div>
-                    <p className="dna-text">{result.masterDNA}</p>
-                  </div>
+                  )}
 
                   {/* Tabs */}
                   <div className="tabs">
-                    <button
-                      className={`tab ${activeTab === 'keyframes' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('keyframes')}
-                    >
-                      <Camera /> Keyframes ({result.keyframes.length})
-                    </button>
-                    <button
-                      className={`tab ${activeTab === 'scenes' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('scenes')}
-                    >
-                      <Film /> Scenes ({result.scenes.length})
-                    </button>
-                    <button
-                      className={`tab ${activeTab === 'image' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('image')}
-                    >
-                      <ImageIcon /> Create Image
-                    </button>
-                    <button
-                      className={`tab ${activeTab === 'all' ? 'active' : ''}`}
-                      onClick={() => setActiveTab('all')}
-                    >
-                      <Layers /> Tất cả
-                    </button>
+                    {result && (
+                      <button
+                        className={`tab ${activeTab === 'keyframes' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('keyframes')}
+                      >
+                        <Camera /> Keyframes ({result.keyframes.length})
+                      </button>
+                    )}
+                    {result && (
+                      <button
+                        className={`tab ${activeTab === 'scenes' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('scenes')}
+                      >
+                        <Film /> Scenes ({result.scenes.length})
+                      </button>
+                    )}
+                    {seoResult && (
+                      <button
+                        className={`tab ${activeTab === 'seo' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('seo')}
+                      >
+                        <MessageSquare /> SEO ({seoResult.seoVariants.length})
+                      </button>
+                    )}
+                    {voiceoverResult && (
+                      <button
+                        className={`tab ${activeTab === 'voiceover' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('voiceover')}
+                      >
+                        <FileText /> Voiceover
+                      </button>
+                    )}
+                    {result && (
+                      <button
+                        className={`tab ${activeTab === 'image' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('image')}
+                      >
+                        <ImageIcon /> Create Image
+                      </button>
+                    )}
+                    {result && (
+                      <button
+                        className={`tab ${activeTab === 'all' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('all')}
+                      >
+                        <Layers /> Tất cả
+                      </button>
+                    )}
                   </div>
 
                   {/* Content */}
-                  {(activeTab === 'keyframes' || activeTab === 'all') && (
+                  {result && (activeTab === 'keyframes' || activeTab === 'all') && (
                     <>
                       {activeTab === 'all' && (
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -1655,7 +2341,7 @@ export default function App() {
                     </>
                   )}
 
-                  {(activeTab === 'scenes' || activeTab === 'all') && (
+                  {result && (activeTab === 'scenes' || activeTab === 'all') && (
                     <>
                       {activeTab === 'all' && (
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-pink)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -1686,8 +2372,125 @@ export default function App() {
                     </>
                   )}
 
+                  {/* SEO Tab */}
+                  {seoResult && (activeTab === 'seo' || activeTab === 'all') && (
+                    <>
+                      {activeTab === 'all' && (
+                        <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-emerald)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          🧠 Nhiệm vụ 1: SEO TikTok
+                        </h3>
+                      )}
+
+                      <div className="prompt-card">
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: 'var(--accent-emerald)' }}>
+                            <Sparkles size={14} /> Sản phẩm SEO
+                          </div>
+                          <span className="prompt-card-time">{seoResult.productName}</span>
+                        </div>
+                        <div className="prompt-card-body">
+                          <div className="prompt-text">
+                            <strong>Tạo lúc:</strong> {new Date(seoResult.generatedAt).toLocaleString('vi-VN', { hour12: false })}
+                            {'\n'}<strong>Biến thể đang chọn:</strong> {selectedSeoVariant ? `#${selectedSeoVariant.index}` : 'N/A'}
+                          </div>
+                        </div>
+                      </div>
+
+                      {seoResult.seoVariants.map((variant, index) => {
+                        const isSelected = selectedSeoVariantIndex === index
+                        const copyValue = [
+                          `TITLE: ${variant.title}`,
+                          `HOOK: ${variant.hook}`,
+                          `CTA: ${variant.cta}`,
+                          `TAGS: ${variant.tags.join(' ')}`,
+                        ].join('\n')
+
+                        return (
+                          <div key={variant.index} className={`prompt-card seo-variant-card ${isSelected ? 'selected' : ''}`}>
+                            <div className="prompt-card-header">
+                              <div className="prompt-card-badge" style={{ color: 'var(--accent-emerald)' }}>
+                                <MessageSquare size={14} /> Biến thể SEO {variant.index}
+                              </div>
+                              <button
+                                type="button"
+                                className={`seo-select-btn ${isSelected ? 'active' : ''}`}
+                                onClick={() => setSelectedSeoVariantIndex(index)}
+                              >
+                                {isSelected ? 'Đang chọn' : 'Chọn biến thể'}
+                              </button>
+                            </div>
+                            <div className="prompt-card-body">
+                              <CopyButton text={copyValue} />
+                              <div className="prompt-text">
+                                <strong>TIÊU ĐỀ SEO:</strong> {variant.title}
+                                {'\n'}<strong>HOOK:</strong> {variant.hook}
+                                {'\n'}<strong>CTA:</strong> {variant.cta}
+                                {'\n'}<strong>5 TAG:</strong> {variant.tags.join(' ')}
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </>
+                  )}
+
+                  {/* Voiceover Tab */}
+                  {voiceoverResult && (activeTab === 'voiceover' || activeTab === 'all') && (
+                    <>
+                      {activeTab === 'all' && (
+                        <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-amber)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          🎙️ Nhiệm vụ 2: Kịch bản lồng tiếng
+                        </h3>
+                      )}
+
+                      <div className="prompt-card">
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: 'var(--accent-amber)' }}>
+                            <Sparkles size={14} /> Sản phẩm voiceover
+                          </div>
+                          <span className="prompt-card-time">{voiceoverResult.productName}</span>
+                        </div>
+                        <div className="prompt-card-body">
+                          <div className="prompt-text">
+                            <strong>Tạo lúc:</strong> {new Date(voiceoverResult.generatedAt).toLocaleString('vi-VN', { hour12: false })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="prompt-card">
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: 'var(--accent-amber)' }}>
+                            <FileText size={14} /> Văn mẫu kịch bản lồng tiếng
+                          </div>
+                          <span className="prompt-card-time">~{voiceoverResult.voiceover.durationSec}s</span>
+                        </div>
+                        <div className="prompt-card-body">
+                          <CopyButton
+                            text={[
+                              `STYLE: ${voiceoverResult.voiceover.style}`,
+                              `DURATION: ~${voiceoverResult.voiceover.durationSec}s`,
+                              '',
+                              voiceoverResult.voiceover.script,
+                            ].join('\n')}
+                          />
+                          <div className="prompt-text" style={{ lineHeight: 1.8 }}>
+                            <strong>STYLE:</strong> {voiceoverResult.voiceover.style}
+                            {'\n'}<strong>SCRIPT:</strong>
+                            {'\n'}{voiceoverResult.voiceover.script}
+                            {voiceoverResult.voiceover.lines.length > 0 && (
+                              <>
+                                {'\n\n'}<strong>BEAT TIMELINE:</strong>
+                                {'\n'}{voiceoverResult.voiceover.lines.map((line) => `${line.timeRange}: ${line.line}`).join('\n')}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {/* Create Image Prompt Tab */}
-                  {(activeTab === 'image' || activeTab === 'all') && result.createImagePrompt && (
+                  {result && (activeTab === 'image' || activeTab === 'all') && result.createImagePrompt && (
                     <>
                       {activeTab === 'all' && (
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-amber)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
