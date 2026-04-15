@@ -79,6 +79,10 @@ const CONTENT_TYPES = [
   { value: 'grwm', label: 'GRWM', icon: Star, desc: 'Get Ready With Me', color: 'var(--accent-purple)' },
   { value: 'fyp', label: 'FYP', icon: TrendingUp, desc: 'For You Page', color: 'var(--accent-cyan)' },
   { value: 'review', label: 'Review', icon: MessageSquare, desc: 'Product Review', color: 'var(--accent-emerald)' },
+  { value: 'athleisure', label: 'Athleisure', icon: TrendingUp, desc: 'Gym-to-Café Styling', color: '#10b981' },
+  { value: 'haul', label: 'Haul', icon: Layers, desc: 'Try-On / Collection Showcase', color: '#f59e0b' },
+  { value: 'styling', label: 'Styling', icon: Wand2, desc: 'Fashion Styling Tips', color: '#ec4899' },
+  { value: 'luxury', label: 'Luxury', icon: Star, desc: 'Old Money / Sophisticated', color: '#8b5cf6' },
 ] as const
 
 type ContentType = typeof CONTENT_TYPES[number]['value']
@@ -125,6 +129,38 @@ const SCENE_BEATS_MAP: Record<ContentType, Array<{ name: string; emoji: string; 
     { name: 'HONEST VERDICT', emoji: '⭐', cameraHint: 'Eye-level talking head, honest expression' },
     { name: 'FINAL RECOMMENDATION', emoji: '🎬', cameraHint: 'Happy model with product, call-to-action framing' },
   ],
+  athleisure: [
+    { name: 'GYM-TO-CAFÉ TRANSITION HOOK', emoji: '🏃‍♀️', cameraHint: 'Dynamic entrance from gym, effortless swagger' },
+    { name: 'ACTIVEWEAR DETAIL MOMENT', emoji: '💪', cameraHint: 'Close-up on sports bra/leggings fabric and fit' },
+    { name: 'STYLING MIX SHOWCASE', emoji: '✨', cameraHint: 'Smooth pan revealing casual layers and accessories' },
+    { name: 'EVERYDAY VERSATILITY', emoji: '☕', cameraHint: 'Medium shot at café setting, relaxed confidence' },
+    { name: 'MOVEMENT & COMFORT DEMO', emoji: '🌟', cameraHint: 'Dynamic movement shot showing flexibility and ease' },
+    { name: 'ASPIRATIONAL CLOSER', emoji: '🎬', cameraHint: 'Cinematic wide shot of model in full athleisure look' },
+  ],
+  haul: [
+    { name: 'HAUL UNBOXING HOOK', emoji: '📦', cameraHint: 'Fast-paced reveal of multiple items, excitement energy' },
+    { name: 'FIRST PIECE TRY-ON', emoji: '👠', cameraHint: 'Quick transition into first outfit with reaction' },
+    { name: 'SIZE & FIT CHECK', emoji: '📏', cameraHint: 'Full-body mirror shot, model checking fit and silhouette' },
+    { name: 'STYLING COMBINATIONS', emoji: '💫', cameraHint: 'Rapid montage of pairing items different ways' },
+    { name: 'PRICE-TO-QUALITY VERDICT', emoji: '💰', cameraHint: 'Close-up detail shots highlighting quality and value' },
+    { name: 'FINAL COLLECTION SHOWCASE', emoji: '🎬', cameraHint: 'Wide shot of all haul items, thumbs up finale' },
+  ],
+  styling: [
+    { name: 'STYLING PROBLEM HOOK', emoji: '🤔', cameraHint: 'Model presenting common fashion dilemma' },
+    { name: 'WARDROBE PIECES INTRO', emoji: '👗', cameraHint: 'Organized display of base pieces to be styled' },
+    { name: 'FIRST OUTFIT CREATION', emoji: '✨', cameraHint: 'Quick demonstration of combining items, reveal' },
+    { name: 'ALTERNATIVE STYLING', emoji: '💡', cameraHint: 'Second outfit transformation from same pieces' },
+    { name: 'EXPERT TIP SHARE', emoji: '🌟', cameraHint: 'Close-up of styling detail, narration of tips' },
+    { name: 'INSPIRATION FINALE', emoji: '🎬', cameraHint: 'Model in final look with confidence, actionable inspo' },
+  ],
+  luxury: [
+    { name: 'SOPHISTICATED ENTRANCE HOOK', emoji: '✨', cameraHint: 'Slow, composed entrance with understated elegance' },
+    { name: 'QUALITY DETAIL MOMENT', emoji: '💎', cameraHint: 'Macro close-up of fine fabric, stitching, logo placement' },
+    { name: 'CLASSIC SILHOUETTE SHOWCASE', emoji: '👗', cameraHint: 'Slow full-body shot showing timeless tailoring' },
+    { name: 'TIMELESS LAYERING', emoji: '🤍', cameraHint: 'Deliberate reveal of neutral, minimalist layering' },
+    { name: 'COMPOSED CONFIDENCE WALK', emoji: '🌟', cameraHint: 'Slow, steady walk with refined poise and grace' },
+    { name: 'OLD MONEY AESTHETIC CLOSER', emoji: '🎬', cameraHint: 'Wide shot capturing understated luxury and refinement' },
+  ],
 }
 
 function buildCharacterDNA(notes: string, contentType: ContentType): string {
@@ -133,6 +169,10 @@ function buildCharacterDNA(notes: string, contentType: ContentType): string {
     grwm: 'Lifestyle vlog aesthetic, warm and intimate GRWM style',
     fyp: 'Trending viral aesthetic, high-fashion editorial with cinematic flair',
     review: 'Authentic product review style, natural lighting, trustworthy feel',
+    athleisure: 'Urban sporty-chic lifestyle, gym-to-café casual confidence',
+    haul: 'Excited energetic unboxing aesthetic, approachable and relatable',
+    styling: 'Expert fashion advisor aesthetic, polished and informative',
+    luxury: 'Old money aesthetic, understated elegance, timeless sophistication',
   }
   return `[FACE PRESERVATION]: The model's face must be rendered with exact, hyper-realistic photographic likeness based on the provided face reference image.
 [GARMENT PRESERVATION]: The garment from the product reference image must be preserved EXACTLY — no redesign, no reinterpretation. Prioritize intricate details.
@@ -148,6 +188,10 @@ function buildCreateImagePrompt(contentType: ContentType, notes: string): string
     grwm: 'GRWM (Get Ready With Me) — warm lifestyle aesthetic showing complete look',
     fyp: 'FYP (For You Page) — viral trending aesthetic with dramatic fashion presentation',
     review: 'Product Review — authentic product showcase highlighting garment quality and details',
+    athleisure: 'Athleisure — gym-to-café styling combining sportswear with casual sophistication',
+    haul: 'Haul Showcase — collection display with multiple outfit combinations',
+    styling: 'Fashion Styling Guide — showcase expert outfit coordination and versatility',
+    luxury: 'Luxury / Old Money — timeless sophisticated style with understated elegance',
   }
 
   return `Create a vertical portrait product promotional image (9:16 aspect ratio) for ${contentDesc[contentType]}.
@@ -166,7 +210,13 @@ function buildCreateImagePrompt(contentType: ContentType, notes: string): string
 
 [BACKGROUND]: Clean gradient backdrop — warm cream to soft taupe, matching the ${contentType.toUpperCase()} aesthetic.
 
-[STYLE]: Professional fashion e-commerce photography. ${contentType === 'review' ? 'Authentic and trustworthy feel.' : 'High-end editorial quality.'} Shot on Sony A7R IV, 85mm f/1.4 lens, ISO 100.
+[STYLE]: Professional fashion e-commerce photography. ${
+  contentType === 'review' ? 'Authentic and trustworthy feel.' :
+  contentType === 'luxury' ? 'Understated elegance, refined luxury presentation.' :
+  contentType === 'athleisure' ? 'Urban sporty-chic, approachable lifestyle.' :
+  contentType === 'haul' ? 'Energetic and approachable showcase.' :
+  'High-end editorial quality.'
+} Shot on Sony A7R IV, 85mm f/1.4 lens, ISO 100.
 
 [TEXT OVERLAYS]: 
 • Product name label at top center (clean sans-serif typography)
@@ -355,6 +405,10 @@ Output as JSON with this exact structure:
       grwm: 'Natural getting-ready movement that highlights styling steps and final look',
       fyp: 'Scroll-stopping fashion movement with dynamic pose transition',
       review: 'Authentic product demonstration pose emphasizing fit and material quality',
+      athleisure: 'Energetic gym-to-café transition movement with sporty-chic confidence',
+      haul: 'Excited try-on movements showcasing product fit and styling versatility',
+      styling: 'Purposeful modeling pose highlighting outfit coordination and styling impact',
+      luxury: 'Composed understated movement exuding timeless elegance and quiet confidence',
     }
 
     const fallbackStyleByType: Record<ContentType, string> = {
@@ -362,6 +416,10 @@ Output as JSON with this exact structure:
       grwm: 'Warm lifestyle GRWM visual style, intimate and clean',
       fyp: 'Viral cinematic fashion style with bold visual energy',
       review: 'Trustworthy product review style with high material clarity',
+      athleisure: 'Urban sporty-chic lifestyle photography, natural daylight',
+      haul: 'Energetic colorful unboxing and try-on aesthetic, dynamic lighting',
+      styling: 'Expert fashion editorial style, polished and educational',
+      luxury: 'Old money sophisticated aesthetic, understated timeless elegance, neutral palette',
     }
 
     const inferredLocationFallback = 'Location inferred from garment style and reference images'
