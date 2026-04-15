@@ -262,6 +262,7 @@ CRITICAL RULES:
 7. Keep scene context coherent across the timeline; only change location when there is a clear narrative transition
 8. NEVER use background, location, props, or lighting from the FACE reference image. The face image is identity-only and must not influence scene context.
 9. Infer scene context primarily from garment/product characteristics, content type, and user notes.
+10. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Select authentic, recognizable real locations (cafes, streets, parks, urban spaces, shopping districts, studios) NOT CGI, digital backgrounds, or artificial environments. Include specific venue characteristics that make the scene feel authentic and photogenic.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -422,7 +423,7 @@ Output as JSON with this exact structure:
       luxury: 'Old money sophisticated aesthetic, understated timeless elegance, neutral palette',
     }
 
-    const inferredLocationFallback = 'Location inferred from garment style and reference images'
+    const inferredLocationFallback = 'Real-world authentic venue location inferred from garment style and reference images — specific recognizable place with authentic characteristics'
     const inferredCameraFallback = 'AI-selected framing, lens, and movement optimized for fashion storytelling'
     const inferredLightingFallback = 'Lighting inferred from scene mood and garment texture visibility'
 
