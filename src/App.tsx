@@ -622,7 +622,7 @@ Output as JSON with this exact structure:
 
     // Build full prompts for each keyframe and scene
     const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
-      const subject = toSafeString(kf.subject, '[facePreservation from reference]')
+      const subject = `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`
       const action = toSafeString(kf.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
       const location = ensureVietnamLocation(kf.location, i)
       const camera = toSafeString(kf.camera, inferredCameraFallback)
@@ -2344,8 +2344,7 @@ export default function App() {
                           <div className="prompt-card-body">
                             <CopyButton text={kf.fullPrompt} />
                             <div className="prompt-text">
-                              {/* <strong>SUBJECT:</strong> {kf.subject} */}
-                              {'\n'}<strong>Create image 9:16 no split...Faithful character face and body outfit likeness image reference.. </strong> 
+                              <strong>SUBJECT:</strong> {kf.subject}
                               {'\n'}<strong>ACTION:</strong> {kf.action}
                               {'\n'}<strong>LOCATION:</strong> {kf.location}
                               {'\n'}<strong>CAMERA:</strong> {kf.camera}
