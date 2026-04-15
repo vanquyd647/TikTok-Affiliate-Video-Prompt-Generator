@@ -249,6 +249,7 @@ async function generateWithGemini(
   // Determine final content type (if 'auto', AI will decide)
   const isAuto = contentType === 'auto'
   const contentTypeForPrompt = isAuto ? '(AI will automatically determine the best type)' : contentType.toUpperCase()
+  const diversitySeed = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 
   // Build the master prompt for Gemini
   const systemPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos (OOTD, FYP). 
@@ -257,6 +258,7 @@ Your task: Generate a COMPLETE prompt package for a ${duration}-second video wit
 - ${keyframeCount} keyframe image prompts (n+1 algorithm: ${sceneCount} scenes need ${keyframeCount} images)
 - ${sceneCount} scene prompts for Veo 3.1 (first-frame → last-frame video generation, 8s each)
 - Aspect ratio: ${aspectRatio}
+- Diversity seed: ${diversitySeed}
 
 CONTENT TYPE: ${contentTypeForPrompt}
 ${isAuto ? `Since content type is set to AUTO, you MUST first analyze the provided product/garment image and determine which content type is MOST SUITABLE based on:
@@ -277,6 +279,8 @@ CRITICAL RULES:
 8. NEVER use background, location, props, or lighting from the FACE reference image. The face image is identity-only and must not influence scene context.
 9. Infer scene context primarily from garment/product characteristics, content type, and user notes.
 10. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Select authentic, recognizable real locations (cafes, streets, parks, urban spaces, shopping districts, studios) NOT CGI, digital backgrounds, or artificial environments. Include specific venue characteristics that make the scene feel authentic and photogenic.
+11. **LOCATION COUNTRY LOCK = VIETNAM ONLY** — Every location MUST be in Vietnam. Use specific Vietnamese city/province and venue details (e.g., Hanoi Old Quarter, Nguyen Hue Walking Street in Ho Chi Minh City, Da Nang beachside boulevard, Hoi An ancient town streets, Da Lat hill cafe district).
+12. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed above to generate a fresh concept each run. Do not repeat template wording. Ensure ACTION, LOCATION, CAMERA, and NARRATIVE fields are not duplicated across keyframes/scenes in the same output.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -290,7 +294,7 @@ Output as JSON with this exact structure:
       "timestamp": "0s",
       "subject": "face preservation instruction",
       "action": "pose/movement description",
-      "location": "setting/background",
+      "location": "real location in Vietnam (city + venue details)",
       "camera": "lens, shot type, angle",
       "lighting": "lighting setup",
       "style": "photography style"
@@ -426,6 +430,34 @@ Output as JSON with this exact structure:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
+    const inferredLocationFallback = 'Nguyen Hue Walking Street, District 1, Ho Chi Minh City, Vietnam (real urban venue)'
+    const vietnamLocationPool = [
+      inferredLocationFallback,
+      'Hoan Kiem Lake pedestrian zone, Hanoi, Vietnam (real city-center street venue)',
+      'Tran Phu riverside boulevard, Hoi An, Quang Nam, Vietnam (real heritage street venue)',
+      'My Khe beach promenade, Da Nang, Vietnam (real coastal urban venue)',
+      'Xuan Huong Lake cafe street, Da Lat, Lam Dong, Vietnam (real hill-town venue)',
+      'Nha Trang beachfront walking street, Khanh Hoa, Vietnam (real seaside venue)',
+      'Ninh Kieu Wharf riverside, Can Tho, Vietnam (real Mekong urban venue)',
+      'Bui Vien pedestrian street, Ho Chi Minh City, Vietnam (real nightlife venue)',
+    ]
+    const vietnamLocationOffset = Math.floor(Math.random() * vietnamLocationPool.length)
+    const pickVietnamLocationFallback = (index: number) => (
+      vietnamLocationPool[(index + vietnamLocationOffset) % vietnamLocationPool.length]
+    )
+
+    const hasVietnamReference = (value: string) => (
+      /(viet\s?nam|vietnam|ha\s?noi|hanoi|ho\s?chi\s?minh|sai\s?gon|saigon|da\s?nang|hoi\s?an|da\s?lat|nha\s?trang|can\s?tho|ha\s?long|hue|phu\s?quoc)/i.test(value)
+    )
+
+    const ensureVietnamLocation = (value: unknown, index: number) => {
+      const candidate = toSafeString(value, '')
+      if (candidate.length > 0 && hasVietnamReference(candidate)) {
+        return candidate
+      }
+      return pickVietnamLocationFallback(index)
+    }
+
     const fallbackActionByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Confident outfit showcase pose and movement tailored for OOTD storytelling',
       grwm: 'Natural getting-ready movement that highlights styling steps and final look',
@@ -448,7 +480,6 @@ Output as JSON with this exact structure:
       luxury: 'Old money sophisticated aesthetic, understated timeless elegance, neutral palette',
     }
 
-    const inferredLocationFallback = 'Real-world authentic venue location inferred from garment style and reference images — specific recognizable place with authentic characteristics'
     const inferredCameraFallback = 'AI-selected framing, lens, and movement optimized for fashion storytelling'
     const inferredLightingFallback = 'Lighting inferred from scene mood and garment texture visibility'
 
@@ -456,7 +487,7 @@ Output as JSON with this exact structure:
     const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
       const subject = toSafeString(kf.subject, '[facePreservation from reference]')
       const action = toSafeString(kf.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
-      const location = toSafeString(kf.location, inferredLocationFallback)
+      const location = ensureVietnamLocation(kf.location, i)
       const camera = toSafeString(kf.camera, inferredCameraFallback)
       const lighting = toSafeString(kf.lighting, inferredLightingFallback)
       const style = toSafeString(kf.style, fallbackStyleByType[finalContentType as Exclude<ContentType, 'auto'>])
