@@ -39,6 +39,19 @@ interface GenerateResult {
   createImagePrompt?: string
 }
 
+interface RecentLocalImage {
+  id: string
+  name: string
+  dataUrl: string
+  createdAt: number
+}
+
+interface RecentLocalImageBucket {
+  bucket: string
+  images: RecentLocalImage[]
+  updatedAt: number
+}
+
 // ═══════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════
@@ -69,6 +82,10 @@ const CONTENT_TYPES = [
 ] as const
 
 type ContentType = typeof CONTENT_TYPES[number]['value']
+
+const AFF_STORAGE_DB_NAME = 'aff_prompt_storage'
+const AFF_STORAGE_DB_VERSION = 1
+const AFF_STORAGE_STORE = 'recent_local_images'
 
 // ═══════════════════════════════════════════════
 // PROMPT ENGINE — N+1 Algorithm
@@ -447,6 +464,143 @@ function resizeImage(dataUrl: string, maxSize = 1024): Promise<string> {
   })
 }
 
+function makeLocalImageName(rawName?: string, fallbackPrefix = 'pc-image'): string {
+  const trimmed = rawName?.trim()
+  if (trimmed) return trimmed
+
+  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')
+  return `${fallbackPrefix}-${stamp}.jpg`
+}
+
+function normalizeRecentLocalImages(input: unknown): RecentLocalImage[] {
+  if (!Array.isArray(input)) return []
+  const now = Date.now()
+
+  return input
+    .map((item: unknown, index): RecentLocalImage | null => {
+      if (typeof item === 'string' && item.startsWith('data:image/')) {
+        return {
+          id: `legacy-${now}-${index}`,
+          name: makeLocalImageName(`pc-image-${index + 1}.jpg`),
+          dataUrl: item,
+          createdAt: now,
+        }
+      }
+
+      if (!item || typeof item !== 'object') return null
+      const candidate = item as Record<string, unknown>
+
+      if (typeof candidate.dataUrl !== 'string' || !candidate.dataUrl.startsWith('data:image/')) {
+        return null
+      }
+
+      const id = typeof candidate.id === 'string'
+        ? candidate.id
+        : `legacy-${now}-${index}`
+
+      const name = typeof candidate.name === 'string'
+        ? makeLocalImageName(candidate.name)
+        : makeLocalImageName(`pc-image-${index + 1}.jpg`)
+
+      const createdAt = typeof candidate.createdAt === 'number' && Number.isFinite(candidate.createdAt)
+        ? candidate.createdAt
+        : now
+
+      return {
+        id,
+        name,
+        dataUrl: candidate.dataUrl,
+        createdAt,
+      }
+    })
+    .filter((item): item is RecentLocalImage => item !== null)
+    .sort((a, b) => b.createdAt - a.createdAt)
+}
+
+function loadLegacyRecentLocalImages(storageKey: string): RecentLocalImage[] {
+  try {
+    const raw = localStorage.getItem(storageKey)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    return normalizeRecentLocalImages(parsed)
+  } catch {
+    return []
+  }
+}
+
+function saveLegacyRecentLocalImages(storageKey: string, images: RecentLocalImage[]): void {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(images))
+  } catch {
+    // no-op fallback only
+  }
+}
+
+function openAffStorageDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      reject(new Error('IndexedDB is not available in this browser'))
+      return
+    }
+
+    const request = window.indexedDB.open(AFF_STORAGE_DB_NAME, AFF_STORAGE_DB_VERSION)
+
+    request.onupgradeneeded = () => {
+      const db = request.result
+      if (!db.objectStoreNames.contains(AFF_STORAGE_STORE)) {
+        db.createObjectStore(AFF_STORAGE_STORE, { keyPath: 'bucket' })
+      }
+    }
+
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error ?? new Error('Failed to open IndexedDB'))
+  })
+}
+
+async function loadRecentLocalImagesFromIndexedDb(bucket: string): Promise<RecentLocalImage[]> {
+  const db = await openAffStorageDb()
+
+  try {
+    const record = await new Promise<RecentLocalImageBucket | undefined>((resolve, reject) => {
+      const tx = db.transaction(AFF_STORAGE_STORE, 'readonly')
+      const store = tx.objectStore(AFF_STORAGE_STORE)
+      const request = store.get(bucket)
+
+      request.onsuccess = () => resolve(request.result as RecentLocalImageBucket | undefined)
+      request.onerror = () => reject(request.error ?? new Error('Failed to read IndexedDB'))
+      tx.onerror = () => reject(tx.error ?? new Error('Failed to read IndexedDB'))
+      tx.onabort = () => reject(tx.error ?? new Error('Failed to read IndexedDB'))
+    })
+
+    return normalizeRecentLocalImages(record?.images)
+  } finally {
+    db.close()
+  }
+}
+
+async function saveRecentLocalImagesToIndexedDb(bucket: string, images: RecentLocalImage[]): Promise<void> {
+  const db = await openAffStorageDb()
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(AFF_STORAGE_STORE, 'readwrite')
+      const store = tx.objectStore(AFF_STORAGE_STORE)
+      const payload: RecentLocalImageBucket = {
+        bucket,
+        images,
+        updatedAt: Date.now(),
+      }
+
+      store.put(payload)
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error ?? new Error('Failed to write IndexedDB'))
+      tx.onabort = () => reject(tx.error ?? new Error('Failed to write IndexedDB'))
+    })
+  } finally {
+    db.close()
+  }
+}
+
 // ═══════════════════════════════════════════════
 // COMPONENTS
 // ═══════════════════════════════════════════════
@@ -485,6 +639,8 @@ function ImageUploader({
   onImageChange,
   isPasteTarget,
   onActivatePasteTarget,
+  recentLocalStorageKey,
+  onLoadError,
   icon: Icon,
 }: {
   label: string
@@ -492,28 +648,127 @@ function ImageUploader({
   onImageChange: (img: string | null) => void
   isPasteTarget: boolean
   onActivatePasteTarget: () => void
+  recentLocalStorageKey: string
+  onLoadError?: (message: string) => void
   icon: React.ElementType
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [recentLocalImages, setRecentLocalImages] = useState<RecentLocalImage[]>([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
 
-  const handleFile = useCallback(async (file: File) => {
-    if (!file.type.startsWith('image/')) return
+  const rememberLocalImage = useCallback((dataUrl: string, rawName?: string) => {
+    const name = makeLocalImageName(rawName)
+    const now = Date.now()
+
+    setRecentLocalImages((prev) => {
+      const existing = prev.find((entry) => entry.dataUrl === dataUrl)
+      const withoutSame = prev.filter((entry) => entry.dataUrl !== dataUrl)
+      return [
+        existing
+          ? { ...existing, name, createdAt: now }
+          : {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            name,
+            dataUrl,
+            createdAt: now,
+          },
+        ...withoutSame,
+      ]
+    })
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadHistory = async () => {
+      try {
+        let loaded = await loadRecentLocalImagesFromIndexedDb(recentLocalStorageKey)
+
+        if (loaded.length === 0) {
+          const legacy = loadLegacyRecentLocalImages(recentLocalStorageKey)
+          if (legacy.length > 0) {
+            loaded = legacy
+            try {
+              await saveRecentLocalImagesToIndexedDb(recentLocalStorageKey, legacy)
+              localStorage.removeItem(recentLocalStorageKey)
+            } catch {
+              // ignore migration error and continue with loaded data
+            }
+          }
+        }
+
+        if (!cancelled) {
+          setRecentLocalImages(loaded)
+        }
+      } catch {
+        const legacy = loadLegacyRecentLocalImages(recentLocalStorageKey)
+        if (!cancelled) {
+          setRecentLocalImages(legacy)
+          if (legacy.length === 0) {
+            onLoadError?.('Khong the tai lich su anh tu bo nho trinh duyet')
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setHistoryLoaded(true)
+        }
+      }
+    }
+
+    void loadHistory()
+    return () => { cancelled = true }
+  }, [onLoadError, recentLocalStorageKey])
+
+  useEffect(() => {
+    if (!historyLoaded) return
+
+    let cancelled = false
+
+    const persistHistory = async () => {
+      try {
+        await saveRecentLocalImagesToIndexedDb(recentLocalStorageKey, recentLocalImages)
+      } catch {
+        saveLegacyRecentLocalImages(recentLocalStorageKey, recentLocalImages)
+        if (!cancelled) {
+          onLoadError?.('Khong the luu vao IndexedDB. Da tam luu bang localStorage.')
+        }
+      }
+    }
+
+    void persistHistory()
+    return () => { cancelled = true }
+  }, [historyLoaded, onLoadError, recentLocalImages, recentLocalStorageKey])
+
+  const handleFile = useCallback(async (file: File, sourceName?: string) => {
+    if (!file.type.startsWith('image/')) {
+      onLoadError?.('Chi ho tro tep anh tu PC')
+      return
+    }
+
     const reader = new FileReader()
     reader.onload = async (e) => {
-      const result = e.target?.result as string
+      const result = e.target?.result
+      if (typeof result !== 'string') {
+        onLoadError?.('Khong the doc tep anh')
+        return
+      }
       const resized = await resizeImage(result)
       onImageChange(resized)
+      rememberLocalImage(resized, sourceName ?? file.name)
+      onLoadError?.('')
     }
+    reader.onerror = () => onLoadError?.('Khong the doc tep anh')
     reader.readAsDataURL(file)
-  }, [onImageChange])
+  }, [onImageChange, onLoadError, rememberLocalImage])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
     onActivatePasteTarget()
     const file = e.dataTransfer.files[0]
-    if (file) handleFile(file)
+    if (file) handleFile(file, file.name || 'pc-drag-image')
   }, [handleFile, onActivatePasteTarget])
 
   const handlePaste = useCallback((e: ClipboardEvent) => {
@@ -523,7 +778,7 @@ function ImageUploader({
     for (const item of items) {
       if (item.type.startsWith('image/')) {
         const file = item.getAsFile()
-        if (file) handleFile(file)
+        if (file) handleFile(file, file.name || 'pc-paste-image')
         break
       }
     }
@@ -533,6 +788,34 @@ function ImageUploader({
     document.addEventListener('paste', handlePaste)
     return () => document.removeEventListener('paste', handlePaste)
   }, [handlePaste])
+
+  const handleSelectRecent = useCallback((item: RecentLocalImage) => {
+    onActivatePasteTarget()
+    onImageChange(item.dataUrl)
+    setRecentLocalImages((prev) => {
+      const withoutCurrent = prev.filter((entry) => entry.id !== item.id)
+      return [{ ...item, createdAt: Date.now() }, ...withoutCurrent]
+    })
+    onLoadError?.('')
+  }, [onActivatePasteTarget, onImageChange, onLoadError])
+
+  const handleRemoveRecent = useCallback((id: string) => {
+    setRecentLocalImages((prev) => prev.filter((item) => item.id !== id))
+  }, [])
+
+  const filteredRecentImages = searchTerm.trim().length > 0
+    ? recentLocalImages.filter((item) => item.name.toLowerCase().includes(searchTerm.trim().toLowerCase()))
+    : recentLocalImages
+
+  const formatSavedTime = useCallback((timestamp: number) => {
+    try {
+      return new Date(timestamp).toLocaleString('vi-VN', {
+        hour12: false,
+      })
+    } catch {
+      return ''
+    }
+  }, [])
 
   return (
     <div className="input-group">
@@ -570,10 +853,76 @@ function ImageUploader({
         onChange={(e) => {
           onActivatePasteTarget()
           const file = e.target.files?.[0]
-          if (file) handleFile(file)
+          if (file) handleFile(file, file.name || 'pc-upload-image')
           e.target.value = ''
         }}
       />
+      <div className="image-local-tools">
+        <div className="recent-local-wrap">
+          <div className="recent-local-head">
+            <span>Anh PC da luu ({recentLocalImages.length})</span>
+            {recentLocalImages.length > 0 && (
+              <button
+                type="button"
+                className="recent-local-clear"
+                onClick={() => {
+                  setRecentLocalImages([])
+                  setSearchTerm('')
+                }}
+              >
+                Xoa tat ca
+              </button>
+            )}
+          </div>
+
+          {recentLocalImages.length > 0 && (
+            <input
+              className="input-field recent-local-search"
+              value={searchTerm}
+              placeholder="Tim theo ten file..."
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          )}
+
+          {filteredRecentImages.length > 0 ? (
+            <div className="recent-local-list">
+              {filteredRecentImages.map((item) => {
+                const active = image === item.dataUrl
+                return (
+                  <div key={item.id} className={`recent-local-row ${active ? 'active' : ''}`}>
+                    <button
+                      type="button"
+                      className="recent-local-item"
+                      title={item.name}
+                      onClick={() => handleSelectRecent(item)}
+                    >
+                      <img src={item.dataUrl} alt={item.name} className="recent-local-thumb" />
+                      <span className="recent-local-meta">
+                        <span className="recent-local-name">{item.name}</span>
+                        <span className="recent-local-time">{formatSavedTime(item.createdAt)}</span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="recent-local-remove"
+                      title="Xoa anh nay khoi danh sach"
+                      onClick={() => handleRemoveRecent(item.id)}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="recent-local-empty">
+              {recentLocalImages.length === 0
+                ? 'Anh upload/paste tu PC se duoc luu tai day de chon nhanh.'
+                : 'Khong tim thay anh phu hop tu khoa tim kiem.'}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -774,6 +1123,8 @@ export default function App() {
                 onImageChange={setFaceImage}
                 isPasteTarget={pasteTarget === 'face'}
                 onActivatePasteTarget={() => setPasteTarget('face')}
+                recentLocalStorageKey="aff_recent_local_images_face"
+                onLoadError={setError}
                 icon={ImageIcon}
               />
               <ImageUploader
@@ -782,6 +1133,8 @@ export default function App() {
                 onImageChange={setProductImage}
                 isPasteTarget={pasteTarget === 'product'}
                 onActivatePasteTarget={() => setPasteTarget('product')}
+                recentLocalStorageKey="aff_recent_local_images_product"
+                onLoadError={setError}
                 icon={Upload}
               />
             </div>
