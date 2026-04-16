@@ -540,25 +540,7 @@ Output as JSON with this exact structure:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
-    const inferredLocationFallback = 'Nguyen Hue Walking Street, District 1, Ho Chi Minh City, Vietnam (real urban venue)'
-    const vietnamLocationPool = [
-      inferredLocationFallback,
-      'Hoan Kiem Lake pedestrian zone, Hanoi, Vietnam (real city-center street venue)',
-      'Tran Phu riverside boulevard, Hoi An, Quang Nam, Vietnam (real heritage street venue)',
-      'My Khe beach promenade, Da Nang, Vietnam (real coastal urban venue)',
-      'Xuan Huong Lake cafe street, Da Lat, Lam Dong, Vietnam (real hill-town venue)',
-      'Nha Trang beachfront walking street, Khanh Hoa, Vietnam (real seaside venue)',
-      'Ninh Kieu Wharf riverside, Can Tho, Vietnam (real Mekong urban venue)',
-      'Bui Vien pedestrian street, Ho Chi Minh City, Vietnam (real nightlife venue)',
-      'Pham Ngu Lao area street cafe zone, Ho Chi Minh City, Vietnam (real urban venue)',
-      'West Lake promenade near Truc Bach, Hanoi, Vietnam (real urban-lake venue)',
-      'Bach Dang riverfront walkway, Da Nang, Vietnam (real city riverfront venue)',
-      'Vo Thi Sau street cafe strip, Da Lat, Vietnam (real hill-city venue)',
-      'Tran Hung Dao riverside route, Can Tho, Vietnam (real Mekong venue)',
-      'Le Loi boulevard central district, Hue, Vietnam (real heritage city venue)',
-      'Duong Dong night market surroundings, Phu Quoc, Vietnam (real island town venue)',
-    ]
-    const vietnamLocationOffset = Math.floor(Math.random() * vietnamLocationPool.length)
+    const vietnamFallbackNonce = Math.random().toString(36).slice(2, 8)
     const blockedLocationKeys = new Set(normalizedUsedLocations.map((location) => normalizeLocationKey(location)))
     const usedLocationKeysInRun = new Set<string>()
 
@@ -568,15 +550,7 @@ Output as JSON with this exact structure:
     }
 
     const pickVietnamLocationFallback = (index: number) => {
-      for (let cursor = 0; cursor < vietnamLocationPool.length; cursor++) {
-        const candidate = vietnamLocationPool[(index + vietnamLocationOffset + cursor) % vietnamLocationPool.length]
-        const candidateKey = normalizeLocationKey(candidate)
-        if (!blockedLocationKeys.has(candidateKey) && !usedLocationKeysInRun.has(candidateKey)) {
-          return markLocationUsed(candidate)
-        }
-      }
-
-      const fallback = vietnamLocationPool[(index + vietnamLocationOffset) % vietnamLocationPool.length]
+      const fallback = `Vietnam (real-world venue; AI should specify city/province + venue details) [fallback-${index + 1}-${vietnamFallbackNonce}]`
       return markLocationUsed(fallback)
     }
 
@@ -1801,16 +1775,8 @@ export default function App() {
     }
 
     if (seoResult) {
-      lines.push('', `SEO (${seoResult.productName}):`)
-
       for (const variant of seoResult.seoVariants) {
-        lines.push(
-          `\nSEO VARIANT ${variant.index}`,
-          `TITLE: ${variant.title}`,
-          `HOOK: ${variant.hook}`,
-          `CTA: ${variant.cta}`,
-          `TAGS: ${variant.tags.join(' ')}`,
-        )
+        lines.push(`${variant.title} ${variant.tags.join(' ')}`.trim())
       }
     }
 
@@ -2414,12 +2380,7 @@ export default function App() {
 
                       {seoResult.seoVariants.map((variant, index) => {
                         const isSelected = selectedSeoVariantIndex === index
-                        const copyValue = [
-                          `TITLE: ${variant.title}`,
-                          `HOOK: ${variant.hook}`,
-                          `CTA: ${variant.cta}`,
-                          `TAGS: ${variant.tags.join(' ')}`,
-                        ].join('\n')
+                        const copyValue = `${variant.title} ${variant.tags.join(' ')}`.trim()
 
                         return (
                           <div key={variant.index} className={`prompt-card seo-variant-card ${isSelected ? 'selected' : ''}`}>
