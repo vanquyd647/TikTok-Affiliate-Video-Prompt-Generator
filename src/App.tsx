@@ -516,9 +516,10 @@ CRITICAL RULES:
 18. **PRODUCT-FIRST COMPOSITION** — Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
 19. **MOBILE SAFE-FRAME RULE** — Keep hero subject in a central safe area and avoid placing critical details at extreme top/bottom edges where TikTok UI/captions can cover them.
 20. **RETENTION PACING RULE** — Avoid static visuals for too long; every ~1-2 seconds should include meaningful subject or camera progression.
-21. **AUDIO CUE CLARITY (IF USED)** — If adding dialogue/SFX/ambience in narrative, describe it explicitly and naturally (quote dialogue, define ambient sound) so audio aligns with visuals.
-22. **AUTHENTICITY + TRUST** — Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
-23. **CTA-SAFE ENDING + TEMPLATE CONSISTENCY** — Final scene must naturally set up conversion CTA while keeping tone and pressure aligned with selected Sales Template.
+21. **NO VOICE REQUIREMENT** — The video must work fully without voiceover/dialogue. Do not rely on spoken lines to deliver value, proof, or CTA.
+22. **AUDIO IS OPTIONAL (IF USED)** — Prefer silent-first visual storytelling. If adding SFX/ambience, describe it clearly but keep comprehension independent from audio.
+23. **AUTHENTICITY + TRUST** — Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
+24. **CTA-SAFE ENDING + TEMPLATE CONSISTENCY** — Final scene must naturally set up conversion CTA while keeping tone and pressure aligned with selected Sales Template.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
