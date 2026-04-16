@@ -506,9 +506,9 @@ CRITICAL RULES:
 8. NEVER use background, location, props, or lighting from the FACE reference image. The face image is identity-only and must not influence scene context.
 9. Infer scene context primarily from garment/product characteristics, content type, and user notes.
 10. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Select authentic, recognizable real locations (cafes, streets, parks, urban spaces, shopping districts, studios) NOT CGI, digital backgrounds, or artificial environments. Include specific venue characteristics that make the scene feel authentic and photogenic.
-11. **LOCATION COUNTRY LOCK = VIETNAM ONLY** — Every location MUST be in Vietnam. Use specific Vietnamese city/province and venue details (e.g., Hanoi Old Quarter, Nguyen Hue Walking Street in Ho Chi Minh City, Da Nang beachside boulevard, Hoi An ancient town streets, Da Lat hill cafe district).
+11. **LOCATION SCOPE = GLOBAL REAL LOCATIONS** — You may use real locations from any country. Always include specific city/area + venue details (street, district, mall, cafe, park, waterfront, etc.) so the place feels concrete and cinematic.
 12. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed above to generate a fresh concept each run. Do not repeat template wording. Ensure ACTION, LOCATION, CAMERA, and NARRATIVE fields are not duplicated across keyframes/scenes in the same output.
-13. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID** — Do NOT use any location from the provided "LOCATIONS ALREADY USED" list. Pick different real venues in Vietnam.
+13. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID** — Do NOT use any location from the provided "LOCATIONS ALREADY USED" list. Pick different real venues.
 14. **PRODUCT-FIRST COMPOSITION** — Keep the garment/product as the hero subject in each keyframe, avoid visual clutter that hides product details.
 15. **CTA-SAFE ENDING** — The final scene should naturally set up a conversion CTA line for TikTok affiliate flow.
 16. **TEMPLATE CONSISTENCY** — Keep narrative style and CTA intensity aligned with the selected Sales Template.
@@ -525,7 +525,7 @@ Output as JSON with this exact structure:
       "timestamp": "0s",
       "subject": "face preservation instruction",
       "action": "pose/movement description",
-      "location": "real location in Vietnam (city + venue details)",
+      "location": "real location (city/area + venue details, any country)",
       "camera": "lens, shot type, angle",
       "lighting": "lighting setup",
       "style": "photography style"
@@ -674,7 +674,7 @@ Output as JSON with this exact structure:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
-    const vietnamFallbackNonce = Math.random().toString(36).slice(2, 8)
+    const locationFallbackNonce = Math.random().toString(36).slice(2, 8)
     const blockedLocationKeys = new Set(normalizedUsedLocations.map((location) => normalizeLocationKey(location)))
     const usedLocationKeysInRun = new Set<string>()
 
@@ -683,24 +683,30 @@ Output as JSON with this exact structure:
       return location
     }
 
-    const pickVietnamLocationFallback = (index: number) => {
-      const fallback = `Vietnam (real-world venue; AI should specify city/province + venue details) [fallback-${index + 1}-${vietnamFallbackNonce}]`
+    const globalFallbackLocations = [
+      'Old Quarter cafe lane, Hanoi, Vietnam',
+      'Shibuya Center-Gai fashion street, Tokyo, Japan',
+      'Myeongdong retail district, Seoul, South Korea',
+      'Orchard Road shopping belt, Singapore',
+      'Le Marais fashion lane, Paris, France',
+      'Soho shopping street, London, United Kingdom',
+    ]
+
+    const pickLocationFallback = (index: number) => {
+      const seedLocation = globalFallbackLocations[index % globalFallbackLocations.length]
+      const fallback = `${seedLocation} [fallback-${index + 1}-${locationFallbackNonce}]`
       return markLocationUsed(fallback)
     }
 
-    const hasVietnamReference = (value: string) => (
-      /(viet\s?nam|vietnam|ha\s?noi|hanoi|ho\s?chi\s?minh|sai\s?gon|saigon|da\s?nang|hoi\s?an|da\s?lat|nha\s?trang|can\s?tho|ha\s?long|hue|phu\s?quoc)/i.test(value)
-    )
-
-    const ensureVietnamLocation = (value: unknown, index: number) => {
+    const ensureRealLocation = (value: unknown, index: number) => {
       const candidate = toSafeString(value, '')
-      if (candidate.length > 0 && hasVietnamReference(candidate)) {
+      if (candidate.length > 0) {
         const candidateKey = normalizeLocationKey(candidate)
         if (!blockedLocationKeys.has(candidateKey) && !usedLocationKeysInRun.has(candidateKey)) {
           return markLocationUsed(candidate)
         }
       }
-      return pickVietnamLocationFallback(index)
+      return pickLocationFallback(index)
     }
 
     const fallbackActionByType: Record<Exclude<ContentType, 'auto'>, string> = {
@@ -736,7 +742,7 @@ Output as JSON with this exact structure:
     const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
       const subject = `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`
       const action = toSafeString(kf.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
-      const location = ensureVietnamLocation(kf.location, i)
+      const location = ensureRealLocation(kf.location, i)
       const camera = toSafeString(kf.camera, inferredCameraFallback)
       const lighting = toSafeString(kf.lighting, inferredLightingFallback)
       const style = toSafeString(kf.style, fallbackStyleByType[finalContentType as Exclude<ContentType, 'auto'>])
