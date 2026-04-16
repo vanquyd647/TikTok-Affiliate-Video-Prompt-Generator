@@ -71,6 +71,11 @@ interface VoiceoverTaskResult {
   generatedAt: number
 }
 
+interface PromptToastState {
+  kind: 'loading' | 'success' | 'error'
+  message: string
+}
+
 interface RecentLocalImage {
   id: string
   name: string
@@ -127,6 +132,12 @@ const AFF_STORAGE_DB_VERSION = 1
 const AFF_STORAGE_STORE = 'recent_local_images'
 const PRODUCT_LOCATION_HISTORY_STORAGE_KEY = 'aff_product_location_history_v1'
 const MAX_LOCATION_HISTORY_PER_PRODUCT = 40
+const PROMPT_LOADING_STAGES = [
+  'AI đang phân tích ảnh khuôn mặt...',
+  'AI đang phân tích ảnh sản phẩm...',
+  'AI đang dựng keyframe và scene prompts...',
+  'AI đang tối ưu prompt đầu ra...',
+] as const
 
 // ═══════════════════════════════════════════════
 // PROMPT ENGINE — N+1 Algorithm
@@ -1524,6 +1535,8 @@ export default function App() {
   const [contentType, setContentType] = useState<ContentType>('ootd')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingStageIndex, setLoadingStageIndex] = useState(0)
+  const [promptToast, setPromptToast] = useState<PromptToastState | null>(null)
   const [seoLoading, setSeoLoading] = useState(false)
   const [voiceoverLoading, setVoiceoverLoading] = useState(false)
   const [error, setError] = useState('')
@@ -1546,6 +1559,30 @@ export default function App() {
   useEffect(() => { localStorage.setItem('aff_model', model) }, [model])
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
 
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStageIndex(0)
+      return
+    }
+
+    setLoadingStageIndex(0)
+    const timer = window.setInterval(() => {
+      setLoadingStageIndex((prev) => Math.min(prev + 1, PROMPT_LOADING_STAGES.length - 1))
+    }, 1700)
+
+    return () => window.clearInterval(timer)
+  }, [loading])
+
+  useEffect(() => {
+    if (!promptToast || promptToast.kind === 'loading') return
+
+    const timer = window.setTimeout(() => {
+      setPromptToast(null)
+    }, 3600)
+
+    return () => window.clearTimeout(timer)
+  }, [promptToast])
+
   // Derived
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const canGenerate = apiKey.trim().length > 0
@@ -1555,6 +1592,18 @@ export default function App() {
   const hasSeoResult = seoResult !== null
   const hasVoiceoverResult = voiceoverResult !== null
   const hasAnyResult = hasPromptResult || hasSeoResult || hasVoiceoverResult
+  const promptStatusKind = loading ? 'loading' : error ? 'error' : hasPromptResult ? 'success' : 'idle'
+  const promptLoadingStep = PROMPT_LOADING_STAGES[Math.min(loadingStageIndex, PROMPT_LOADING_STAGES.length - 1)]
+  const promptLoadingProgress = loading ? Math.min(90, 24 + loadingStageIndex * 22) : 100
+  const promptFloatingStatus = loading
+    ? promptLoadingStep
+    : error
+      ? 'Có lỗi khi tạo prompt. Kiểm tra thông báo để thử lại.'
+      : hasPromptResult
+        ? 'Prompt package đã sẵn sàng ở panel kết quả.'
+        : canGenerate
+          ? 'Sẵn sàng tạo Prompt Package ngay bây giờ.'
+          : 'Nhập Gemini API Key để bật tính năng tạo prompt.'
   const selectedSeoVariant = seoResult
     ? seoResult.seoVariants[Math.min(selectedSeoVariantIndex, seoResult.seoVariants.length - 1)]
     : null
@@ -1567,6 +1616,11 @@ export default function App() {
   // Generate handler
   const handleGenerate = async () => {
     setLoading(true)
+    setLoadingStageIndex(0)
+    setPromptToast({
+      kind: 'loading',
+      message: 'Đang tạo Prompt Package, vui lòng chờ trong giây lát...',
+    })
     setError('')
     setResult(null)
 
@@ -1597,6 +1651,10 @@ export default function App() {
       setResult(res)
       setSelectedContentType(usedType)
       setActiveTab('keyframes')
+      setPromptToast({
+        kind: 'success',
+        message: 'Đã tạo xong Prompt Package. Bạn có thể copy hoặc export ngay.',
+      })
 
       if (currentProductImageId) {
         const generatedLocations = Array.from(
@@ -1619,9 +1677,15 @@ export default function App() {
         }
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to generate prompts')
+      const message = err?.message || 'Failed to generate prompts'
+      setError(message)
+      setPromptToast({
+        kind: 'error',
+        message,
+      })
     } finally {
       setLoading(false)
+      setPromptToast((prev) => (prev?.kind === 'loading' ? null : prev))
     }
   }
 
@@ -2146,32 +2210,37 @@ export default function App() {
               </p>
             </div>
 
-            {/* Generate Button */}
-            <button
-              id="generate-btn"
-              className={`btn-generate ${loading ? 'loading' : ''}`}
-              onClick={handleGenerate}
-              disabled={loading || !canGenerate}
-            >
-              {loading ? (
-                <>
+            <div className={`prompt-inline-status prompt-inline-status-${promptStatusKind}`}>
+              <div className="prompt-inline-status-head">
+                {loading ? (
                   <div className="spinner" />
-                  Đang tạo prompt...
-                </>
-              ) : (
-                <>
-                  <Wand2 size={18} />
-                  Tạo Prompt Package
-                  <ArrowRight size={16} />
-                </>
-              )}
-            </button>
-
-            {loading && (
-              <div className="progress-bar">
-                <div className="progress-bar-fill" style={{ width: '60%' }} />
+                ) : promptStatusKind === 'error' ? (
+                  <AlertCircle size={16} />
+                ) : promptStatusKind === 'success' ? (
+                  <Check size={16} />
+                ) : (
+                  <Wand2 size={16} />
+                )}
+                <div>
+                  <p className="prompt-inline-status-title">
+                    {loading
+                      ? 'Đang tạo Prompt Package'
+                      : promptStatusKind === 'error'
+                        ? 'Tạo prompt chưa thành công'
+                        : promptStatusKind === 'success'
+                          ? 'Prompt package đã sẵn sàng'
+                          : 'Nút tạo prompt đang nổi cố định phía dưới màn hình'}
+                  </p>
+                  <p className="prompt-inline-status-subtitle">{promptFloatingStatus}</p>
+                </div>
               </div>
-            )}
+
+              {loading && (
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: `${promptLoadingProgress}%` }} />
+                </div>
+              )}
+            </div>
 
             {error && (
               <div className="error-message">
@@ -2507,6 +2576,71 @@ export default function App() {
             </div>
           </div>
         </div>
+
+        <div className="prompt-floating-bar-wrap" role="region" aria-label="Tạo Prompt Package">
+          <div className={`prompt-floating-bar ${loading ? 'is-loading' : ''}`}>
+            <div className="prompt-floating-meta">
+              <p className="prompt-floating-title">Tạo Prompt Package</p>
+              <p className={`prompt-floating-subtitle ${promptStatusKind}`}>
+                {promptFloatingStatus}
+              </p>
+            </div>
+
+            <button
+              id="generate-btn"
+              className={`btn-generate prompt-floating-btn ${loading ? 'loading' : ''}`}
+              onClick={handleGenerate}
+              disabled={loading || !canGenerate}
+            >
+              {loading ? (
+                <>
+                  <div className="spinner" />
+                  Đang tạo prompt...
+                </>
+              ) : (
+                <>
+                  <Wand2 size={18} />
+                  Tạo Prompt Package
+                  <ArrowRight size={16} />
+                </>
+              )}
+            </button>
+
+            {loading && (
+              <div className="prompt-floating-progress">
+                <div className="prompt-floating-progress-fill" style={{ width: `${promptLoadingProgress}%` }} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {promptToast && (
+          <div
+            className={`prompt-toast prompt-toast-${promptToast.kind}`}
+            role="status"
+            aria-live="polite"
+          >
+            <div className={`prompt-toast-icon ${promptToast.kind === 'loading' ? 'spinning' : ''}`}>
+              {promptToast.kind === 'success' ? (
+                <Check size={15} />
+              ) : promptToast.kind === 'error' ? (
+                <AlertCircle size={15} />
+              ) : (
+                <Sparkles size={15} />
+              )}
+            </div>
+            <div className="prompt-toast-body">
+              <p className="prompt-toast-title">
+                {promptToast.kind === 'loading'
+                  ? 'Đang tạo Prompt Package'
+                  : promptToast.kind === 'success'
+                    ? 'Tạo Prompt thành công'
+                    : 'Có lỗi khi tạo Prompt'}
+              </p>
+              <p className="prompt-toast-message">{promptToast.message}</p>
+            </div>
+          </div>
+        )}
       </div>
     </>
   )
