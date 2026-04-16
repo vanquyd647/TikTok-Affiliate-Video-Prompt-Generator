@@ -496,22 +496,29 @@ LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsPrompt}
 
 CRITICAL RULES:
-1. Each scene is exactly 8 seconds, using Veo 3.1's first-frame + last-frame interpolation
-2. Keyframe images must be SEAMLESSLY CONNECTED: the last frame of scene N = first frame of scene N+1
-3. Character identity must be PERFECTLY CONSISTENT across all keyframes (use Character DNA)
-4. Product/garment must be EXACTLY preserved from reference image
-5. Follow TikTok viral structure: Hook (0-3s) → Value → Proof → CTA
-6. Infer location, lighting, camera mood, and styling directly from the provided reference images (face + garment) instead of generic preset randomness
-7. Keep scene context coherent across the timeline; only change location when there is a clear narrative transition
-8. NEVER use background, location, props, or lighting from the FACE reference image. The face image is identity-only and must not influence scene context.
-9. Infer scene context primarily from garment/product characteristics, content type, and user notes.
-10. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Select authentic, recognizable real locations (cafes, streets, parks, urban spaces, shopping districts, studios) NOT CGI, digital backgrounds, or artificial environments. Include specific venue characteristics that make the scene feel authentic and photogenic.
-11. **LOCATION SCOPE = GLOBAL REAL LOCATIONS** — You may use real locations from any country. Always include specific city/area + venue details (street, district, mall, cafe, park, waterfront, etc.) so the place feels concrete and cinematic.
-12. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed above to generate a fresh concept each run. Do not repeat template wording. Ensure ACTION, LOCATION, CAMERA, and NARRATIVE fields are not duplicated across keyframes/scenes in the same output.
-13. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID** — Do NOT use any location from the provided "LOCATIONS ALREADY USED" list. Pick different real venues.
-14. **PRODUCT-FIRST COMPOSITION** — Keep the garment/product as the hero subject in each keyframe, avoid visual clutter that hides product details.
-15. **CTA-SAFE ENDING** — The final scene should naturally set up a conversion CTA line for TikTok affiliate flow.
-16. **TEMPLATE CONSISTENCY** — Keep narrative style and CTA intensity aligned with the selected Sales Template.
+1. Each scene is exactly 8 seconds, using Veo 3.1 first-frame + last-frame interpolation.
+2. Keyframe chain must be SEAMLESS: last frame of scene N = first frame of scene N+1.
+3. Character identity must be perfectly consistent across all keyframes (face, body proportions, hair, skin tone).
+4. Product/garment must be EXACTLY preserved from the reference image (color, silhouette, material, details).
+5. Follow TikTok retention arc across timeline: Hook (0-3s) → Value → Proof → CTA.
+6. Scene 1 must create a strong visual hook in the first 1-3 seconds with immediate product readability.
+7. Infer scene context from garment/product characteristics, content type, and user notes; avoid generic preset randomness.
+8. NEVER use background, location, props, or lighting from the FACE reference image. Face image is identity-only.
+9. Keep scene context coherent; only change location when there is a clear narrative transition.
+10. Prompt detail quality must follow Veo best practice: each keyframe/scenes should be specific on Subject, Action, Camera, Composition, Style, and Ambiance/Lighting.
+11. Camera grammar must stay coherent: one dominant camera move per 8s scene, no chaotic mixed camera instructions.
+12. Motion continuity is mandatory across scene boundaries: maintain compatible direction, speed feel, and body orientation to reduce interpolation artifacts.
+13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
+14. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments.
+15. **LOCATION SCOPE = GLOBAL REAL LOCATIONS** — Any country is allowed, but always provide concrete city/area + venue details.
+16. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID** — Never reuse locations listed in "LOCATIONS ALREADY USED".
+17. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed to generate fresh concepts; do not duplicate ACTION, LOCATION, CAMERA, NARRATIVE in one output.
+18. **PRODUCT-FIRST COMPOSITION** — Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
+19. **MOBILE SAFE-FRAME RULE** — Keep hero subject in a central safe area and avoid placing critical details at extreme top/bottom edges where TikTok UI/captions can cover them.
+20. **RETENTION PACING RULE** — Avoid static visuals for too long; every ~1-2 seconds should include meaningful subject or camera progression.
+21. **AUDIO CUE CLARITY (IF USED)** — If adding dialogue/SFX/ambience in narrative, describe it explicitly and naturally (quote dialogue, define ambient sound) so audio aligns with visuals.
+22. **AUTHENTICITY + TRUST** — Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
+23. **CTA-SAFE ENDING + TEMPLATE CONSISTENCY** — Final scene must naturally set up conversion CTA while keeping tone and pressure aligned with selected Sales Template.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
