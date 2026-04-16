@@ -37,6 +37,9 @@ interface GenerateResult {
   keyframes: KeyframePrompt[]
   scenes: ScenePrompt[]
   createImagePrompt?: string
+  resolvedContentType?: ResolvedContentType
+  affiliateModeUsed?: AffiliateMode
+  salesTemplateUsed?: SalesTemplate
 }
 
 interface SeoVariant {
@@ -115,8 +118,10 @@ const CONTENT_TYPES = [
   { value: 'auto', label: 'Auto', icon: Sparkles, desc: 'AI Decides', color: 'var(--accent-purple)' },
   { value: 'ootd', label: 'OOTD', icon: Shirt, desc: 'Outfit of the Day', color: 'var(--accent-pink)' },
   { value: 'grwm', label: 'GRWM', icon: Star, desc: 'Get Ready With Me', color: 'var(--accent-purple)' },
-  { value: 'fyp', label: 'FYP', icon: TrendingUp, desc: 'For You Page', color: 'var(--accent-cyan)' },
+  { value: 'outfitideas', label: 'Outfit Ideas', icon: Shirt, desc: 'Lookbook / Phoi do', color: '#22c55e' },
+  { value: 'fyp', label: 'FYP', icon: TrendingUp, desc: 'Viral Discovery', color: 'var(--accent-cyan)' },
   { value: 'review', label: 'Review', icon: MessageSquare, desc: 'Product Review', color: 'var(--accent-emerald)' },
+  { value: 'tiktokshop', label: 'TikTok Shop', icon: Sparkles, desc: 'Affiliate Conversion', color: '#f97316' },
   { value: 'athleisure', label: 'Athleisure', icon: TrendingUp, desc: 'Gym-to-Café Styling', color: '#10b981' },
   { value: 'haul', label: 'Haul', icon: Layers, desc: 'Try-On / Collection Showcase', color: '#f59e0b' },
   { value: 'styling', label: 'Styling', icon: Wand2, desc: 'Fashion Styling Tips', color: '#ec4899' },
@@ -125,6 +130,8 @@ const CONTENT_TYPES = [
 
 type ContentType = typeof CONTENT_TYPES[number]['value']
 type ResolvedContentType = Exclude<ContentType, 'auto'>
+type AffiliateMode = 'balanced' | 'strict'
+type SalesTemplate = 'hard' | 'soft'
 type ProductLocationHistoryMap = Record<string, string[]>
 
 const AFF_STORAGE_DB_NAME = 'aff_prompt_storage'
@@ -138,6 +145,52 @@ const PROMPT_LOADING_STAGES = [
   'AI đang dựng keyframe và scene prompts...',
   'AI đang tối ưu prompt đầu ra...',
 ] as const
+
+const FIXED_AFFILIATE_MODE: AffiliateMode = 'strict'
+const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
+const FIXED_STRATEGY_LABEL = 'TikTok Shop Core (Strict AUTO + Soft Sell)'
+const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-first de ban ben vung.'
+
+const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfitideas', 'review', 'ootd']
+
+const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
+  ootd: 'Prioritize clean outfit readability and aspirational styling while keeping product details purchase-relevant.',
+  grwm: 'Build trust through natural routine storytelling, then transition clearly to product desire and purchase intent.',
+  outfitideas: 'Deliver practical lookbook combinations users can copy immediately, with clear value for saving/sharing and buying.',
+  fyp: 'Create high-retention viral pacing but still preserve product clarity and affiliate conversion direction.',
+  review: 'Lead with honest product proof, fit/material verification, and credible recommendation cues.',
+  tiktokshop: 'Maximize conversion for TikTok Shop: strong hook, product proof, objection handling, and explicit buy-now CTA.',
+  athleisure: 'Show movement comfort and styling versatility from active to casual settings, tied to practical purchase value.',
+  haul: 'Showcase variety and excitement with clear piece-by-piece value, fit proof, and purchasing motivation.',
+  styling: 'Teach actionable styling transformations that position the product as a high-utility wardrobe solution.',
+  luxury: 'Communicate premium quality, silhouette precision, and refined aspirational value that justifies purchase.',
+}
+
+function buildSalesTemplateRules(salesTemplate: SalesTemplate): string {
+  if (salesTemplate === 'hard') {
+    return `HARD SELL TEMPLATE (A):
+- Emphasize urgency cues (limited stock, deal window, hot trend now).
+- Use direct buying language and stronger conversion energy.
+- Keep pacing punchy and outcome-oriented.`
+  }
+
+  return `SOFT SELL TEMPLATE (B):
+- Lead with trust, comfort, and practical daily utility.
+- Use recommendation tone before direct CTA.
+- Keep language natural, friendly, and less aggressive while still conversion-focused.`
+}
+
+function buildSeoToneHint(salesTemplate: SalesTemplate): string {
+  return salesTemplate === 'hard'
+    ? 'SEO tone: stronger urgency and deal-forward copy, but avoid spammy claims.'
+    : 'SEO tone: trust-led and benefit-led copy with softer CTA and natural persuasion.'
+}
+
+function buildVoiceoverToneHint(salesTemplate: SalesTemplate): string {
+  return salesTemplate === 'hard'
+    ? 'Voiceover tone: energetic and conversion-forward with clear urgency cues.'
+    : 'Voiceover tone: warm, trustworthy, and relatable with softer recommendation flow.'
+}
 
 // ═══════════════════════════════════════════════
 // PROMPT ENGINE — N+1 Algorithm
@@ -161,6 +214,14 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'FINAL GLAM REVEAL', emoji: '✨', cameraHint: 'Slow push-in on completed look' },
     { name: 'READY TO GO', emoji: '🎬', cameraHint: 'Confident walk-out with cinematic farewell' },
   ],
+  outfitideas: [
+    { name: 'LOOKBOOK HOOK', emoji: '📌', cameraHint: 'Quick full-body reveal with clean framing for instant outfit read' },
+    { name: 'BASE PIECE FOCUS', emoji: '👚', cameraHint: 'Medium shot highlighting hero garment and fit details' },
+    { name: 'MIX-AND-MATCH TRANSITION', emoji: '🔁', cameraHint: 'Smooth transition shot swapping layers/accessories' },
+    { name: 'SITUATION STYLING', emoji: '👜', cameraHint: 'Lifestyle framing showing office/date/cafe-ready variation' },
+    { name: 'DETAILS THAT SELL', emoji: '✨', cameraHint: 'Close-up on texture, silhouette, and finishing details' },
+    { name: 'SAVEABLE FINAL LOOK', emoji: '🎬', cameraHint: 'Clean final look hold with polished full-body composition' },
+  ],
   fyp: [
     { name: 'SCROLL-STOPPING HOOK', emoji: '🎯', cameraHint: 'Dramatic slow-mo entrance or unexpected angle' },
     { name: 'AESTHETIC MOMENT', emoji: '💫', cameraHint: 'Smooth lateral tracking, dreamy atmosphere' },
@@ -176,6 +237,14 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'TRY-ON MOMENT', emoji: '👗', cameraHint: 'Full body try-on, spinning showcase' },
     { name: 'HONEST VERDICT', emoji: '⭐', cameraHint: 'Eye-level talking head, honest expression' },
     { name: 'FINAL RECOMMENDATION', emoji: '🎬', cameraHint: 'Happy model with product, call-to-action framing' },
+  ],
+  tiktokshop: [
+    { name: 'PRODUCT HOOK + PRICE SIGNAL', emoji: '🛍️', cameraHint: 'Immediate hero shot with strong product readability' },
+    { name: 'FIT & MATERIAL PROOF', emoji: '🧵', cameraHint: 'Close-up to medium transitions proving fabric and fit' },
+    { name: 'TRY-ON VALUE MOMENT', emoji: '👗', cameraHint: 'Full-body movement emphasizing versatility and comfort' },
+    { name: 'SOCIAL PROOF VISUAL', emoji: '⭐', cameraHint: 'Lifestyle framing with confident model reaction beat' },
+    { name: 'BUYING OBJECTION HANDLER', emoji: '✅', cameraHint: 'Detail-focused shot answering size/quality concerns' },
+    { name: 'CTA CLOSER', emoji: '🎬', cameraHint: 'Clean end frame optimized for tap-to-shop conversion' },
   ],
   athleisure: [
     { name: 'GYM-TO-CAFÉ TRANSITION HOOK', emoji: '🏃‍♀️', cameraHint: 'Dynamic entrance from gym, effortless swagger' },
@@ -215,8 +284,10 @@ function buildCharacterDNA(notes: string, contentType: ResolvedContentType): str
   const styleMap: Record<ResolvedContentType, string> = {
     ootd: 'Professional fashion editorial, OOTD TikTok, cinematic quality',
     grwm: 'Lifestyle vlog aesthetic, warm and intimate GRWM style',
+    outfitideas: 'Practical lookbook aesthetic, mix-and-match styling with daily wear context',
     fyp: 'Trending viral aesthetic, high-fashion editorial with cinematic flair',
     review: 'Authentic product review style, natural lighting, trustworthy feel',
+    tiktokshop: 'Conversion-focused TikTok Shop style, product clarity, social proof, and CTA-driven framing',
     athleisure: 'Urban sporty-chic lifestyle, gym-to-café casual confidence',
     haul: 'Excited energetic unboxing aesthetic, approachable and relatable',
     styling: 'Expert fashion advisor aesthetic, polished and informative',
@@ -234,8 +305,10 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
   const contentDesc: Record<ResolvedContentType, string> = {
     ootd: 'OOTD (Outfit of the Day) — full outfit showcase with front and back views',
     grwm: 'GRWM (Get Ready With Me) — warm lifestyle aesthetic showing complete look',
+    outfitideas: 'Outfit Ideas — lookbook format with practical mix-and-match inspiration',
     fyp: 'FYP (For You Page) — viral trending aesthetic with dramatic fashion presentation',
     review: 'Product Review — authentic product showcase highlighting garment quality and details',
+    tiktokshop: 'TikTok Shop Affiliate — conversion-focused showcase with clear purchase motivation',
     athleisure: 'Athleisure — gym-to-café styling combining sportswear with casual sophistication',
     haul: 'Haul Showcase — collection display with multiple outfit combinations',
     styling: 'Fashion Styling Guide — showcase expert outfit coordination and versatility',
@@ -259,6 +332,8 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
 [BACKGROUND]: Clean gradient backdrop — warm cream to soft taupe, matching the ${contentType.toUpperCase()} aesthetic.
 
 [STYLE]: Professional fashion e-commerce photography. ${
+  contentType === 'tiktokshop' ? 'Conversion-focused showcase with clear value proposition and buy-now momentum.' :
+  contentType === 'outfitideas' ? 'Lookbook inspiration style with practical daily styling guidance.' :
   contentType === 'review' ? 'Authentic and trustworthy feel.' :
   contentType === 'luxury' ? 'Understated elegance, refined luxury presentation.' :
   contentType === 'athleisure' ? 'Urban sporty-chic, approachable lifestyle.' :
@@ -347,7 +422,9 @@ async function generateWithGemini(
   aspectRatio: string,
   notes: string,
   contentType: ContentType = 'ootd',
-  usedLocationsForProduct: string[] = []
+  usedLocationsForProduct: string[] = [],
+  affiliateMode: AffiliateMode = 'balanced',
+  salesTemplate: SalesTemplate = 'hard'
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const { scenes: sceneCount, keyframes: keyframeCount } = durationInfo
@@ -355,6 +432,33 @@ async function generateWithGemini(
   // Determine final content type (if 'auto', AI will decide)
   const isAuto = contentType === 'auto'
   const contentTypeForPrompt = isAuto ? '(AI will automatically determine the best type)' : contentType.toUpperCase()
+  const affiliateModeLabel = affiliateMode === 'strict' ? 'STRICT' : 'BALANCED'
+  const salesTemplateLabel = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
+  const affiliateObjective = isAuto
+    ? 'In AUTO mode, prioritize types that improve affiliate conversion for women fashion (tiktokshop, outfitideas, ootd, review) before generic viral framing.'
+    : AFFILIATE_VIDEO_OBJECTIVES[contentType as ResolvedContentType]
+  const autoModeRule = affiliateMode === 'strict'
+    ? 'STRICT AUTO MODE: only allow conversion-oriented types (tiktokshop, outfitideas, review, ootd). If uncertain, default to tiktokshop.'
+    : 'BALANCED AUTO MODE: allow broader creative variety but still prioritize conversion-friendly fashion formats.'
+  const salesTemplateRules = buildSalesTemplateRules(salesTemplate)
+  const affiliateExecutionRules = `
+AFFILIATE CONVERSION OBJECTIVE:
+${affiliateObjective}
+
+AFFILIATE MODE:
+${affiliateModeLabel}
+${autoModeRule}
+
+SALES TEMPLATE:
+${salesTemplateLabel}
+${salesTemplateRules}
+
+AFFILIATE EXECUTION RULES:
+- Scene 1 must create a clear scroll-stopping hook within the first 1.5 seconds while keeping garment visible.
+- Across all scenes, garment/product visibility should remain high and details must be readable for purchase decisions.
+- Include at least one proof cue: fit demonstration, fabric/texture close-up, real-life usage, or social-proof style reaction.
+- Final scene must end with explicit purchase intent framing (buy now, check link/cart, limited stock, deal urgency) in narrative language.
+- Avoid overly abstract cinematic framing that reduces product clarity.`
   const diversitySeed = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   const normalizedUsedLocations = Array.from(
     new Set(
@@ -369,7 +473,7 @@ async function generateWithGemini(
     : 'None yet for this product image ID'
 
   // Build the master prompt for Gemini
-  const systemPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos (OOTD, FYP). 
+  const systemPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos (OOTD, GRWM, TikTok Shop, Outfit Ideas, Review). 
 
 Your task: Generate a COMPLETE prompt package for a ${duration}-second video with:
 - ${keyframeCount} keyframe image prompts (n+1 algorithm: ${sceneCount} scenes need ${keyframeCount} images)
@@ -382,8 +486,11 @@ ${isAuto ? `Since content type is set to AUTO, you MUST first analyze the provid
 - Garment category (outfit piece, sportswear, luxury item, collection item, etc.)
 - Visual characteristics and best presentation style
 - Trending TikTok content format for this product
-Valid types: ootd, grwm, fyp, review, athleisure, haul, styling, luxury
-Include your recommended type in the JSON response as "recommendedContentType".` : ''}
+Valid types: ootd, grwm, outfitideas, fyp, review, tiktokshop, athleisure, haul, styling, luxury
+Include your recommended type in the JSON response as "recommendedContentType".
+${autoModeRule}` : ''}
+
+${affiliateExecutionRules}
 
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsPrompt}
@@ -402,13 +509,16 @@ CRITICAL RULES:
 11. **LOCATION COUNTRY LOCK = VIETNAM ONLY** — Every location MUST be in Vietnam. Use specific Vietnamese city/province and venue details (e.g., Hanoi Old Quarter, Nguyen Hue Walking Street in Ho Chi Minh City, Da Nang beachside boulevard, Hoi An ancient town streets, Da Lat hill cafe district).
 12. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed above to generate a fresh concept each run. Do not repeat template wording. Ensure ACTION, LOCATION, CAMERA, and NARRATIVE fields are not duplicated across keyframes/scenes in the same output.
 13. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID** — Do NOT use any location from the provided "LOCATIONS ALREADY USED" list. Pick different real venues in Vietnam.
+14. **PRODUCT-FIRST COMPOSITION** — Keep the garment/product as the hero subject in each keyframe, avoid visual clutter that hides product details.
+15. **CTA-SAFE ENDING** — The final scene should naturally set up a conversion CTA line for TikTok affiliate flow.
+16. **TEMPLATE CONSISTENCY** — Keep narrative style and CTA intensity aligned with the selected Sales Template.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
 Output as JSON with this exact structure:
 {
   "masterDNA": "character consistency description",
-  ${isAuto ? '"recommendedContentType": "ootd|grwm|fyp|review|athleisure|haul|styling|luxury",' : ''}
+  ${isAuto ? '"recommendedContentType": "ootd|grwm|outfitideas|fyp|review|tiktokshop|athleisure|haul|styling|luxury",' : ''}
   "keyframes": [
     {
       "index": 0,
@@ -530,10 +640,23 @@ Output as JSON with this exact structure:
     let finalContentType: ContentType = contentType as ContentType
     if (isAuto && typeof parsed.recommendedContentType === 'string') {
       const recommended = parsed.recommendedContentType.toLowerCase()
-      const validTypes: ContentType[] = ['ootd', 'grwm', 'fyp', 'review', 'athleisure', 'haul', 'styling', 'luxury']
+      const validTypes: ContentType[] = ['ootd', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury']
       if (validTypes.includes(recommended as ContentType)) {
         finalContentType = recommended as ContentType
       }
+
+      // FYP is a distribution label; in AUTO affiliate mode, remap to a concrete commerce format.
+      if (finalContentType === 'fyp') {
+        finalContentType = 'outfitideas'
+      }
+
+      if (affiliateMode === 'strict' && !STRICT_AUTO_ALLOWED_TYPES.includes(finalContentType as ResolvedContentType)) {
+        finalContentType = 'tiktokshop'
+      }
+    }
+
+    if (finalContentType === 'auto') {
+      finalContentType = affiliateMode === 'strict' ? 'tiktokshop' : 'outfitideas'
     }
 
     const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
@@ -583,8 +706,10 @@ Output as JSON with this exact structure:
     const fallbackActionByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Confident outfit showcase pose and movement tailored for OOTD storytelling',
       grwm: 'Natural getting-ready movement that highlights styling steps and final look',
+      outfitideas: 'Practical mix-and-match outfit demonstration with clear style transformation',
       fyp: 'Scroll-stopping fashion movement with dynamic pose transition',
       review: 'Authentic product demonstration pose emphasizing fit and material quality',
+      tiktokshop: 'Conversion-focused product showcase movement optimized for TikTok Shop CTA',
       athleisure: 'Energetic gym-to-café transition movement with sporty-chic confidence',
       haul: 'Excited try-on movements showcasing product fit and styling versatility',
       styling: 'Purposeful modeling pose highlighting outfit coordination and styling impact',
@@ -594,8 +719,10 @@ Output as JSON with this exact structure:
     const fallbackStyleByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Professional fashion editorial, OOTD TikTok aesthetic',
       grwm: 'Warm lifestyle GRWM visual style, intimate and clean',
+      outfitideas: 'Practical outfit idea lookbook, clean visual hierarchy and wearable styling cues',
       fyp: 'Viral cinematic fashion style with bold visual energy',
       review: 'Trustworthy product review style with high material clarity',
+      tiktokshop: 'TikTok Shop conversion style with product clarity, social proof, and urgency cues',
       athleisure: 'Urban sporty-chic lifestyle photography, natural daylight',
       haul: 'Energetic colorful unboxing and try-on aesthetic, dynamic lighting',
       styling: 'Expert fashion editorial style, polished and educational',
@@ -671,6 +798,9 @@ FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
       masterDNA: parsed.masterDNA || buildCharacterDNA(notes, finalContentType as Exclude<ContentType, 'auto'>),
       keyframes,
       scenes,
+      resolvedContentType: finalContentType as ResolvedContentType,
+      affiliateModeUsed: affiliateMode,
+      salesTemplateUsed: salesTemplate,
     }
   } catch (error: any) {
     throw new Error(error?.message || 'Gemini generation failed')
@@ -759,17 +889,20 @@ async function generateSeoWithGemini(
   model: string,
   productName: string,
   extraNotes: string,
-  contentType: ContentType
+  contentType: ContentType,
+  salesTemplate: SalesTemplate
 ): Promise<SeoTaskResult> {
   const trimmedProductName = productName.trim()
   const trimmedNotes = extraNotes.trim()
   const contentHint = contentType === 'auto' ? 'AUTO' : contentType.toUpperCase()
+  const salesTemplateHint = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
 
   const systemPrompt = `You are a senior TikTok Shop content strategist and copywriter.
 
 INPUT:
 - Product name: ${trimmedProductName}
 - Preferred content type: ${contentHint}
+- Sales template: ${salesTemplateHint}
 ${trimmedNotes ? `- Additional notes: ${trimmedNotes}` : '- Additional notes: none'}
 
 TASK:
@@ -780,6 +913,7 @@ TASK:
   3) "hook": one short hook sentence.
   4) "cta": one short call-to-action sentence.
 - Title must include product intent and buying motivation, avoid spammy overclaims.
+- ${buildSeoToneHint(salesTemplate)}
 
 Return JSON only with this exact schema:
 {
@@ -906,17 +1040,20 @@ async function generateVoiceoverWithGemini(
   model: string,
   productName: string,
   extraNotes: string,
-  contentType: ContentType
+  contentType: ContentType,
+  salesTemplate: SalesTemplate
 ): Promise<VoiceoverTaskResult> {
   const trimmedProductName = productName.trim()
   const trimmedNotes = extraNotes.trim()
   const contentHint = contentType === 'auto' ? 'AUTO' : contentType.toUpperCase()
+  const salesTemplateHint = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
 
   const systemPrompt = `You are a senior TikTok Shop video script writer.
 
 INPUT:
 - Product name: ${trimmedProductName}
 - Preferred content type: ${contentHint}
+- Sales template: ${salesTemplateHint}
 ${trimmedNotes ? `- Additional notes: ${trimmedNotes}` : '- Additional notes: none'}
 
 TASK:
@@ -928,6 +1065,7 @@ TASK:
   * 15-24s: social proof / usage context
   * 24-30s: CTA
 - Tone must be natural, trust-building, and conversion-friendly.
+- ${buildVoiceoverToneHint(salesTemplate)}
 
 Return JSON only with this exact schema:
 {
@@ -1546,7 +1684,7 @@ export default function App() {
   const [seoResult, setSeoResult] = useState<SeoTaskResult | null>(null)
   const [voiceoverResult, setVoiceoverResult] = useState<VoiceoverTaskResult | null>(null)
   const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image' | 'seo' | 'voiceover'>('keyframes')
-  const [selectedContentType, setSelectedContentType] = useState<ContentType>('auto')
+  const [selectedContentType, setSelectedContentType] = useState<ResolvedContentType>('ootd')
   const [seoProductName, setSeoProductName] = useState('')
   const [seoNotes, setSeoNotes] = useState('')
   const [voiceoverProductName, setVoiceoverProductName] = useState('')
@@ -1600,9 +1738,9 @@ export default function App() {
     : error
       ? 'Có lỗi khi tạo prompt. Kiểm tra thông báo để thử lại.'
       : hasPromptResult
-        ? 'Prompt package đã sẵn sàng ở panel kết quả.'
+        ? `Prompt package đã sẵn sàng (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL}).`
         : canGenerate
-          ? 'Sẵn sàng tạo Prompt Package ngay bây giờ.'
+          ? `Sẵn sàng tạo Prompt Package (${FIXED_STRATEGY_DESC}).`
           : 'Nhập Gemini API Key để bật tính năng tạo prompt.'
   const selectedSeoVariant = seoResult
     ? seoResult.seoVariants[Math.min(selectedSeoVariantIndex, seoResult.seoVariants.length - 1)]
@@ -1635,21 +1773,27 @@ export default function App() {
         : []
 
       const res = await generateWithGemini(
-        apiKey, model, faceImage, productImage, duration, aspectRatio, notes, contentType, usedLocationsForProduct
+        apiKey,
+        model,
+        faceImage,
+        productImage,
+        duration,
+        aspectRatio,
+        notes,
+        contentType,
+        usedLocationsForProduct,
+        FIXED_AFFILIATE_MODE,
+        FIXED_SALES_TEMPLATE,
       )
-      
-      // Track which content type was used (for auto mode, this comes from Gemini's recommendation)
-      let usedType: ContentType = contentType
-      if (contentType === 'auto') {
-        // Extract from the response's fallback usage - we can tell by analyzing the returned prompts
-        // For now, we'll store what AI decided based on the system parsing
-        // This will be updated when we have explicit recommendation tracking
-        usedType = 'auto'
-      }
-      
-      res.createImagePrompt = buildCreateImagePrompt(usedType !== 'auto' ? usedType : 'ootd', notes)
+
+      const resolvedType: ResolvedContentType = res.resolvedContentType
+        || (contentType === 'auto'
+          ? (FIXED_AFFILIATE_MODE === 'strict' ? 'tiktokshop' : 'outfitideas')
+          : contentType)
+
+      res.createImagePrompt = buildCreateImagePrompt(resolvedType, notes)
       setResult(res)
-      setSelectedContentType(usedType)
+      setSelectedContentType(resolvedType)
       setActiveTab('keyframes')
       setPromptToast({
         kind: 'success',
@@ -1708,7 +1852,8 @@ export default function App() {
         model,
         trimmedProductName,
         seoNotes.trim(),
-        contentType
+        contentType,
+        FIXED_SALES_TEMPLATE,
       )
 
       setSeoResult(generated)
@@ -1740,7 +1885,8 @@ export default function App() {
         model,
         trimmedProductName,
         voiceoverNotes.trim(),
-        contentType
+        contentType,
+        FIXED_SALES_TEMPLATE,
       )
 
       setVoiceoverResult(generated)
@@ -1767,6 +1913,9 @@ export default function App() {
         '',
         '── VIDEO PROMPT PACKAGE ──',
         `Duration: ${duration}s | Ratio: ${aspectRatio}`,
+        `Resolved Type: ${selectedContentType.toUpperCase()}`,
+        `Affiliate Mode: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
+        `Sales Template: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
         '',
         '── CHARACTER DNA ──',
         result.masterDNA,
@@ -1831,6 +1980,10 @@ export default function App() {
 
     if (result) {
       lines.push(
+        `RESOLVED TYPE: ${selectedContentType.toUpperCase()}`,
+        `AFFILIATE MODE: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
+        `SALES TEMPLATE: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
+        '',
         'CHARACTER DNA:', result.masterDNA, '',
         'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => kf.fullPrompt), '',
         'SCENE PROMPTS:', ...result.scenes.map(sc => sc.fullPrompt),
@@ -2038,6 +2191,19 @@ export default function App() {
                   })}
                 </div>
               </div>
+            </div>
+
+            {/* Affiliate Strategy (Locked) */}
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-title">
+                <TrendingUp /> Chiến lược Affiliate (Cố định)
+              </div>
+              <p className="ai-task-hint">
+                Đã khóa 1 hướng tối ưu duy nhất theo TikTok: <strong>{FIXED_STRATEGY_LABEL}</strong>.
+              </p>
+              <p className="ai-task-hint" style={{ marginBottom: 0 }}>
+                Mục tiêu: ưu tiên chuyển đổi bền vững, giữ sản phẩm rõ ràng, tăng niềm tin trước CTA mua hàng.
+              </p>
             </div>
 
             {/* Notes */}
@@ -2279,9 +2445,14 @@ export default function App() {
                 <>
                   <div className="card-title">
                     <Sparkles /> {resultsHeader}
-                    {result && selectedContentType && selectedContentType !== 'auto' && (
+                    {result && (
                       <span style={{ marginLeft: 12, fontSize: '0.75rem', opacity: 0.8 }}>
                         (Type: {selectedContentType.toUpperCase()})
+                      </span>
+                    )}
+                    {result && (
+                      <span style={{ marginLeft: 8, fontSize: '0.75rem', opacity: 0.7 }}>
+                        [{(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()} • {(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}]
                       </span>
                     )}
                   </div>
@@ -2549,7 +2720,7 @@ export default function App() {
                             <Palette size={14} />
                             Create Product Image Prompt
                           </div>
-                          <span className="prompt-card-time">{contentType.toUpperCase()}</span>
+                          <span className="prompt-card-time">{selectedContentType.toUpperCase()}</span>
                         </div>
                         <div className="prompt-card-body">
                           <CopyButton text={result.createImagePrompt} />
