@@ -265,6 +265,15 @@ const ALLOWED_LOCATION_KEYWORDS = [
   'korea',
 ]
 
+const STAGE_CACHE_TTL_MS = 5 * 60 * 1000
+type StageCacheEntry = {
+  data: Record<string, unknown>
+  expiresAt: number
+}
+
+const VISUAL_EXTRACT_STAGE_CACHE = new Map<string, StageCacheEntry>()
+const CREATIVE_PLAN_STAGE_CACHE = new Map<string, StageCacheEntry>()
+
 const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
   ootd: 'Prioritize clean outfit readability and aspirational styling while keeping product details purchase-relevant.',
   grwm: 'Build trust through natural routine storytelling, then transition clearly to product desire and purchase intent.',
@@ -493,6 +502,44 @@ function createProductImageId(dataUrl: string): string {
   return `prod-${(hash >>> 0).toString(36)}-${sample.length.toString(36)}`
 }
 
+function createTextFingerprint(value: string): string {
+  const normalized = value.trim()
+  let hash = 5381
+
+  for (let i = 0; i < normalized.length; i += 1) {
+    hash = ((hash << 5) + hash) ^ normalized.charCodeAt(i)
+  }
+
+  return `fp-${(hash >>> 0).toString(36)}-${normalized.length.toString(36)}`
+}
+
+function cloneStageData(value: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>
+  } catch {
+    return { ...value }
+  }
+}
+
+function readStageCache(cache: Map<string, StageCacheEntry>, key: string): Record<string, unknown> | null {
+  const entry = cache.get(key)
+  if (!entry) return null
+
+  if (entry.expiresAt < Date.now()) {
+    cache.delete(key)
+    return null
+  }
+
+  return cloneStageData(entry.data)
+}
+
+function writeStageCache(cache: Map<string, StageCacheEntry>, key: string, data: Record<string, unknown>): void {
+  cache.set(key, {
+    data: cloneStageData(data),
+    expiresAt: Date.now() + STAGE_CACHE_TTL_MS,
+  })
+}
+
 function normalizeLocationList(value: unknown): string[] {
   if (!Array.isArray(value)) return []
 
@@ -669,6 +716,9 @@ AFFILIATE EXECUTION RULES:
   const pipelineStartedAt = Date.now()
   const stageMetrics: Array<{ stage: string; attempt: number; durationMs: number; ok: boolean; note?: string }> = []
   const validResolvedTypes: ResolvedContentType[] = ['ootd', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury']
+  const faceImageId = faceImage ? createProductImageId(faceImage) : 'none'
+  const productImageId = productImage ? createProductImageId(productImage) : 'none'
+  const notesFingerprint = createTextFingerprint(notes)
 
   const asRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
 
@@ -843,6 +893,21 @@ AFFILIATE EXECUTION RULES:
   ): Promise<Record<string, unknown>> => {
     let lastError: unknown = null
 
+    const shouldRetryStageError = (error: unknown) => {
+      const message = (error instanceof Error ? error.message : `${error || ''}`).toLowerCase()
+
+      return (
+        message.includes('could not parse json')
+        || message.includes('empty content')
+        || message.includes('shape mismatch')
+        || message.includes('low completeness score')
+        || message.includes('keyframe mismatch')
+        || message.includes('timeout')
+        || message.includes('timed out')
+        || message.includes('aborted')
+      )
+    }
+
     for (let i = 0; i < temperatures.length; i += 1) {
       const temperature = temperatures[i]
       const attempt = i + 1
@@ -873,6 +938,11 @@ AFFILIATE EXECUTION RULES:
           ok: false,
           note: error instanceof Error ? error.message : `${error}`,
         })
+
+        const hasNextAttempt = i < temperatures.length - 1
+        if (!hasNextAttempt || !shouldRetryStageError(error)) {
+          break
+        }
       }
     }
 
@@ -935,7 +1005,16 @@ Rules:
 - Focus on preserving identity and garment fidelity.
 ${notes ? `USER NOTES: ${notes}` : ''}`
 
-    const visualAnalysisRaw = await runStage(
+    const visualExtractCacheKey = JSON.stringify({
+      model,
+      faceImageId,
+      productImageId,
+      notesFingerprint,
+      visualExtractPrompt,
+    })
+
+    const cachedVisualExtract = readStageCache(VISUAL_EXTRACT_STAGE_CACHE, visualExtractCacheKey)
+    const visualAnalysisRaw = cachedVisualExtract ?? await runStage(
       'visual_extract',
       [0.35, 0.24],
       3072,
@@ -948,6 +1027,19 @@ ${notes ? `USER NOTES: ${notes}` : ''}`
       ),
       validateVisualExtract,
     )
+
+    if (cachedVisualExtract) {
+      stageMetrics.push({
+        stage: 'visual_extract',
+        attempt: 0,
+        durationMs: 0,
+        ok: true,
+        note: 'cache_hit',
+      })
+    } else {
+      writeStageCache(VISUAL_EXTRACT_STAGE_CACHE, visualExtractCacheKey, visualAnalysisRaw)
+    }
+
     const visualAnalysis = normalizeVisualExtract(visualAnalysisRaw)
 
     // STAGE 2 — CREATIVE PLAN
@@ -991,13 +1083,41 @@ Output STRICT JSON only:
   "avoid": ["..."]
 }`
 
-    const planningResultRaw = await runStage(
+    const creativePlanCacheKey = JSON.stringify({
+      model,
+      duration,
+      aspectRatio,
+      requestedContentType: contentType,
+      affiliateMode,
+      salesTemplate,
+      faceImageId,
+      productImageId,
+      notesFingerprint,
+      usedLocationsForProduct: normalizedUsedLocationsForProduct,
+      usedLocationsByOutfitType: normalizedUsedLocationsByOutfitType,
+    })
+
+    const cachedCreativePlan = readStageCache(CREATIVE_PLAN_STAGE_CACHE, creativePlanCacheKey)
+    const planningResultRaw = cachedCreativePlan ?? await runStage(
       'creative_plan',
       [0.68, 0.52],
       4096,
       (temperature, maxTokens) => requestGeminiJson(apiKey, model, planningPrompt, temperature, maxTokens),
       validatePlanningResult,
     )
+
+    if (cachedCreativePlan) {
+      stageMetrics.push({
+        stage: 'creative_plan',
+        attempt: 0,
+        durationMs: 0,
+        ok: true,
+        note: 'cache_hit',
+      })
+    } else {
+      writeStageCache(CREATIVE_PLAN_STAGE_CACHE, creativePlanCacheKey, planningResultRaw)
+    }
+
     const planningResult = normalizePlanningResult(planningResultRaw)
 
     let finalContentType: ContentType = contentType as ContentType
@@ -1041,6 +1161,7 @@ Output STRICT JSON only:
 
     const aiPlannedLocationPool = planningResult.locationCandidates
       .filter((location) => isLocationCandidateAllowed(location))
+    const primaryPlannedLocation = aiPlannedLocationPool[0] || ''
 
     const validatePackageLocationsBasic = (value: Record<string, unknown>): { ok: boolean; reason?: string } => {
       const keyframes = Array.isArray(value.keyframes) ? value.keyframes : []
@@ -1152,6 +1273,11 @@ ${usedLocationsProductPrompt}
 LOCATIONS ALREADY USED FOR SAME OUTFIT TYPE (MUST AVOID REUSE):
 ${usedLocationsOutfitTypePrompt}
 
+PRIMARY LOCATION LOCK (MANDATORY):
+${primaryPlannedLocation.length > 0
+  ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
+  : 'Select one valid real-world location in Vietnam/China/South Korea and keep it identical across all keyframes/scenes.'}
+
 CRITICAL RULES (NON-NEGOTIABLE):
 1. Each scene is exactly 8 seconds, using Veo 3.1 first-frame + last-frame interpolation.
 2. Keyframe chain must be SEAMLESS: last frame of scene N = first frame of scene N+1.
@@ -1184,14 +1310,12 @@ CRITICAL RULES (NON-NEGOTIABLE):
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
-Return STRICT JSON only in this schema:
+Return STRICT COMPACT JSON only in this schema:
 {
   "masterDNA": "character consistency description",
   "keyframes": [
     {
       "index": 0,
-      "timestamp": "0s",
-      "subject": "face/body preservation instruction",
       "action": "pose/movement description",
       "location": "real location (city/area + venue details in Vietnam/China/South Korea)",
       "camera": "lens, shot type, angle",
@@ -1202,14 +1326,14 @@ Return STRICT JSON only in this schema:
   "scenes": [
     {
       "index": 0,
-      "timeRange": "0s-8s",
       "narrative": "scene description with retention beat",
-      "startPose": "starting keyframe pose",
-      "endPose": "ending keyframe pose",
       "cameraMovement": "camera movement description"
     }
   ]
-}`
+}
+
+Keep output compact. Omit fields that can be deterministically rebuilt later (subject, timestamp, timeRange, startPose, endPose).
+`
 
     const draftPackage = await runStage(
       'package_generation',
@@ -1225,8 +1349,23 @@ Return STRICT JSON only in this schema:
       (value) => validatePackageShapeAndLocations(value, 0.62),
     )
 
-    // STAGE 4 — QA + REPAIR
-    const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
+    // STAGE 4 — QA + REPAIR (with fast-path skip)
+    const draftQualityScore = getPackageCompletenessScore(draftPackage, keyframeCount, sceneCount)
+    const draftStrictValidation = validatePackageShapeAndLocationsStrict(draftPackage, 0.65)
+    const canSkipQaRepair = draftStrictValidation.ok && draftQualityScore >= 0.65
+
+    let parsed: Record<string, unknown> = draftPackage
+
+    if (canSkipQaRepair) {
+      stageMetrics.push({
+        stage: 'qa_repair',
+        attempt: 0,
+        durationMs: 0,
+        ok: true,
+        note: `fast_path_skip strict_ok score=${draftQualityScore.toFixed(2)}`,
+      })
+    } else {
+      const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
 
   Validate and repair the draft package to satisfy all constraints below:
   - Enforce CRITICAL RULES 1..28 exactly as defined in package generation stage.
@@ -1237,6 +1376,12 @@ Return STRICT JSON only in this schema:
   - Preserve character identity and garment fidelity with zero drift.
   - Keep mirror/studio lock consistent for OOTD/OutfitIdeas unless narrative explicitly transitions.
   - Keep product-first composition and TikTok retention pacing.
+  - Use the same primary location lock in all keyframes/scenes.
+
+PRIMARY LOCATION LOCK (MANDATORY):
+${primaryPlannedLocation.length > 0
+    ? primaryPlannedLocation
+    : 'No pre-selected lock available. Keep one location consistent across all keyframes/scenes.'}
 
 DRAFT PACKAGE JSON:
 ${safeJsonStringify(draftPackage)}
@@ -1248,24 +1393,23 @@ Return STRICT JSON only, same schema:
   "scenes": [ ... ]
 }`
 
-    const draftQualityScore = getPackageCompletenessScore(draftPackage, keyframeCount, sceneCount)
-    let parsed: Record<string, unknown> = draftPackage
-    try {
-      const repairedPackage = await runStage(
-        'qa_repair',
-        [0.45, 0.32],
-        8192,
-        (temperature, maxTokens) => requestGeminiJson(apiKey, model, qaRepairPrompt, temperature, maxTokens),
-        (value) => validatePackageShapeAndLocations(value, 0.65),
-      )
-      const repairedQualityScore = getPackageCompletenessScore(repairedPackage, keyframeCount, sceneCount)
+      try {
+        const repairedPackage = await runStage(
+          'qa_repair',
+          [0.45, 0.32],
+          8192,
+          (temperature, maxTokens) => requestGeminiJson(apiKey, model, qaRepairPrompt, temperature, maxTokens),
+          (value) => validatePackageShapeAndLocations(value, 0.65),
+        )
+        const repairedQualityScore = getPackageCompletenessScore(repairedPackage, keyframeCount, sceneCount)
 
-      if (repairedQualityScore >= draftQualityScore - 0.02) {
-        parsed = repairedPackage
+        if (repairedQualityScore >= draftQualityScore - 0.02) {
+          parsed = repairedPackage
+        }
+      } catch {
+        // If QA repair fails, fallback to draft package to keep generation flow resilient.
+        parsed = draftPackage
       }
-    } catch {
-      // If QA repair fails, fallback to draft package to keep generation flow resilient.
-      parsed = draftPackage
     }
 
     const strictLocationValidation = validatePackageLocationsStrict(parsed)
@@ -1290,6 +1434,11 @@ ${usedLocationsOutfitTypePrompt}
 
 AI-PLANNED LOCATION CANDIDATES (PREFERRED):
 ${aiPlannedLocationPool.length > 0 ? aiPlannedLocationPool.join('\n') : 'None'}
+
+PRIMARY LOCATION LOCK (MANDATORY):
+${primaryPlannedLocation.length > 0
+  ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
+  : 'If unavailable, keep one valid location consistent across all keyframes/scenes.'}
 
 FAILED VALIDATION REASON:
 ${strictLocationValidation.reason || 'unknown'}
@@ -1341,6 +1490,10 @@ Return STRICT JSON only, same schema:
     }
 
     const resolveLocationFromPackage = (value: unknown) => {
+      if (primaryPlannedLocation.length > 0 && isLocationCandidateAllowed(primaryPlannedLocation)) {
+        return primaryPlannedLocation
+      }
+
       const candidate = toSafeString(value, '')
       if (isLocationCandidateAllowed(candidate)) {
         return candidate
