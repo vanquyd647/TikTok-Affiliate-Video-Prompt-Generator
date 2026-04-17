@@ -177,6 +177,25 @@ const CONTENT_TYPES = [
       'dressing room',
     ],
   },
+  {
+    value: 'ootdmirror',
+    label: 'OOTD Mirror',
+    icon: Camera,
+    desc: 'Mirror Fitcheck',
+    color: '#f43f5e',
+    locationStyleKeywords: [
+      'mirror',
+      'mirrorselfie',
+      'mirrorootd',
+      'fitcheck',
+      'wardrobe mirror',
+      'guong',
+      'guong soi',
+      'phong thay do',
+      'phong thu do',
+      'dressing room',
+    ],
+  },
   { value: 'grwm', label: 'GRWM', icon: Star, desc: 'Get Ready With Me', color: 'var(--accent-purple)' },
   {
     value: 'outfitideas',
@@ -242,6 +261,7 @@ const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-fir
 
 const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'ootd',
+  'ootdmirror',
   'grwm',
   'outfitideas',
   'fyp',
@@ -253,7 +273,7 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'luxury',
 ]
 
-const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfitideas', 'review', 'ootd']
+const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfitideas', 'review', 'ootd', 'ootdmirror']
 
 const ALLOWED_LOCATION_KEYWORDS = [
   'vietnam',
@@ -264,6 +284,43 @@ const ALLOWED_LOCATION_KEYWORDS = [
   'han quoc',
   'korea',
 ]
+
+const MIRROR_LOCATION_STYLE_KEYWORDS = [
+  'mirror',
+  'mirrorselfie',
+  'mirrorootd',
+  'mirror fitcheck',
+  'wardrobe mirror',
+  'fitting room',
+  'dressing room',
+  'changing room',
+  'reflection',
+  'guong',
+  'guong soi',
+  'phong thay do',
+  'phong thu do',
+] as const
+
+const STUDIO_LOCATION_STYLE_KEYWORDS = [
+  'studio',
+  'studio corner',
+  'photo studio',
+  'content studio',
+  'lookbook studio',
+  'showroom',
+  'backdrop',
+  'set wall',
+  'set corner',
+  'goc studio',
+  'studio mini',
+] as const
+
+const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster frequently combines #ootd, #outfit, #outfitideas, #xuhuong, #fyp.
+- Fitcheck cluster frequently combines #fitcheck, #ootd, #outfitinspo, #outfitideas.
+- Mirror-fitcheck cluster uses mirror semantics such as mirror fit check, mirror selfie, and reflection-led framing.
+- TikTok Shop fashion cluster often combines #tiktokshop, #review, #unboxing, #xuhuong, and clear value-proof language.`
+
+type ContentStyleLock = 'mirror' | 'studio' | 'flex'
 
 const STAGE_CACHE_TTL_MS = 5 * 60 * 1000
 type StageCacheEntry = {
@@ -276,6 +333,7 @@ const CREATIVE_PLAN_STAGE_CACHE = new Map<string, StageCacheEntry>()
 
 const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
   ootd: 'Prioritize clean outfit readability and aspirational styling while keeping product details purchase-relevant.',
+  ootdmirror: 'Deliver mirror-first fitcheck storytelling with full-body readability and high trust social-native framing.',
   grwm: 'Build trust through natural routine storytelling, then transition clearly to product desire and purchase intent.',
   outfitideas: 'Deliver practical lookbook combinations users can copy immediately, with clear value for saving/sharing and buying.',
   fyp: 'Create high-retention viral pacing but still preserve product clarity and affiliate conversion direction.',
@@ -326,6 +384,14 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'FULL LOOK FINALE', emoji: '🔥', cameraHint: 'Crane/pedestal shot showing complete styled outfit' },
     { name: 'CONFIDENCE WALK', emoji: '🌟', cameraHint: 'Dynamic tracking shot, model walking with attitude' },
     { name: 'ICONIC POSE CLOSER', emoji: '🎬', cameraHint: 'Slow-motion final pose with dramatic backlight' },
+  ],
+  ootdmirror: [
+    { name: 'MIRROR FITCHECK HOOK', emoji: '🪞', cameraHint: 'Vertical mirror framing with full-body readability from head to toe' },
+    { name: 'SILHOUETTE PROOF', emoji: '👗', cameraHint: 'Slow tilt in mirror reflection to verify fit, hemline, and waist structure' },
+    { name: 'TEXTURE DETAIL BEAT', emoji: '✨', cameraHint: 'Controlled push-in toward reflection for fabric and cut clarity' },
+    { name: 'SIDE-ANGLE CONFIDENCE', emoji: '💫', cameraHint: 'Subtle lateral move while keeping mirror axis stable and social-native' },
+    { name: 'FULL LOOK WALKBACK', emoji: '🚶‍♀️', cameraHint: 'Mirror-safe walk and return motion, preserving full outfit visibility' },
+    { name: 'MIRROR CTA CLOSER', emoji: '🎬', cameraHint: 'Clean final mirror pose with conversion-ready product-first composition' },
   ],
   grwm: [
     { name: 'COZY MORNING HOOK', emoji: '☀️', cameraHint: 'Warm close-up of model waking/stretching naturally' },
@@ -404,6 +470,7 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
 function buildCharacterDNA(notes: string, contentType: ResolvedContentType): string {
   const styleMap: Record<ResolvedContentType, string> = {
     ootd: 'Professional fashion editorial, OOTD TikTok, cinematic quality',
+    ootdmirror: 'Mirror fitcheck social-native aesthetic, full-body framing, reflection-safe composition',
     grwm: 'Lifestyle vlog aesthetic, warm and intimate GRWM style',
     outfitideas: 'Practical lookbook aesthetic, mix-and-match styling with daily wear context',
     fyp: 'Trending viral aesthetic, high-fashion editorial with cinematic flair',
@@ -425,6 +492,7 @@ ${notes ? `[CUSTOM NOTES]: ${notes}` : ''}`
 function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string): string {
   const contentDesc: Record<ResolvedContentType, string> = {
     ootd: 'OOTD (Outfit of the Day) — full outfit showcase with front and back views',
+    ootdmirror: 'OOTD Mirror — mirror fitcheck format with social-native full-body outfit readability',
     grwm: 'GRWM (Get Ready With Me) — warm lifestyle aesthetic showing complete look',
     outfitideas: 'Outfit Ideas — lookbook format with practical mix-and-match inspiration',
     fyp: 'FYP (For You Page) — viral trending aesthetic with dramatic fashion presentation',
@@ -454,6 +522,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
 
 [STYLE]: Professional fashion e-commerce photography. ${
   contentType === 'tiktokshop' ? 'Conversion-focused showcase with clear value proposition and buy-now momentum.' :
+  contentType === 'ootdmirror' ? 'Mirror fitcheck social-native framing with strong head-to-toe outfit readability and trust cues.' :
   contentType === 'outfitideas' ? 'Lookbook inspiration style with practical daily styling guidance.' :
   contentType === 'review' ? 'Authentic and trustworthy feel.' :
   contentType === 'luxury' ? 'Understated elegance, refined luxury presentation.' :
@@ -479,6 +548,74 @@ function normalizeLocationKey(value: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
+}
+
+function hasStyleKeyword(value: string, keywords: readonly string[]): boolean {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return false
+
+  return keywords.some((keyword) => normalized.includes(normalizeLocationKey(keyword)))
+}
+
+function getContentTypeStyleLock(contentType: ResolvedContentType): ContentStyleLock {
+  if (contentType === 'ootdmirror') return 'mirror'
+  if (contentType === 'ootd') return 'studio'
+  return 'flex'
+}
+
+function matchesStyleLockForLocation(location: string, styleLock: ContentStyleLock): boolean {
+  if (styleLock === 'flex') return true
+
+  const hasMirror = hasStyleKeyword(location, MIRROR_LOCATION_STYLE_KEYWORDS)
+  const hasStudio = hasStyleKeyword(location, STUDIO_LOCATION_STYLE_KEYWORDS)
+
+  if (styleLock === 'mirror') {
+    return hasMirror
+  }
+
+  return hasStudio && !hasMirror
+}
+
+function getStyleLockFallbackLocation(styleLock: ContentStyleLock): string {
+  if (styleLock === 'mirror') {
+    return 'Wardrobe mirror corner in a fashion fitting room, District 1, Ho Chi Minh City, Vietnam'
+  }
+
+  if (styleLock === 'studio') {
+    return 'Single-corner fashion studio with clean backdrop, District 7, Ho Chi Minh City, Vietnam'
+  }
+
+  return 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam'
+}
+
+function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string {
+  if (contentType === 'ootdmirror') {
+    return `- Mirror-first social grammar: mirror fit check, mirror selfie, reflection readability.
+- Keep full-body reflection visible for most of the timeline, with at least one stable fit-check hold.
+- Align visual rhythm with fitcheck cluster behavior: clear silhouette proof before transitions.`
+  }
+
+  if (contentType === 'ootd') {
+    return `- Studio-first OOTD grammar: clean single-corner set, full-look reveal, detail proof, confidence closer.
+- Align social-native cues with OOTD cluster behavior (#ootd, #outfit, #outfitideas style readability).
+- Prioritize outfit readability over aggressive transitions.`
+  }
+
+  if (contentType === 'outfitideas') {
+    return `- Outfit ideas grammar: practical mix-and-match sequence, not random cinematic fragments.
+- Include at least one clear before/after styling switch and one save-worthy final composition.
+- Align pacing with fitcheck and outfitinspo behavior seen on TikTok.`
+  }
+
+  if (contentType === 'tiktokshop') {
+    return `- TikTok Shop grammar: proof stack (fit + material + usage) then objection handling and CTA.
+- Keep product readability dominant and include review or unboxing style trust cues.
+- Maintain conversion-native language and framing consistency across scenes.`
+  }
+
+  return `- Keep social-native pacing, clear outfit readability, and practical value demonstration.
+- Favor authentic creator-style framing over over-produced ad-like visuals.
+- Maintain hook-to-value-to-proof-to-CTA structure.`
 }
 
 function isAllowedLocationCountry(value: string): boolean {
@@ -642,10 +779,10 @@ async function generateWithGemini(
   const affiliateModeLabel = affiliateMode === 'strict' ? 'STRICT' : 'BALANCED'
   const salesTemplateLabel = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
   const affiliateObjective = isAuto
-    ? 'In AUTO mode, prioritize types that improve affiliate conversion for women fashion (tiktokshop, outfitideas, ootd, review) before generic viral framing.'
+    ? 'In AUTO mode, prioritize types that improve affiliate conversion for women fashion (tiktokshop, outfitideas, ootd, ootdmirror, review) before generic viral framing.'
     : AFFILIATE_VIDEO_OBJECTIVES[contentType as ResolvedContentType]
   const autoModeRule = affiliateMode === 'strict'
-    ? 'STRICT AUTO MODE: only allow conversion-oriented types (tiktokshop, outfitideas, review, ootd). If uncertain, default to tiktokshop.'
+    ? 'STRICT AUTO MODE: only allow conversion-oriented types (tiktokshop, outfitideas, review, ootd, ootdmirror). If uncertain, default to tiktokshop.'
     : 'BALANCED AUTO MODE: allow broader creative variety but still prioritize conversion-friendly fashion formats.'
   const salesTemplateRules = buildSalesTemplateRules(salesTemplate)
   const affiliateExecutionRules = `
@@ -715,7 +852,7 @@ AFFILIATE EXECUTION RULES:
 
   const pipelineStartedAt = Date.now()
   const stageMetrics: Array<{ stage: string; attempt: number; durationMs: number; ok: boolean; note?: string }> = []
-  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury']
+  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury']
   const faceImageId = faceImage ? createProductImageId(faceImage) : 'none'
   const productImageId = productImage ? createProductImageId(productImage) : 'none'
   const notesFingerprint = createTextFingerprint(notes)
@@ -1062,17 +1199,22 @@ ${usedLocationsProductPrompt}
 LOCATIONS ALREADY USED FOR SAME OUTFIT TYPE (MUST AVOID REUSE):
 ${usedLocationsOutfitTypePrompt}
 
+OBSERVED TIKTOK FASHION BASELINES:
+${TIKTOK_OBSERVED_SIGNAL_BASELINE}
+
 RULES:
 - Location scope: Vietnam, China, South Korea only.
 - No duplicate locations against history lists above.
 - AI must self-select fresh real-world locations. Do not use fixed/preset location pools.
 - Choose ONE primary location and keep it consistent across all keyframes/scenes.
-- For OOTD/OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
+- For OOTDMIRROR, enforce mirror-fitcheck setup across all scenes.
+- For OOTD, enforce single-corner studio setup across all scenes.
+- For OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
 - Plan for retention arc: Hook -> Value -> Proof -> CTA.
 
 Output STRICT JSON only:
 {
-  ${isAuto ? '"recommendedContentType": "ootd|grwm|outfitideas|fyp|review|tiktokshop|athleisure|haul|styling|luxury",' : '"recommendedContentType": "same-as-requested",'}
+  ${isAuto ? '"recommendedContentType": "ootd|ootdmirror|grwm|outfitideas|fyp|review|tiktokshop|athleisure|haul|styling|luxury",' : '"recommendedContentType": "same-as-requested",'}
   "creativeDirection": "...",
   "storyArc": ["hook", "value", "proof", "cta"],
   "locationCandidates": ["..."],
@@ -1140,8 +1282,12 @@ Output STRICT JSON only:
       finalContentType = affiliateMode === 'strict' ? 'tiktokshop' : 'outfitideas'
     }
 
-    const affiliateObjectiveForFinal = AFFILIATE_VIDEO_OBJECTIVES[finalContentType as ResolvedContentType]
-    const usedLocationsForFinalOutfitType = normalizedUsedLocationsByOutfitType[finalContentType as ResolvedContentType] || []
+    const finalResolvedType = finalContentType as ResolvedContentType
+    const finalStyleLock = getContentTypeStyleLock(finalResolvedType)
+    const contentTypeNativeSignalRules = buildTikTokNativeSignalRules(finalResolvedType)
+
+    const affiliateObjectiveForFinal = AFFILIATE_VIDEO_OBJECTIVES[finalResolvedType]
+    const usedLocationsForFinalOutfitType = normalizedUsedLocationsByOutfitType[finalResolvedType] || []
     const blockedLocationKeys = new Set(
       [...normalizedUsedLocationsForProduct, ...usedLocationsForFinalOutfitType]
         .map((location) => normalizeLocationKey(location))
@@ -1155,6 +1301,7 @@ Output STRICT JSON only:
 
       return (
         isAllowedLocationCountry(candidate)
+        && matchesStyleLockForLocation(candidate, finalStyleLock)
         && !blockedLocationKeys.has(candidateKey)
       )
     }
@@ -1208,6 +1355,10 @@ Output STRICT JSON only:
 
         if (!isLocationCandidateAllowed(location)) {
           return { ok: false, reason: `keyframe[${i}] location blocked by history constraints` }
+        }
+
+        if (!matchesStyleLockForLocation(location, finalStyleLock)) {
+          return { ok: false, reason: `keyframe[${i}] location violates style lock ${finalStyleLock}` }
         }
       }
 
@@ -1267,6 +1418,12 @@ ${safeJsonStringify(visualAnalysis)}
 CREATIVE PLAN JSON:
 ${safeJsonStringify(planningResult)}
 
+OBSERVED TIKTOK FASHION BASELINES:
+${TIKTOK_OBSERVED_SIGNAL_BASELINE}
+
+TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
+${contentTypeNativeSignalRules}
+
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsProductPrompt}
 
@@ -1303,10 +1460,10 @@ CRITICAL RULES (NON-NEGOTIABLE):
 22. AUDIO IS OPTIONAL (IF USED) - Prefer silent-first visual storytelling. If adding SFX/ambience, describe it clearly but keep comprehension independent from audio.
 23. AUTHENTICITY + TRUST - Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
 24. CTA-SAFE ENDING + TEMPLATE CONSISTENCY - Final scene must naturally set up conversion CTA while keeping tone and pressure aligned with selected Sales Template.
-25. OOTD/OUTFITIDEAS TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTD or OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow.
+25. OOTD FAMILY TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTDMIRROR, enforce mirror fitcheck flow only. For OOTD, enforce single-corner studio flow only. For OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow.
 26. MIRROR FITCHECK SPEC - Use full-body mirror framing, vertical social-native phone aesthetic, visible head-to-toe outfit readability, and ensure no camera/tripod/operator reflection appears in the mirror.
 27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes.
-28. STYLE CONSISTENCY LOCK - Once mirror or studio setup is chosen for OOTD/OutfitIdeas, keep that setup consistent across all scenes unless there is an explicit narrative reason to transition.
+28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -1374,7 +1531,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - AI must choose fresh locations itself and must avoid all locations listed in location-history constraints.
   - Keep camera grammar coherent and avoid chaotic mixed movement in one scene.
   - Preserve character identity and garment fidelity with zero drift.
-  - Keep mirror/studio lock consistent for OOTD/OutfitIdeas unless narrative explicitly transitions.
+  - Enforce style lock by type: OOTDMIRROR mirror-only, OOTD studio-only, OutfitIdeas fixed to its chosen setup unless narrative explicitly transitions.
   - Keep product-first composition and TikTok retention pacing.
   - Use the same primary location lock in all keyframes/scenes.
 
@@ -1385,6 +1542,9 @@ ${primaryPlannedLocation.length > 0
 
 DRAFT PACKAGE JSON:
 ${safeJsonStringify(draftPackage)}
+
+TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
+${contentTypeNativeSignalRules}
 
 Return STRICT JSON only, same schema:
 {
@@ -1504,6 +1664,11 @@ Return STRICT JSON only, same schema:
         return fallbackFromAiPlan
       }
 
+      const styleLockFallback = getStyleLockFallbackLocation(finalStyleLock)
+      if (isLocationCandidateAllowed(styleLockFallback)) {
+        return styleLockFallback
+      }
+
       throw new Error('No valid AI-selected primary location available')
     }
 
@@ -1512,6 +1677,7 @@ Return STRICT JSON only, same schema:
 
     const fallbackActionByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Confident outfit showcase pose and movement tailored for OOTD storytelling',
+      ootdmirror: 'Mirror-first fitcheck movement with full-body readability and reflection-safe posing',
       grwm: 'Natural getting-ready movement that highlights styling steps and final look',
       outfitideas: 'Practical mix-and-match outfit demonstration with clear style transformation',
       fyp: 'Scroll-stopping fashion movement with dynamic pose transition',
@@ -1525,6 +1691,7 @@ Return STRICT JSON only, same schema:
 
     const fallbackStyleByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Professional fashion editorial, OOTD TikTok aesthetic',
+      ootdmirror: 'Mirror fitcheck social-native aesthetic, clean reflection-safe composition',
       grwm: 'Warm lifestyle GRWM visual style, intimate and clean',
       outfitideas: 'Practical outfit idea lookbook, clean visual hierarchy and wearable styling cues',
       fyp: 'Viral cinematic fashion style with bold visual energy',
