@@ -1083,7 +1083,6 @@ Output STRICT JSON only:
         return { ok: false, reason: `location validation keyframe mismatch ${keyframes.length}/${keyframeCount}` }
       }
 
-      const seenLocationKeys = new Set<string>()
       for (let i = 0; i < keyframes.length; i += 1) {
         const keyframe = asRecord(keyframes[i]) ? keyframes[i] as Record<string, unknown> : null
         if (!keyframe) {
@@ -1094,12 +1093,6 @@ Output STRICT JSON only:
         if (!isLocationCandidateAllowed(location)) {
           return { ok: false, reason: `keyframe[${i}] invalid/blocked location` }
         }
-
-        const locationKey = normalizeLocationKey(location)
-        if (seenLocationKeys.has(locationKey)) {
-          return { ok: false, reason: `duplicate location in package at keyframe[${i}]` }
-        }
-        seenLocationKeys.add(locationKey)
       }
 
       return { ok: true }
@@ -1272,20 +1265,20 @@ Return STRICT JSON only, same schema:
     }
 
     const usedLocationKeysInOutput = new Set<string>()
-    const pickAiPlannedLocationFallback = (index: number) => {
+    const pickAiPlannedLocationFallback = (index: number, allowUsed = false): string => {
       if (aiPlannedLocationPool.length === 0) {
-        throw new Error(`No valid AI-selected location candidate available for keyframe ${index + 1}`)
+        return ''
       }
 
       for (let offset = 0; offset < aiPlannedLocationPool.length; offset += 1) {
         const candidate = aiPlannedLocationPool[(index + offset) % aiPlannedLocationPool.length]
         const candidateKey = normalizeLocationKey(candidate)
-        if (!usedLocationKeysInOutput.has(candidateKey)) {
+        if (allowUsed || !usedLocationKeysInOutput.has(candidateKey)) {
           return candidate
         }
       }
 
-      throw new Error(`All AI-selected location candidates are exhausted for keyframe ${index + 1}`)
+      return ''
     }
 
     const resolveLocationFromPackage = (value: unknown, index: number) => {
@@ -1296,11 +1289,24 @@ Return STRICT JSON only, same schema:
           usedLocationKeysInOutput.add(candidateKey)
           return candidate
         }
+
+        const uniqueFallback = pickAiPlannedLocationFallback(index)
+        if (uniqueFallback.length > 0) {
+          usedLocationKeysInOutput.add(normalizeLocationKey(uniqueFallback))
+          return uniqueFallback
+        }
+
+        // Keep candidate to preserve continuity when no unique alternative exists.
+        return candidate
       }
 
-      const fallbackFromAiPlan = pickAiPlannedLocationFallback(index)
-      usedLocationKeysInOutput.add(normalizeLocationKey(fallbackFromAiPlan))
-      return fallbackFromAiPlan
+      const fallbackFromAiPlan = pickAiPlannedLocationFallback(index, true)
+      if (fallbackFromAiPlan.length > 0) {
+        usedLocationKeysInOutput.add(normalizeLocationKey(fallbackFromAiPlan))
+        return fallbackFromAiPlan
+      }
+
+      throw new Error(`No valid AI-selected location candidate available for keyframe ${index + 1}`)
     }
 
     const resolvedKeyframeLocations = rawKeyframes.map((kf: any, i: number) => resolveLocationFromPackage(kf?.location, i))
