@@ -258,39 +258,11 @@ const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfiti
 const ALLOWED_LOCATION_KEYWORDS = [
   'vietnam',
   'viet nam',
-  'hanoi',
-  'ho chi minh',
-  'saigon',
-  'da nang',
-  'danang',
-  'nha trang',
-  'hai phong',
-  'can tho',
-  'hue',
   'china',
   'trung quoc',
-  'beijing',
-  'shanghai',
-  'guangzhou',
-  'shenzhen',
-  'chengdu',
-  'hangzhou',
-  'chongqing',
-  'wuhan',
-  'nanjing',
-  'xiamen',
-  'tianjin',
   'south korea',
   'han quoc',
-  'seoul',
-  'busan',
-  'incheon',
-  'daegu',
-  'daejeon',
-  'gwangju',
-  'jeju',
-  'suwon',
-  'ulsan',
+  'korea',
 ]
 
 const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
@@ -1002,6 +974,7 @@ RULES:
 - Location scope: Vietnam, China, South Korea only.
 - No duplicate locations against history lists above.
 - AI must self-select fresh real-world locations. Do not use fixed/preset location pools.
+- Choose ONE primary location and keep it consistent across all keyframes/scenes.
 - For OOTD/OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
 - Plan for retention arc: Hook -> Value -> Proof -> CTA.
 
@@ -1117,6 +1090,21 @@ Output STRICT JSON only:
         }
       }
 
+      const firstLocation = asRecord(keyframes[0]) ? toSafeText((keyframes[0] as Record<string, unknown>).location, '') : ''
+      const primaryLocationKey = normalizeLocationKey(firstLocation)
+      if (!primaryLocationKey) {
+        return { ok: false, reason: 'missing primary location in keyframe[0]' }
+      }
+
+      for (let i = 1; i < keyframes.length; i += 1) {
+        const keyframe = asRecord(keyframes[i]) ? keyframes[i] as Record<string, unknown> : null
+        const location = keyframe ? toSafeText(keyframe.location, '') : ''
+        const locationKey = normalizeLocationKey(location)
+        if (locationKey !== primaryLocationKey) {
+          return { ok: false, reason: `keyframe[${i}] location not consistent with primary location` }
+        }
+      }
+
       return { ok: true }
     }
 
@@ -1173,7 +1161,7 @@ CRITICAL RULES (NON-NEGOTIABLE):
 6. Scene 1 must create a strong visual hook in the first 1-3 seconds with immediate product readability.
 7. Infer scene context from garment/product characteristics, content type, and user notes; avoid generic preset randomness.
 8. NEVER use background, location, props, or lighting from the FACE reference image. Face image is identity-only.
-9. Keep scene context coherent; only change location when there is a clear narrative transition.
+9. Keep one primary location coherent across all keyframes/scenes; do not change location unless user explicitly requests a transition.
 10. Prompt detail quality must follow Veo best practice: each keyframe/scenes should be specific on Subject, Action, Camera, Composition, Style, and Ambiance/Lighting.
 11. Camera grammar must stay coherent: one dominant camera move per 8s scene, no chaotic mixed camera instructions.
 12. Motion continuity is mandatory across scene boundaries: maintain compatible direction, speed feel, and body orientation to reduce interpolation artifacts.
@@ -1287,6 +1275,7 @@ Return STRICT JSON only, same schema:
 TASK:
 - Repair ONLY location-related fields so the package satisfies constraints.
 - Keep masterDNA, actions, camera, lighting, style, and scene pacing unchanged unless absolutely necessary for continuity.
+- Enforce ONE primary location across all keyframes/scenes.
 
 LOCATION CONSTRAINTS:
 - Scope strictly Vietnam/China/South Korea.
@@ -1344,52 +1333,29 @@ Return STRICT JSON only, same schema:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
-    const usedLocationKeysInOutput = new Set<string>()
-    const pickAiPlannedLocationFallback = (index: number, allowUsed = false): string => {
+    const pickAiPlannedLocationFallback = (): string => {
       if (aiPlannedLocationPool.length === 0) {
         return ''
       }
-
-      for (let offset = 0; offset < aiPlannedLocationPool.length; offset += 1) {
-        const candidate = aiPlannedLocationPool[(index + offset) % aiPlannedLocationPool.length]
-        const candidateKey = normalizeLocationKey(candidate)
-        if (allowUsed || !usedLocationKeysInOutput.has(candidateKey)) {
-          return candidate
-        }
-      }
-
-      return ''
+      return aiPlannedLocationPool[0]
     }
 
-    const resolveLocationFromPackage = (value: unknown, index: number) => {
+    const resolveLocationFromPackage = (value: unknown) => {
       const candidate = toSafeString(value, '')
       if (isLocationCandidateAllowed(candidate)) {
-        const candidateKey = normalizeLocationKey(candidate)
-        if (!usedLocationKeysInOutput.has(candidateKey)) {
-          usedLocationKeysInOutput.add(candidateKey)
-          return candidate
-        }
-
-        const uniqueFallback = pickAiPlannedLocationFallback(index)
-        if (uniqueFallback.length > 0) {
-          usedLocationKeysInOutput.add(normalizeLocationKey(uniqueFallback))
-          return uniqueFallback
-        }
-
-        // Keep candidate to preserve continuity when no unique alternative exists.
         return candidate
       }
 
-      const fallbackFromAiPlan = pickAiPlannedLocationFallback(index, true)
+      const fallbackFromAiPlan = pickAiPlannedLocationFallback()
       if (fallbackFromAiPlan.length > 0) {
-        usedLocationKeysInOutput.add(normalizeLocationKey(fallbackFromAiPlan))
         return fallbackFromAiPlan
       }
 
-      throw new Error(`No valid AI-selected location candidate available for keyframe ${index + 1}`)
+      throw new Error('No valid AI-selected primary location available')
     }
 
-    const resolvedKeyframeLocations = rawKeyframes.map((kf: any, i: number) => resolveLocationFromPackage(kf?.location, i))
+    const primaryResolvedLocation = resolveLocationFromPackage(rawKeyframes[0]?.location)
+    const synchronizedKeyframeLocations = Array.from({ length: keyframeCount }, () => primaryResolvedLocation)
 
     const fallbackActionByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Confident outfit showcase pose and movement tailored for OOTD storytelling',
@@ -1424,7 +1390,7 @@ Return STRICT JSON only, same schema:
     const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
       const subject = `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`
       const action = toSafeString(kf.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
-      const location = resolvedKeyframeLocations[i] || resolveLocationFromPackage(kf?.location, i)
+      const location = synchronizedKeyframeLocations[i] || primaryResolvedLocation
       const camera = toSafeString(kf.camera, inferredCameraFallback)
       const lighting = toSafeString(kf.lighting, inferredLightingFallback)
       const style = toSafeString(kf.style, fallbackStyleByType[finalContentType as Exclude<ContentType, 'auto'>])
@@ -1454,8 +1420,8 @@ ASPECT RATIO: ${aspectRatio}`,
       const endSec = Math.round(((i + 1) * duration) / sceneCount)
       const startPose = keyframes[i]?.action || toSafeString(sc.startPose, '')
       const endPose = keyframes[i + 1]?.action || toSafeString(sc.endPose, '')
-      const startLocation = keyframes[i]?.location || resolvedKeyframeLocations[i] || ''
-      const endLocation = keyframes[i + 1]?.location || resolvedKeyframeLocations[i + 1] || startLocation
+      const startLocation = keyframes[i]?.location || primaryResolvedLocation
+      const endLocation = keyframes[i + 1]?.location || primaryResolvedLocation
       const locationFlow = normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
         ? `Hold location: ${startLocation}`
         : `${startLocation} -> ${endLocation}`
