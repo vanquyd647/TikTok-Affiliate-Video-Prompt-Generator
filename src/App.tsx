@@ -133,12 +133,15 @@ type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type ProductLocationHistoryMap = Record<string, string[]>
+type OutfitTypeLocationHistoryMap = Partial<Record<ResolvedContentType, string[]>>
 
 const AFF_STORAGE_DB_NAME = 'aff_prompt_storage'
 const AFF_STORAGE_DB_VERSION = 1
 const AFF_STORAGE_STORE = 'recent_local_images'
 const PRODUCT_LOCATION_HISTORY_STORAGE_KEY = 'aff_product_location_history_v1'
+const OUTFIT_TYPE_LOCATION_HISTORY_STORAGE_KEY = 'aff_outfit_type_location_history_v1'
 const MAX_LOCATION_HISTORY_PER_PRODUCT = 40
+const MAX_LOCATION_HISTORY_PER_OUTFIT_TYPE = 40
 const PROMPT_LOADING_STAGES = [
   'AI đang phân tích ảnh khuôn mặt...',
   'AI đang phân tích ảnh sản phẩm...',
@@ -150,6 +153,19 @@ const FIXED_AFFILIATE_MODE: AffiliateMode = 'strict'
 const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
 const FIXED_STRATEGY_LABEL = 'TikTok Shop Core (Strict AUTO + Soft Sell)'
 const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-first de ban ben vung.'
+
+const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
+  'ootd',
+  'grwm',
+  'outfitideas',
+  'fyp',
+  'review',
+  'tiktokshop',
+  'athleisure',
+  'haul',
+  'styling',
+  'luxury',
+]
 
 const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfitideas', 'review', 'ootd']
 
@@ -374,6 +390,19 @@ function createProductImageId(dataUrl: string): string {
   return `prod-${(hash >>> 0).toString(36)}-${sample.length.toString(36)}`
 }
 
+function normalizeLocationList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+
+  return Array.from(
+    new Set(
+      value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    )
+  )
+}
+
 function loadProductLocationHistory(): ProductLocationHistoryMap {
   try {
     const raw = localStorage.getItem(PRODUCT_LOCATION_HISTORY_STORAGE_KEY)
@@ -384,12 +413,7 @@ function loadProductLocationHistory(): ProductLocationHistoryMap {
 
     const normalized: ProductLocationHistoryMap = {}
     for (const [productImageId, value] of Object.entries(parsed as Record<string, unknown>)) {
-      if (!Array.isArray(value)) continue
-
-      const locations = value
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0)
+      const locations = normalizeLocationList(value)
 
       if (locations.length > 0) {
         normalized[productImageId] = Array.from(new Set(locations)).slice(0, MAX_LOCATION_HISTORY_PER_PRODUCT)
@@ -410,6 +434,38 @@ function saveProductLocationHistory(history: ProductLocationHistoryMap): void {
   }
 }
 
+function loadOutfitTypeLocationHistory(): OutfitTypeLocationHistoryMap {
+  try {
+    const raw = localStorage.getItem(OUTFIT_TYPE_LOCATION_HISTORY_STORAGE_KEY)
+    if (!raw) return {}
+
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+
+    const normalized: OutfitTypeLocationHistoryMap = {}
+    for (const [outfitType, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!RESOLVED_CONTENT_TYPES.includes(outfitType as ResolvedContentType)) continue
+
+      const locations = normalizeLocationList(value)
+      if (locations.length > 0) {
+        normalized[outfitType as ResolvedContentType] = locations.slice(0, MAX_LOCATION_HISTORY_PER_OUTFIT_TYPE)
+      }
+    }
+
+    return normalized
+  } catch {
+    return {}
+  }
+}
+
+function saveOutfitTypeLocationHistory(history: OutfitTypeLocationHistoryMap): void {
+  try {
+    localStorage.setItem(OUTFIT_TYPE_LOCATION_HISTORY_STORAGE_KEY, JSON.stringify(history))
+  } catch {
+    // no-op if quota exceeded
+  }
+}
+
 // ═══════════════════════════════════════════════
 // AI-ENHANCED GENERATION (via Gemini API)
 // ═══════════════════════════════════════════════
@@ -423,6 +479,7 @@ async function generateWithGemini(
   notes: string,
   contentType: ContentType = 'ootd',
   usedLocationsForProduct: string[] = [],
+  usedLocationsByOutfitType: OutfitTypeLocationHistoryMap = {},
   affiliateMode: AffiliateMode = 'balanced',
   salesTemplate: SalesTemplate = 'hard'
 ): Promise<GenerateResult> {
@@ -460,17 +517,44 @@ AFFILIATE EXECUTION RULES:
 - Final scene must end with explicit purchase intent framing (buy now, check link/cart, limited stock, deal urgency) in narrative language.
 - Avoid overly abstract cinematic framing that reduces product clarity.`
   const diversitySeed = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-  const normalizedUsedLocations = Array.from(
-    new Set(
-      usedLocationsForProduct
-        .filter((item): item is string => typeof item === 'string')
-        .map((item) => item.trim())
-        .filter((item) => item.length > 0)
-    )
-  )
-  const usedLocationsPrompt = normalizedUsedLocations.length > 0
-    ? normalizedUsedLocations.map((location, index) => `${index + 1}. ${location}`).join('\n')
+  const normalizeLocationsForPrompt = (locations: unknown) => normalizeLocationList(locations)
+
+  const normalizedUsedLocationsForProduct = normalizeLocationsForPrompt(usedLocationsForProduct)
+  const normalizedUsedLocationsByOutfitType = RESOLVED_CONTENT_TYPES.reduce<OutfitTypeLocationHistoryMap>((acc, outfitType) => {
+    const normalized = normalizeLocationsForPrompt(usedLocationsByOutfitType[outfitType])
+    if (normalized.length > 0) {
+      acc[outfitType] = normalized
+    }
+    return acc
+  }, {})
+
+  const formatLocationsForPrompt = (locations: string[]) => locations.map((location, index) => `${index + 1}. ${location}`).join('\n')
+
+  const usedLocationsProductPrompt = normalizedUsedLocationsForProduct.length > 0
+    ? formatLocationsForPrompt(normalizedUsedLocationsForProduct)
     : 'None yet for this product image ID'
+
+  const usedLocationsOutfitTypePrompt = isAuto
+    ? (() => {
+      const lines = RESOLVED_CONTENT_TYPES
+        .map((outfitType) => {
+          const locations = normalizedUsedLocationsByOutfitType[outfitType] || []
+          if (locations.length === 0) return ''
+          return `${outfitType.toUpperCase()}:\n${formatLocationsForPrompt(locations)}`
+        })
+        .filter((item) => item.length > 0)
+
+      return lines.length > 0
+        ? lines.join('\n\n')
+        : 'None yet for any outfit type'
+    })()
+    : (() => {
+      const selectedType = contentType as ResolvedContentType
+      const locations = normalizedUsedLocationsByOutfitType[selectedType] || []
+      return locations.length > 0
+        ? formatLocationsForPrompt(locations)
+        : `None yet for outfit type ${selectedType.toUpperCase()}`
+    })()
 
   // Build the master prompt for Gemini
   const systemPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos (OOTD, GRWM, TikTok Shop, Outfit Ideas, Review). 
@@ -493,7 +577,10 @@ ${autoModeRule}` : ''}
 ${affiliateExecutionRules}
 
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
-${usedLocationsPrompt}
+${usedLocationsProductPrompt}
+
+LOCATIONS ALREADY USED FOR SAME OUTFIT TYPE (MUST AVOID REUSE):
+${usedLocationsOutfitTypePrompt}
 
 CRITICAL RULES:
 1. Each scene is exactly 8 seconds, using Veo 3.1 first-frame + last-frame interpolation.
@@ -511,7 +598,7 @@ CRITICAL RULES:
 13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
 14. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments.
 15. **LOCATION SCOPE = GLOBAL REAL LOCATIONS** — Any country is allowed, but always provide concrete city/area + venue details.
-16. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID** — Never reuse locations listed in "LOCATIONS ALREADY USED".
+16. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID + SAME OUTFIT TYPE** — Never reuse locations listed in either location-history section above.
 17. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed to generate fresh concepts; do not duplicate ACTION, LOCATION, CAMERA, NARRATIVE in one output.
 18. **PRODUCT-FIRST COMPOSITION** — Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
 19. **MOBILE SAFE-FRAME RULE** — Keep hero subject in a central safe area and avoid placing critical details at extreme top/bottom edges where TikTok UI/captions can cover them.
@@ -683,7 +770,11 @@ Output as JSON with this exact structure:
     }
 
     const locationFallbackNonce = Math.random().toString(36).slice(2, 8)
-    const blockedLocationKeys = new Set(normalizedUsedLocations.map((location) => normalizeLocationKey(location)))
+    const usedLocationsForFinalOutfitType = normalizedUsedLocationsByOutfitType[finalContentType as ResolvedContentType] || []
+    const blockedLocationKeys = new Set(
+      [...normalizedUsedLocationsForProduct, ...usedLocationsForFinalOutfitType]
+        .map((location) => normalizeLocationKey(location))
+    )
     const usedLocationKeysInRun = new Set<string>()
 
     const markLocationUsed = (location: string) => {
@@ -1705,11 +1796,13 @@ export default function App() {
   const [voiceoverNotes, setVoiceoverNotes] = useState('')
   const [selectedSeoVariantIndex, setSelectedSeoVariantIndex] = useState(0)
   const [productLocationHistory, setProductLocationHistory] = useState<ProductLocationHistoryMap>(() => loadProductLocationHistory())
+  const [outfitTypeLocationHistory, setOutfitTypeLocationHistory] = useState<OutfitTypeLocationHistoryMap>(() => loadOutfitTypeLocationHistory())
 
   // Persist settings
   useEffect(() => { localStorage.setItem('aff_api_key', apiKey) }, [apiKey])
   useEffect(() => { localStorage.setItem('aff_model', model) }, [model])
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
+  useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
 
   useEffect(() => {
     if (!loading) {
@@ -1796,6 +1889,7 @@ export default function App() {
         notes,
         contentType,
         usedLocationsForProduct,
+        outfitTypeLocationHistory,
         FIXED_AFFILIATE_MODE,
         FIXED_SALES_TEMPLATE,
       )
@@ -1814,16 +1908,16 @@ export default function App() {
         message: 'Đã tạo xong Prompt Package. Bạn có thể copy hoặc export ngay.',
       })
 
-      if (currentProductImageId) {
-        const generatedLocations = Array.from(
-          new Set(
-            res.keyframes
-              .map((keyframe) => keyframe.location.trim())
-              .filter((location) => location.length > 0)
-          )
+      const generatedLocations = Array.from(
+        new Set(
+          res.keyframes
+            .map((keyframe) => keyframe.location.trim())
+            .filter((location) => location.length > 0)
         )
+      )
 
-        if (generatedLocations.length > 0) {
+      if (generatedLocations.length > 0) {
+        if (currentProductImageId) {
           setProductLocationHistory((prev) => {
             const existing = prev[currentProductImageId] || []
             const merged = Array.from(new Set([...generatedLocations, ...existing]))
@@ -1833,6 +1927,15 @@ export default function App() {
             }
           })
         }
+
+        setOutfitTypeLocationHistory((prev) => {
+          const existing = prev[resolvedType] || []
+          const merged = Array.from(new Set([...generatedLocations, ...existing]))
+          return {
+            ...prev,
+            [resolvedType]: merged.slice(0, MAX_LOCATION_HISTORY_PER_OUTFIT_TYPE),
+          }
+        })
       }
     } catch (err: any) {
       const message = err?.message || 'Failed to generate prompts'
