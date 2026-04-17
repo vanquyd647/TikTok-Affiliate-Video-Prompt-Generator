@@ -320,6 +320,37 @@ const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster frequently combines #oot
 - Mirror-fitcheck cluster uses mirror semantics such as mirror fit check, mirror selfie, and reflection-led framing.
 - TikTok Shop fashion cluster often combines #tiktokshop, #review, #unboxing, #xuhuong, and clear value-proof language.`
 
+const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use micro-progression between adjacent keyframes (small pose delta, no sudden body jump).
+- Keep one dominant camera movement per 8s scene; avoid mixed or contradictory camera instructions.
+- Preserve camera axis and movement direction across adjacent scenes unless an explicit turn-around beat is written.
+- Avoid discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
+- Keep subject, action, camera, composition, and ambiance explicit for each keyframe/scene prompt.`
+
+const MOTION_DISCONTINUITY_KEYWORDS = [
+  'teleport',
+  'teleports',
+  'jump cut',
+  'hard cut',
+  'smash cut',
+  'flash cut',
+  'instant morph',
+  'abrupt switch',
+  'sudden jump',
+  'warp',
+  'chaotic random',
+] as const
+
+const CAMERA_MOTION_FAMILY_KEYWORDS: Record<string, readonly string[]> = {
+  static: ['static', 'locked off', 'lock off', 'tripod', 'fixed frame'],
+  dolly: ['dolly', 'push in', 'pull back', 'truck'],
+  pan: ['pan', 'panning', 'left to right', 'right to left', 'lateral move'],
+  tilt: ['tilt', 'tilting', 'tilt up', 'tilt down'],
+  tracking: ['tracking', 'follow shot', 'follow camera', 'tracking shot'],
+  orbit: ['orbit', 'arc shot', 'circular move', '360', '180 arc'],
+  zoom: ['zoom', 'zoom in', 'zoom out'],
+  handheld: ['handheld', 'hand held', 'shaky cam'],
+}
+
 type ContentStyleLock = 'mirror' | 'studio' | 'flex'
 
 const STAGE_CACHE_TTL_MS = 5 * 60 * 1000
@@ -338,7 +369,7 @@ const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
   outfitideas: 'Deliver practical lookbook combinations users can copy immediately, with clear value for saving/sharing and buying.',
   fyp: 'Create high-retention viral pacing but still preserve product clarity and affiliate conversion direction.',
   review: 'Lead with honest product proof, fit/material verification, and credible recommendation cues.',
-  tiktokshop: 'Maximize conversion for TikTok Shop: strong hook, product proof, objection handling, and explicit buy-now CTA.',
+  tiktokshop: 'Maximize conversion for TikTok Shop: strong hook, product proof, objection handling, and clear purchase-intent visuals.',
   athleisure: 'Show movement comfort and styling versatility from active to casual settings, tied to practical purchase value.',
   haul: 'Showcase variety and excitement with clear piece-by-piece value, fit proof, and purchasing motivation.',
   styling: 'Teach actionable styling transformations that position the product as a high-utility wardrobe solution.',
@@ -355,7 +386,7 @@ function buildSalesTemplateRules(salesTemplate: SalesTemplate): string {
 
   return `SOFT SELL TEMPLATE (B):
 - Lead with trust, comfort, and practical daily utility.
-- Use recommendation tone before direct CTA.
+- Use recommendation tone before optional purchase cues (no hard CTA required).
 - Keep language natural, friendly, and less aggressive while still conversion-focused.`
 }
 
@@ -391,7 +422,7 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'TEXTURE DETAIL BEAT', emoji: '✨', cameraHint: 'Controlled push-in toward reflection for fabric and cut clarity' },
     { name: 'SIDE-ANGLE CONFIDENCE', emoji: '💫', cameraHint: 'Subtle lateral move while keeping mirror axis stable and social-native' },
     { name: 'FULL LOOK WALKBACK', emoji: '🚶‍♀️', cameraHint: 'Mirror-safe walk and return motion, preserving full outfit visibility' },
-    { name: 'MIRROR CTA CLOSER', emoji: '🎬', cameraHint: 'Clean final mirror pose with conversion-ready product-first composition' },
+    { name: 'MIRROR CONFIDENCE CLOSER', emoji: '🎬', cameraHint: 'Clean final mirror pose with strong product readability and social-native confidence' },
   ],
   grwm: [
     { name: 'COZY MORNING HOOK', emoji: '☀️', cameraHint: 'Warm close-up of model waking/stretching naturally' },
@@ -423,7 +454,7 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'DETAIL INSPECTION', emoji: '🔍', cameraHint: 'Macro close-up on fabric, stitching, material quality' },
     { name: 'TRY-ON MOMENT', emoji: '👗', cameraHint: 'Full body try-on, spinning showcase' },
     { name: 'HONEST VERDICT', emoji: '⭐', cameraHint: 'Eye-level talking head, honest expression' },
-    { name: 'FINAL RECOMMENDATION', emoji: '🎬', cameraHint: 'Happy model with product, call-to-action framing' },
+    { name: 'FINAL RECOMMENDATION', emoji: '🎬', cameraHint: 'Happy model with product, trust-forward recommendation framing' },
   ],
   tiktokshop: [
     { name: 'PRODUCT HOOK + PRICE SIGNAL', emoji: '🛍️', cameraHint: 'Immediate hero shot with strong product readability' },
@@ -431,7 +462,7 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'TRY-ON VALUE MOMENT', emoji: '👗', cameraHint: 'Full-body movement emphasizing versatility and comfort' },
     { name: 'SOCIAL PROOF VISUAL', emoji: '⭐', cameraHint: 'Lifestyle framing with confident model reaction beat' },
     { name: 'BUYING OBJECTION HANDLER', emoji: '✅', cameraHint: 'Detail-focused shot answering size/quality concerns' },
-    { name: 'CTA CLOSER', emoji: '🎬', cameraHint: 'Clean end frame optimized for tap-to-shop conversion' },
+    { name: 'CONVERSION CLOSER', emoji: '🎬', cameraHint: 'Clean end frame optimized for product clarity and conversion intent' },
   ],
   athleisure: [
     { name: 'GYM-TO-CAFÉ TRANSITION HOOK', emoji: '🏃‍♀️', cameraHint: 'Dynamic entrance from gym, effortless swagger' },
@@ -608,14 +639,64 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
   }
 
   if (contentType === 'tiktokshop') {
-    return `- TikTok Shop grammar: proof stack (fit + material + usage) then objection handling and CTA.
+    return `- TikTok Shop grammar: proof stack (fit + material + usage) then objection handling and conversion intent.
 - Keep product readability dominant and include review or unboxing style trust cues.
 - Maintain conversion-native language and framing consistency across scenes.`
   }
 
   return `- Keep social-native pacing, clear outfit readability, and practical value demonstration.
 - Favor authentic creator-style framing over over-produced ad-like visuals.
-- Maintain hook-to-value-to-proof-to-CTA structure.`
+- Maintain hook-to-value-to-proof-to-close structure.`
+}
+
+function containsMotionDiscontinuityKeyword(value: string): boolean {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return false
+
+  return MOTION_DISCONTINUITY_KEYWORDS.some((keyword) => normalized.includes(normalizeLocationKey(keyword)))
+}
+
+function detectCameraMotionFamilies(value: string): string[] {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return []
+
+  return Object.entries(CAMERA_MOTION_FAMILY_KEYWORDS)
+    .filter(([, keywords]) => keywords.some((keyword) => normalized.includes(normalizeLocationKey(keyword))))
+    .map(([family]) => family)
+}
+
+function extractMotionDirection(value: string): 'left' | 'right' | 'forward' | 'backward' | 'up' | 'down' | 'clockwise' | 'counterclockwise' | 'none' {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return 'none'
+
+  if (normalized.includes('counterclockwise') || normalized.includes('anti clockwise')) return 'counterclockwise'
+  if (normalized.includes('clockwise')) return 'clockwise'
+  if (normalized.includes('left') || normalized.includes('sang trai')) return 'left'
+  if (normalized.includes('right') || normalized.includes('sang phai')) return 'right'
+  if (normalized.includes('forward') || normalized.includes('toward') || normalized.includes('push in') || normalized.includes('dolly in')) return 'forward'
+  if (normalized.includes('backward') || normalized.includes('pull back') || normalized.includes('away') || normalized.includes('dolly out')) return 'backward'
+  if (normalized.includes('up') || normalized.includes('rise') || normalized.includes('pedestal up')) return 'up'
+  if (normalized.includes('down') || normalized.includes('drop') || normalized.includes('pedestal down')) return 'down'
+
+  return 'none'
+}
+
+function isOppositeMotionDirection(
+  previous: ReturnType<typeof extractMotionDirection>,
+  current: ReturnType<typeof extractMotionDirection>,
+): boolean {
+  if (previous === 'none' || current === 'none') return false
+
+  return (
+    (previous === 'left' && current === 'right')
+    || (previous === 'right' && current === 'left')
+    || (previous === 'forward' && current === 'backward')
+    || (previous === 'backward' && current === 'forward')
+    || (previous === 'up' && current === 'down')
+    || (previous === 'down' && current === 'up')
+    || (previous === 'clockwise' && current === 'counterclockwise')
+    || (previous === 'counterclockwise' && current === 'clockwise')
+  )
 }
 
 function isAllowedLocationCountry(value: string): boolean {
@@ -801,7 +882,7 @@ AFFILIATE EXECUTION RULES:
 - Scene 1 must create a clear scroll-stopping hook within the first 1.5 seconds while keeping garment visible.
 - Across all scenes, garment/product visibility should remain high and details must be readable for purchase decisions.
 - Include at least one proof cue: fit demonstration, fabric/texture close-up, real-life usage, or social-proof style reaction.
-- Final scene must end with explicit purchase intent framing (buy now, check link/cart, limited stock, deal urgency) in narrative language.
+- Final scene should end with confident product readability and natural visual resolution; do not force CTA language.
 - Avoid overly abstract cinematic framing that reduces product clarity.`
   const diversitySeed = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
   const normalizeLocationsForPrompt = (locations: unknown) => normalizeLocationList(locations)
@@ -1039,6 +1120,10 @@ AFFILIATE EXECUTION RULES:
         || message.includes('shape mismatch')
         || message.includes('low completeness score')
         || message.includes('keyframe mismatch')
+        || message.includes('continuity')
+        || message.includes('camera family conflict')
+        || message.includes('opposite camera direction')
+        || message.includes('discontinuity keyword')
         || message.includes('timeout')
         || message.includes('timed out')
         || message.includes('aborted')
@@ -1202,6 +1287,9 @@ ${usedLocationsOutfitTypePrompt}
 OBSERVED TIKTOK FASHION BASELINES:
 ${TIKTOK_OBSERVED_SIGNAL_BASELINE}
 
+VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
+${VEO_INTERPOLATION_GUARDRAILS}
+
 RULES:
 - Location scope: Vietnam, China, South Korea only.
 - No duplicate locations against history lists above.
@@ -1210,13 +1298,14 @@ RULES:
 - For OOTDMIRROR, enforce mirror-fitcheck setup across all scenes.
 - For OOTD, enforce single-corner studio setup across all scenes.
 - For OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
-- Plan for retention arc: Hook -> Value -> Proof -> CTA.
+- Build action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
+- Plan for retention arc: Hook -> Value -> Proof -> Close.
 
 Output STRICT JSON only:
 {
   ${isAuto ? '"recommendedContentType": "ootd|ootdmirror|grwm|outfitideas|fyp|review|tiktokshop|athleisure|haul|styling|luxury",' : '"recommendedContentType": "same-as-requested",'}
   "creativeDirection": "...",
-  "storyArc": ["hook", "value", "proof", "cta"],
+  "storyArc": ["hook", "value", "proof", "close"],
   "locationCandidates": ["..."],
   "cameraLanguage": ["..."],
   "lightingDirection": "...",
@@ -1235,6 +1324,7 @@ Output STRICT JSON only:
       faceImageId,
       productImageId,
       notesFingerprint,
+      planningPrompt,
       usedLocationsForProduct: normalizedUsedLocationsForProduct,
       usedLocationsByOutfitType: normalizedUsedLocationsByOutfitType,
     })
@@ -1380,6 +1470,76 @@ Output STRICT JSON only:
       return { ok: true }
     }
 
+    const validatePackageTemporalContinuity = (
+      value: Record<string, unknown>,
+      strict: boolean,
+    ): { ok: boolean; reason?: string } => {
+      const keyframes = Array.isArray(value.keyframes) ? value.keyframes : []
+      const scenes = Array.isArray(value.scenes) ? value.scenes : []
+
+      if (keyframes.length !== keyframeCount || scenes.length !== sceneCount) {
+        return { ok: false, reason: 'continuity validation shape mismatch' }
+      }
+
+      for (let i = 0; i < keyframes.length; i += 1) {
+        const keyframe = asRecord(keyframes[i]) ? keyframes[i] as Record<string, unknown> : null
+        if (!keyframe) {
+          return { ok: false, reason: `continuity keyframe[${i}] is not an object` }
+        }
+
+        const action = toSafeText(keyframe.action, '')
+        const camera = toSafeText(keyframe.camera, '')
+
+        if (containsMotionDiscontinuityKeyword(action) || containsMotionDiscontinuityKeyword(camera)) {
+          return { ok: false, reason: `keyframe[${i}] contains discontinuity keyword` }
+        }
+
+        const families = detectCameraMotionFamilies(camera)
+        if (families.length > (strict ? 1 : 2)) {
+          return { ok: false, reason: `keyframe[${i}] camera family conflict ${families.join('/')}` }
+        }
+      }
+
+      for (let i = 0; i < scenes.length; i += 1) {
+        const scene = asRecord(scenes[i]) ? scenes[i] as Record<string, unknown> : null
+        if (!scene) {
+          return { ok: false, reason: `continuity scene[${i}] is not an object` }
+        }
+
+        const narrative = toSafeText(scene.narrative, '')
+        const cameraMovement = toSafeText(scene.cameraMovement, '')
+
+        if (containsMotionDiscontinuityKeyword(narrative) || containsMotionDiscontinuityKeyword(cameraMovement)) {
+          return { ok: false, reason: `scene[${i}] contains discontinuity keyword` }
+        }
+
+        const families = detectCameraMotionFamilies(cameraMovement)
+        if (families.length > 1) {
+          return { ok: false, reason: `scene[${i}] camera family conflict ${families.join('/')}` }
+        }
+      }
+
+      if (strict) {
+        for (let i = 1; i < scenes.length; i += 1) {
+          const prevScene = asRecord(scenes[i - 1]) ? scenes[i - 1] as Record<string, unknown> : null
+          const currentScene = asRecord(scenes[i]) ? scenes[i] as Record<string, unknown> : null
+          if (!prevScene || !currentScene) continue
+
+          const prevDirection = extractMotionDirection(`${toSafeText(prevScene.cameraMovement, '')} ${toSafeText(prevScene.narrative, '')}`)
+          const currentDirection = extractMotionDirection(`${toSafeText(currentScene.cameraMovement, '')} ${toSafeText(currentScene.narrative, '')}`)
+
+          if (isOppositeMotionDirection(prevDirection, currentDirection)) {
+            return {
+              ok: false,
+              reason: `scene[${i}] opposite camera direction ${prevDirection} -> ${currentDirection}`,
+            }
+          }
+        }
+      }
+
+      return { ok: true }
+    }
+
     const validatePackageShapeAndLocations = (
       value: Record<string, unknown>,
       minScore: number,
@@ -1396,6 +1556,24 @@ Output STRICT JSON only:
       const shapeValidation = validatePackageShape(value, keyframeCount, sceneCount, minScore)
       if (!shapeValidation.ok) return shapeValidation
       return validatePackageLocationsStrict(value)
+    }
+
+    const validatePackageShapeLocationsAndMotion = (
+      value: Record<string, unknown>,
+      minScore: number,
+    ): { ok: boolean; reason?: string } => {
+      const shapeAndLocationValidation = validatePackageShapeAndLocations(value, minScore)
+      if (!shapeAndLocationValidation.ok) return shapeAndLocationValidation
+      return validatePackageTemporalContinuity(value, false)
+    }
+
+    const validatePackageShapeLocationsAndMotionStrict = (
+      value: Record<string, unknown>,
+      minScore: number,
+    ): { ok: boolean; reason?: string } => {
+      const shapeAndLocationValidation = validatePackageShapeAndLocationsStrict(value, minScore)
+      if (!shapeAndLocationValidation.ok) return shapeAndLocationValidation
+      return validatePackageTemporalContinuity(value, true)
     }
 
     // STAGE 3 — PACKAGE GENERATION
@@ -1424,6 +1602,9 @@ ${TIKTOK_OBSERVED_SIGNAL_BASELINE}
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
 
+VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
+${VEO_INTERPOLATION_GUARDRAILS}
+
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsProductPrompt}
 
@@ -1440,14 +1621,14 @@ CRITICAL RULES (NON-NEGOTIABLE):
 2. Keyframe chain must be SEAMLESS: last frame of scene N = first frame of scene N+1.
 3. Character identity must be perfectly consistent across all keyframes (face, body proportions, hair, skin tone).
 4. Product/garment must be EXACTLY preserved from the reference image (color, silhouette, material, details).
-5. Follow TikTok retention arc across timeline: Hook (0-3s) -> Value -> Proof -> CTA.
+5. Follow TikTok retention arc across timeline: Hook (0-3s) -> Value -> Proof -> Close.
 6. Scene 1 must create a strong visual hook in the first 1-3 seconds with immediate product readability.
 7. Infer scene context from garment/product characteristics, content type, and user notes; avoid generic preset randomness.
 8. NEVER use background, location, props, or lighting from the FACE reference image. Face image is identity-only.
 9. Keep one primary location coherent across all keyframes/scenes; do not change location unless user explicitly requests a transition.
 10. Prompt detail quality must follow Veo best practice: each keyframe/scenes should be specific on Subject, Action, Camera, Composition, Style, and Ambiance/Lighting.
 11. Camera grammar must stay coherent: one dominant camera move per 8s scene, no chaotic mixed camera instructions.
-12. Motion continuity is mandatory across scene boundaries: maintain compatible direction, speed feel, and body orientation to reduce interpolation artifacts.
+12. First-last-frame interpolation safety is mandatory: adjacent keyframes must use micro-progression (small pose delta, stable framing axis, no sudden body teleport).
 13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
 14. LOCATION MUST BE REAL-WORLD VENUES ONLY - Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments.
 15. LOCATION SCOPE = VIETNAM, CHINA, SOUTH KOREA ONLY - Every location must be in Vietnam, China, or South Korea, and must include concrete city/area + venue details.
@@ -1456,14 +1637,15 @@ CRITICAL RULES (NON-NEGOTIABLE):
 18. PRODUCT-FIRST COMPOSITION - Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
 19. MOBILE SAFE-FRAME RULE - Keep hero subject in a central safe area and avoid placing critical details at extreme top/bottom edges where TikTok UI/captions can cover them.
 20. RETENTION PACING RULE - Avoid static visuals for too long; every ~1-2 seconds should include meaningful subject or camera progression.
-21. NO VOICE REQUIREMENT - The video must work fully without voiceover/dialogue. Do not rely on spoken lines to deliver value, proof, or CTA.
+21. NO VOICE REQUIREMENT - The video must work fully without voiceover/dialogue. Do not rely on spoken lines to deliver value or proof.
 22. AUDIO IS OPTIONAL (IF USED) - Prefer silent-first visual storytelling. If adding SFX/ambience, describe it clearly but keep comprehension independent from audio.
 23. AUTHENTICITY + TRUST - Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
-24. CTA-SAFE ENDING + TEMPLATE CONSISTENCY - Final scene must naturally set up conversion CTA while keeping tone and pressure aligned with selected Sales Template.
+24. NO-CTA ENDING + TEMPLATE CONSISTENCY - Final scene should land a clean visual payoff with product clarity; explicit CTA is optional and never mandatory.
 25. OOTD FAMILY TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTDMIRROR, enforce mirror fitcheck flow only. For OOTD, enforce single-corner studio flow only. For OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow.
 26. MIRROR FITCHECK SPEC - Use full-body mirror framing, vertical social-native phone aesthetic, visible head-to-toe outfit readability, and ensure no camera/tripod/operator reflection appears in the mirror.
 27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes.
 28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition.
+29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -1503,12 +1685,12 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
         temperature,
         maxTokens,
       ),
-      (value) => validatePackageShapeAndLocations(value, 0.62),
+      (value) => validatePackageShapeLocationsAndMotion(value, 0.62),
     )
 
     // STAGE 4 — QA + REPAIR (with fast-path skip)
     const draftQualityScore = getPackageCompletenessScore(draftPackage, keyframeCount, sceneCount)
-    const draftStrictValidation = validatePackageShapeAndLocationsStrict(draftPackage, 0.65)
+    const draftStrictValidation = validatePackageShapeLocationsAndMotionStrict(draftPackage, 0.65)
     const canSkipQaRepair = draftStrictValidation.ok && draftQualityScore >= 0.65
 
     let parsed: Record<string, unknown> = draftPackage
@@ -1525,7 +1707,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
       const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
 
   Validate and repair the draft package to satisfy all constraints below:
-  - Enforce CRITICAL RULES 1..28 exactly as defined in package generation stage.
+  - Enforce CRITICAL RULES 1..29 exactly as defined in package generation stage.
   - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
   - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
   - AI must choose fresh locations itself and must avoid all locations listed in location-history constraints.
@@ -1534,6 +1716,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Enforce style lock by type: OOTDMIRROR mirror-only, OOTD studio-only, OutfitIdeas fixed to its chosen setup unless narrative explicitly transitions.
   - Keep product-first composition and TikTok retention pacing.
   - Use the same primary location lock in all keyframes/scenes.
+  - Enforce interpolation safety guardrails: micro-progression between adjacent keyframes, no abrupt opposite camera direction, no discontinuity keywords.
 
 PRIMARY LOCATION LOCK (MANDATORY):
 ${primaryPlannedLocation.length > 0
@@ -1545,6 +1728,9 @@ ${safeJsonStringify(draftPackage)}
 
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
+
+VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
+${VEO_INTERPOLATION_GUARDRAILS}
 
 Return STRICT JSON only, same schema:
 {
@@ -1559,7 +1745,7 @@ Return STRICT JSON only, same schema:
           [0.45, 0.32],
           8192,
           (temperature, maxTokens) => requestGeminiJson(apiKey, model, qaRepairPrompt, temperature, maxTokens),
-          (value) => validatePackageShapeAndLocations(value, 0.65),
+          (value) => validatePackageShapeLocationsAndMotion(value, 0.65),
         )
         const repairedQualityScore = getPackageCompletenessScore(repairedPackage, keyframeCount, sceneCount)
 
@@ -1627,6 +1813,54 @@ Return STRICT JSON only, same schema:
       }
     }
 
+    const strictMotionValidation = validatePackageTemporalContinuity(parsed, true)
+    if (!strictMotionValidation.ok) {
+      const motionRepairPrompt = `You are a strict interpolation-continuity repair model for Veo 3.1 first-frame -> last-frame fashion videos.
+
+TASK:
+- Repair ONLY motion/camera continuity fields so interpolation between keyframes is physically plausible.
+- Keep location, character identity, garment fidelity, and style lock unchanged.
+- Maintain existing story arc and product-first composition.
+
+INTERPOLATION CONTINUITY REQUIREMENTS:
+- Adjacent keyframes must be micro-progression, not abrupt pose jumps.
+- Use one dominant camera movement per scene (no mixed camera grammar).
+- Avoid immediate opposite camera direction across adjacent scenes unless explicit turnaround beat is described.
+- Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
+
+TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
+${contentTypeNativeSignalRules}
+
+VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
+${VEO_INTERPOLATION_GUARDRAILS}
+
+FAILED VALIDATION REASON:
+${strictMotionValidation.reason || 'unknown'}
+
+DRAFT PACKAGE JSON:
+${safeJsonStringify(parsed)}
+
+Return STRICT JSON only, same schema:
+{
+  "masterDNA": "...",
+  "keyframes": [ ... ],
+  "scenes": [ ... ]
+}`
+
+      try {
+        const motionRepairedPackage = await runStage(
+          'motion_repair',
+          [0.32, 0.22],
+          8192,
+          (temperature, maxTokens) => requestGeminiJson(apiKey, model, motionRepairPrompt, temperature, maxTokens),
+          (value) => validatePackageShapeLocationsAndMotionStrict(value, 0.60),
+        )
+        parsed = motionRepairedPackage
+      } catch {
+        // Keep current package; downstream fallback still builds synchronized prompts.
+      }
+    }
+
     const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
     const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : []
 
@@ -1682,7 +1916,7 @@ Return STRICT JSON only, same schema:
       outfitideas: 'Practical mix-and-match outfit demonstration with clear style transformation',
       fyp: 'Scroll-stopping fashion movement with dynamic pose transition',
       review: 'Authentic product demonstration pose emphasizing fit and material quality',
-      tiktokshop: 'Conversion-focused product showcase movement optimized for TikTok Shop CTA',
+      tiktokshop: 'Conversion-focused product showcase movement optimized for TikTok Shop clarity and intent',
       athleisure: 'Energetic gym-to-café transition movement with sporty-chic confidence',
       haul: 'Excited try-on movements showcasing product fit and styling versatility',
       styling: 'Purposeful modeling pose highlighting outfit coordination and styling impact',
@@ -4012,7 +4246,7 @@ export default function App() {
                 Đã khóa 1 hướng tối ưu duy nhất theo TikTok: <strong>{FIXED_STRATEGY_LABEL}</strong>.
               </p>
               <p className="ai-task-hint" style={{ marginBottom: 0 }}>
-                Mục tiêu: ưu tiên chuyển đổi bền vững, giữ sản phẩm rõ ràng, tăng niềm tin trước CTA mua hàng.
+                Mục tiêu: ưu tiên chuyển đổi bền vững, giữ sản phẩm rõ ràng, tăng niềm tin để thúc đẩy ý định mua tự nhiên.
               </p>
             </div>
 
