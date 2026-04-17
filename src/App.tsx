@@ -116,9 +116,55 @@ const ASPECT_RATIOS = [
 
 const CONTENT_TYPES = [
   { value: 'auto', label: 'Auto', icon: Sparkles, desc: 'AI Decides', color: 'var(--accent-purple)' },
-  { value: 'ootd', label: 'OOTD', icon: Shirt, desc: 'Outfit of the Day', color: 'var(--accent-pink)' },
+  {
+    value: 'ootd',
+    label: 'OOTD',
+    icon: Shirt,
+    desc: 'Outfit of the Day',
+    color: 'var(--accent-pink)',
+    locationStyleKeywords: [
+      'mirror',
+      'mirrorselfie',
+      'mirrorootd',
+      'fitcheck',
+      'studio',
+      'studioshoot',
+      'studio corner',
+      'fitting room',
+      'wardrobe mirror',
+      'guong',
+      'phong thay do',
+      'phong thu do',
+      'goc studio',
+      'studio mini',
+      'dressing room',
+    ],
+  },
   { value: 'grwm', label: 'GRWM', icon: Star, desc: 'Get Ready With Me', color: 'var(--accent-purple)' },
-  { value: 'outfitideas', label: 'Outfit Ideas', icon: Shirt, desc: 'Lookbook / Phoi do', color: '#22c55e' },
+  {
+    value: 'outfitideas',
+    label: 'Outfit Ideas',
+    icon: Shirt,
+    desc: 'Lookbook / Phoi do',
+    color: '#22c55e',
+    locationStyleKeywords: [
+      'mirror',
+      'mirrorselfie',
+      'mirrorootd',
+      'fitcheck',
+      'studio',
+      'studioshoot',
+      'studio corner',
+      'fitting room',
+      'wardrobe mirror',
+      'guong',
+      'phong thay do',
+      'phong thu do',
+      'goc studio',
+      'studio mini',
+      'dressing room',
+    ],
+  },
   { value: 'fyp', label: 'FYP', icon: TrendingUp, desc: 'Viral Discovery', color: 'var(--accent-cyan)' },
   { value: 'review', label: 'Review', icon: MessageSquare, desc: 'Product Review', color: 'var(--accent-emerald)' },
   { value: 'tiktokshop', label: 'TikTok Shop', icon: Sparkles, desc: 'Affiliate Conversion', color: '#f97316' },
@@ -652,6 +698,10 @@ CRITICAL RULES:
 22. **AUDIO IS OPTIONAL (IF USED)** — Prefer silent-first visual storytelling. If adding SFX/ambience, describe it clearly but keep comprehension independent from audio.
 23. **AUTHENTICITY + TRUST** — Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
 24. **CTA-SAFE ENDING + TEMPLATE CONSISTENCY** — Final scene must naturally set up conversion CTA while keeping tone and pressure aligned with selected Sales Template.
+25. **OOTD/OUTFITIDEAS TREND FORMAT (TIKTOK-ALIGNED)** — For content type OOTD or OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow.
+26. **MIRROR FITCHECK SPEC** — Use full-body mirror framing, vertical social-native phone aesthetic, visible head-to-toe outfit readability, and ensure no camera/tripod/operator reflection appears in the mirror.
+27. **SINGLE-CORNER STUDIO SPEC** — Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes.
+28. **STYLE CONSISTENCY LOCK** — Once mirror or studio setup is chosen for OOTD/OutfitIdeas, keep that setup consistent across all scenes unless there is an explicit narrative reason to transition.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -821,6 +871,11 @@ Output as JSON with this exact structure:
         .map((location) => normalizeLocationKey(location))
     )
     const usedLocationKeysInRun = new Set<string>()
+    const matchedContentType = CONTENT_TYPES.find((type) => type.value === finalContentType)
+    const locationStyleKeywordsForType: string[] = matchedContentType && 'locationStyleKeywords' in matchedContentType
+      ? [...matchedContentType.locationStyleKeywords]
+      : []
+    const requiresContentTypeLocationPattern = locationStyleKeywordsForType.length > 0
 
     const markLocationUsed = (location: string) => {
       usedLocationKeysInRun.add(normalizeLocationKey(location))
@@ -828,12 +883,12 @@ Output as JSON with this exact structure:
     }
 
     const regionalFallbackLocations = [
-      'Old Quarter cafe lane, Hanoi, Vietnam',
-      'Nguyen Hue walking street, Ho Chi Minh City, Vietnam',
-      'Xintiandi fashion district, Shanghai, China',
-      'Sanlitun shopping quarter, Beijing, China',
-      'Myeongdong retail district, Seoul, South Korea',
-      'Haeundae seaside promenade, Busan, South Korea',
+      'Full-length dressing mirror corner, Hoan Kiem, Hanoi, Vietnam',
+      'Minimal softbox studio corner, District 7, Ho Chi Minh City, Vietnam',
+      'Boutique fitting-mirror zone, Xintiandi, Shanghai, China',
+      'Neutral cyclorama studio corner, Chaoyang, Beijing, China',
+      'Wardrobe mirror fitcheck corner, Seongsu, Seoul, South Korea',
+      'Clean portrait studio corner, Haeundae, Busan, South Korea',
     ]
 
     const pickLocationFallback = (index: number) => {
@@ -846,7 +901,15 @@ Output as JSON with this exact structure:
       const candidate = toSafeString(value, '')
       if (candidate.length > 0) {
         const candidateKey = normalizeLocationKey(candidate)
-        if (isAllowedLocationCountry(candidate) && !blockedLocationKeys.has(candidateKey) && !usedLocationKeysInRun.has(candidateKey)) {
+        const matchesContentTypeLocationPattern = !requiresContentTypeLocationPattern
+          || locationStyleKeywordsForType.some((keyword: string) => candidateKey.includes(keyword))
+
+        if (
+          isAllowedLocationCountry(candidate)
+          && matchesContentTypeLocationPattern
+          && !blockedLocationKeys.has(candidateKey)
+          && !usedLocationKeysInRun.has(candidateKey)
+        ) {
           return markLocationUsed(candidate)
         }
       }
