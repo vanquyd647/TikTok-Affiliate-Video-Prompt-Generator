@@ -37,6 +37,21 @@ npm run dev
 npm run build
 ```
 
+## Luu Lich Su Lam Viec (MongoDB + Vercel)
+
+Ung dung da co san API de luu lich su tao noi dung vao MongoDB:
+
+- `POST /api/work-history`: Luu 1 ban ghi (`prompt`, `seo`, `voiceover`).
+- `GET /api/work-history?limit=30`: Lay danh sach lich su moi nhat.
+
+Can cau hinh bien moi truong tren Vercel (hoac local):
+
+- `MONGODB_URI` (bat buoc)
+- `MONGODB_DB_NAME` (tuy chon, mac dinh `aff_prompt_generator`)
+- `MONGODB_WORK_HISTORY_COLLECTION` (tuy chon, mac dinh `work_history`)
+
+Su dung file mau: `.env.example`.
+
 ## Tech Stack
 
 - **Frontend**: Vite + React + TypeScript

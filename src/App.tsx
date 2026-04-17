@@ -92,6 +92,15 @@ interface RecentLocalImageBucket {
   updatedAt: number
 }
 
+interface WorkHistoryPayload {
+  action: 'prompt' | 'seo' | 'voiceover'
+  model: string
+  contentType: string
+  notes?: string
+  generatedAt: number
+  metadata?: Record<string, unknown>
+}
+
 // ═══════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════
@@ -1097,6 +1106,21 @@ async function requestGeminiJson(
   return parseGeminiJsonFromText(mergedText)
 }
 
+async function persistWorkHistory(payload: WorkHistoryPayload): Promise<void> {
+  const response = await fetch('/api/work-history', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`History API error (${response.status}): ${errorText.slice(0, 240)}`)
+  }
+}
+
 async function generateSeoWithGemini(
   apiKey: string,
   model: string,
@@ -2023,6 +2047,7 @@ export default function App() {
             .filter((location) => location.length > 0)
         )
       )
+      const workHistoryGeneratedAt = Date.now()
 
       if (generatedLocations.length > 0) {
         if (currentProductImageId) {
@@ -2045,6 +2070,30 @@ export default function App() {
           }
         })
       }
+
+      void persistWorkHistory({
+        action: 'prompt',
+        model,
+        contentType: resolvedType,
+        notes: notes.trim(),
+        generatedAt: workHistoryGeneratedAt,
+        metadata: {
+          inputContentType: contentType,
+          resolvedContentType: resolvedType,
+          duration,
+          aspectRatio,
+          keyframeCount: res.keyframes.length,
+          sceneCount: res.scenes.length,
+          generatedLocations: generatedLocations.slice(0, 10),
+          hasFaceImage: Boolean(faceImage),
+          hasProductImage: Boolean(productImage),
+        },
+      }).catch((saveError) => {
+        console.warn(
+          'Could not save prompt work history:',
+          saveError instanceof Error ? saveError.message : saveError
+        )
+      })
     } catch (err: any) {
       const message = err?.message || 'Failed to generate prompts'
       setError(message)
@@ -2084,6 +2133,24 @@ export default function App() {
       setSeoResult(generated)
       setSelectedSeoVariantIndex(0)
       setActiveTab('seo')
+
+      void persistWorkHistory({
+        action: 'seo',
+        model,
+        contentType,
+        notes: seoNotes.trim(),
+        generatedAt: generated.generatedAt || Date.now(),
+        metadata: {
+          productName: trimmedProductName,
+          variantCount: generated.seoVariants.length,
+          salesTemplate: FIXED_SALES_TEMPLATE,
+        },
+      }).catch((saveError) => {
+        console.warn(
+          'Could not save SEO work history:',
+          saveError instanceof Error ? saveError.message : saveError
+        )
+      })
     } catch (err: any) {
       setSeoError(err?.message || 'Failed to generate SEO variants')
     } finally {
@@ -2116,6 +2183,25 @@ export default function App() {
 
       setVoiceoverResult(generated)
       setActiveTab('voiceover')
+
+      void persistWorkHistory({
+        action: 'voiceover',
+        model,
+        contentType,
+        notes: voiceoverNotes.trim(),
+        generatedAt: generated.generatedAt || Date.now(),
+        metadata: {
+          productName: trimmedProductName,
+          durationSec: generated.voiceover.durationSec,
+          lineCount: generated.voiceover.lines.length,
+          salesTemplate: FIXED_SALES_TEMPLATE,
+        },
+      }).catch((saveError) => {
+        console.warn(
+          'Could not save voiceover work history:',
+          saveError instanceof Error ? saveError.message : saveError
+        )
+      })
     } catch (err: any) {
       setVoiceoverError(err?.message || 'Failed to generate voiceover script')
     } finally {
