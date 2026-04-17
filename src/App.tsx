@@ -29,6 +29,7 @@ interface ScenePrompt {
   startPose: string
   endPose: string
   cameraMovement: string
+  locationFlow?: string
   fullPrompt: string
 }
 
@@ -216,6 +217,9 @@ type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type ProductLocationHistoryMap = Record<string, string[]>
 type OutfitTypeLocationHistoryMap = Partial<Record<ResolvedContentType, string[]>>
+
+const CONTENT_TYPE_VALUES = CONTENT_TYPES.map((item) => item.value) as ContentType[]
+const ASPECT_RATIO_VALUES = ASPECT_RATIOS.map((item) => item.value) as Array<'9:16' | '16:9'>
 
 const AFF_STORAGE_DB_NAME = 'aff_prompt_storage'
 const AFF_STORAGE_DB_VERSION = 1
@@ -997,6 +1001,7 @@ ${usedLocationsOutfitTypePrompt}
 RULES:
 - Location scope: Vietnam, China, South Korea only.
 - No duplicate locations against history lists above.
+- AI must self-select fresh real-world locations. Do not use fixed/preset location pools.
 - For OOTD/OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
 - Plan for retention arc: Hook -> Value -> Proof -> CTA.
 
@@ -1043,6 +1048,71 @@ Output STRICT JSON only:
     }
 
     const affiliateObjectiveForFinal = AFFILIATE_VIDEO_OBJECTIVES[finalContentType as ResolvedContentType]
+    const usedLocationsForFinalOutfitType = normalizedUsedLocationsByOutfitType[finalContentType as ResolvedContentType] || []
+    const blockedLocationKeys = new Set(
+      [...normalizedUsedLocationsForProduct, ...usedLocationsForFinalOutfitType]
+        .map((location) => normalizeLocationKey(location))
+    )
+    const matchedContentType = CONTENT_TYPES.find((type) => type.value === finalContentType)
+    const locationStyleKeywordsForType: string[] = matchedContentType && 'locationStyleKeywords' in matchedContentType
+      ? [...matchedContentType.locationStyleKeywords]
+      : []
+    const requiresContentTypeLocationPattern = locationStyleKeywordsForType.length > 0
+
+    const isLocationCandidateAllowed = (location: string) => {
+      const candidate = location.trim()
+      if (candidate.length === 0) return false
+
+      const candidateKey = normalizeLocationKey(candidate)
+      const matchesContentTypeLocationPattern = !requiresContentTypeLocationPattern
+        || locationStyleKeywordsForType.some((keyword: string) => candidateKey.includes(keyword))
+
+      return (
+        isAllowedLocationCountry(candidate)
+        && matchesContentTypeLocationPattern
+        && !blockedLocationKeys.has(candidateKey)
+      )
+    }
+
+    const aiPlannedLocationPool = planningResult.locationCandidates
+      .filter((location) => isLocationCandidateAllowed(location))
+
+    const validatePackageLocations = (value: Record<string, unknown>): { ok: boolean; reason?: string } => {
+      const keyframes = Array.isArray(value.keyframes) ? value.keyframes : []
+      if (keyframes.length !== keyframeCount) {
+        return { ok: false, reason: `location validation keyframe mismatch ${keyframes.length}/${keyframeCount}` }
+      }
+
+      const seenLocationKeys = new Set<string>()
+      for (let i = 0; i < keyframes.length; i += 1) {
+        const keyframe = asRecord(keyframes[i]) ? keyframes[i] as Record<string, unknown> : null
+        if (!keyframe) {
+          return { ok: false, reason: `keyframe[${i}] is not an object` }
+        }
+
+        const location = toSafeText(keyframe.location, '')
+        if (!isLocationCandidateAllowed(location)) {
+          return { ok: false, reason: `keyframe[${i}] invalid/blocked location` }
+        }
+
+        const locationKey = normalizeLocationKey(location)
+        if (seenLocationKeys.has(locationKey)) {
+          return { ok: false, reason: `duplicate location in package at keyframe[${i}]` }
+        }
+        seenLocationKeys.add(locationKey)
+      }
+
+      return { ok: true }
+    }
+
+    const validatePackageShapeAndLocations = (
+      value: Record<string, unknown>,
+      minScore: number,
+    ): { ok: boolean; reason?: string } => {
+      const shapeValidation = validatePackageShape(value, keyframeCount, sceneCount, minScore)
+      if (!shapeValidation.ok) return shapeValidation
+      return validatePackageLocations(value)
+    }
 
     // STAGE 3 — PACKAGE GENERATION
     const generationPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos.
@@ -1064,19 +1134,41 @@ ${safeJsonStringify(visualAnalysis)}
 CREATIVE PLAN JSON:
 ${safeJsonStringify(planningResult)}
 
-LOCATION CONSTRAINTS:
-- Scope must remain Vietnam, China, South Korea.
-- Avoid all used locations in history.
-- Keep location continuity unless a clear narrative transition is needed.
+LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
+${usedLocationsProductPrompt}
 
-QUALITY RULES:
-1. Character identity must be consistent across all keyframes.
-2. Garment fidelity must be exact from product reference.
-3. Camera grammar must be coherent (one dominant move per scene).
-4. Motion continuity across scene boundaries is mandatory.
-5. Product readability must stay high in every scene.
-6. Retention pacing: meaningful progression every 1-2 seconds.
-7. OOTD/OutfitIdeas must keep mirror or studio lock consistently.
+LOCATIONS ALREADY USED FOR SAME OUTFIT TYPE (MUST AVOID REUSE):
+${usedLocationsOutfitTypePrompt}
+
+CRITICAL RULES (NON-NEGOTIABLE):
+1. Each scene is exactly 8 seconds, using Veo 3.1 first-frame + last-frame interpolation.
+2. Keyframe chain must be SEAMLESS: last frame of scene N = first frame of scene N+1.
+3. Character identity must be perfectly consistent across all keyframes (face, body proportions, hair, skin tone).
+4. Product/garment must be EXACTLY preserved from the reference image (color, silhouette, material, details).
+5. Follow TikTok retention arc across timeline: Hook (0-3s) -> Value -> Proof -> CTA.
+6. Scene 1 must create a strong visual hook in the first 1-3 seconds with immediate product readability.
+7. Infer scene context from garment/product characteristics, content type, and user notes; avoid generic preset randomness.
+8. NEVER use background, location, props, or lighting from the FACE reference image. Face image is identity-only.
+9. Keep scene context coherent; only change location when there is a clear narrative transition.
+10. Prompt detail quality must follow Veo best practice: each keyframe/scenes should be specific on Subject, Action, Camera, Composition, Style, and Ambiance/Lighting.
+11. Camera grammar must stay coherent: one dominant camera move per 8s scene, no chaotic mixed camera instructions.
+12. Motion continuity is mandatory across scene boundaries: maintain compatible direction, speed feel, and body orientation to reduce interpolation artifacts.
+13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
+14. LOCATION MUST BE REAL-WORLD VENUES ONLY - Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments.
+15. LOCATION SCOPE = VIETNAM, CHINA, SOUTH KOREA ONLY - Every location must be in Vietnam, China, or South Korea, and must include concrete city/area + venue details.
+16. AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID + SAME OUTFIT TYPE - Never reuse locations listed in either location-history section above.
+17. ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT - Use the Diversity seed to generate fresh concepts; do not duplicate ACTION, LOCATION, CAMERA, NARRATIVE in one output.
+18. PRODUCT-FIRST COMPOSITION - Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
+19. MOBILE SAFE-FRAME RULE - Keep hero subject in a central safe area and avoid placing critical details at extreme top/bottom edges where TikTok UI/captions can cover them.
+20. RETENTION PACING RULE - Avoid static visuals for too long; every ~1-2 seconds should include meaningful subject or camera progression.
+21. NO VOICE REQUIREMENT - The video must work fully without voiceover/dialogue. Do not rely on spoken lines to deliver value, proof, or CTA.
+22. AUDIO IS OPTIONAL (IF USED) - Prefer silent-first visual storytelling. If adding SFX/ambience, describe it clearly but keep comprehension independent from audio.
+23. AUTHENTICITY + TRUST - Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
+24. CTA-SAFE ENDING + TEMPLATE CONSISTENCY - Final scene must naturally set up conversion CTA while keeping tone and pressure aligned with selected Sales Template.
+25. OOTD/OUTFITIDEAS TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTD or OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow.
+26. MIRROR FITCHECK SPEC - Use full-body mirror framing, vertical social-native phone aesthetic, visible head-to-toe outfit readability, and ensure no camera/tripod/operator reflection appears in the mirror.
+27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes.
+28. STYLE CONSISTENCY LOCK - Once mirror or studio setup is chosen for OOTD/OutfitIdeas, keep that setup consistent across all scenes unless there is an explicit narrative reason to transition.
 
 ${notes ? `USER NOTES: ${notes}` : ''}
 
@@ -1118,18 +1210,21 @@ Return STRICT JSON only in this schema:
         temperature,
         maxTokens,
       ),
-      (value) => validatePackageShape(value, keyframeCount, sceneCount, 0.62),
+      (value) => validatePackageShapeAndLocations(value, 0.62),
     )
 
     // STAGE 4 — QA + REPAIR
     const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
 
-Validate and repair the draft package to satisfy all constraints:
-- location scope must be Vietnam/China/South Korea
-- no obvious duplicate location/action/camera repetition
-- continuity between keyframes and scenes
-- product readability and conversion framing quality
-- mirror/studio consistency for OOTD/OutfitIdeas
+  Validate and repair the draft package to satisfy all constraints below:
+  - Enforce CRITICAL RULES 1..28 exactly as defined in package generation stage.
+  - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
+  - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
+  - AI must choose fresh locations itself and must avoid all locations listed in location-history constraints.
+  - Keep camera grammar coherent and avoid chaotic mixed movement in one scene.
+  - Preserve character identity and garment fidelity with zero drift.
+  - Keep mirror/studio lock consistent for OOTD/OutfitIdeas unless narrative explicitly transitions.
+  - Keep product-first composition and TikTok retention pacing.
 
 DRAFT PACKAGE JSON:
 ${safeJsonStringify(draftPackage)}
@@ -1149,7 +1244,7 @@ Return STRICT JSON only, same schema:
         [0.45, 0.32],
         8192,
         (temperature, maxTokens) => requestGeminiJson(apiKey, model, qaRepairPrompt, temperature, maxTokens),
-        (value) => validatePackageShape(value, keyframeCount, sceneCount, 0.65),
+        (value) => validatePackageShapeAndLocations(value, 0.65),
       )
       const repairedQualityScore = getPackageCompletenessScore(repairedPackage, keyframeCount, sceneCount)
 
@@ -1176,57 +1271,39 @@ Return STRICT JSON only, same schema:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
-    const locationFallbackNonce = Math.random().toString(36).slice(2, 8)
-    const usedLocationsForFinalOutfitType = normalizedUsedLocationsByOutfitType[finalContentType as ResolvedContentType] || []
-    const blockedLocationKeys = new Set(
-      [...normalizedUsedLocationsForProduct, ...usedLocationsForFinalOutfitType]
-        .map((location) => normalizeLocationKey(location))
-    )
-    const usedLocationKeysInRun = new Set<string>()
-    const matchedContentType = CONTENT_TYPES.find((type) => type.value === finalContentType)
-    const locationStyleKeywordsForType: string[] = matchedContentType && 'locationStyleKeywords' in matchedContentType
-      ? [...matchedContentType.locationStyleKeywords]
-      : []
-    const requiresContentTypeLocationPattern = locationStyleKeywordsForType.length > 0
+    const usedLocationKeysInOutput = new Set<string>()
+    const pickAiPlannedLocationFallback = (index: number) => {
+      if (aiPlannedLocationPool.length === 0) {
+        throw new Error(`No valid AI-selected location candidate available for keyframe ${index + 1}`)
+      }
 
-    const markLocationUsed = (location: string) => {
-      usedLocationKeysInRun.add(normalizeLocationKey(location))
-      return location
-    }
-
-    const regionalFallbackLocations = [
-      'Full-length dressing mirror corner, Hoan Kiem, Hanoi, Vietnam',
-      'Minimal softbox studio corner, District 7, Ho Chi Minh City, Vietnam',
-      'Boutique fitting-mirror zone, Xintiandi, Shanghai, China',
-      'Neutral cyclorama studio corner, Chaoyang, Beijing, China',
-      'Wardrobe mirror fitcheck corner, Seongsu, Seoul, South Korea',
-      'Clean portrait studio corner, Haeundae, Busan, South Korea',
-    ]
-
-    const pickLocationFallback = (index: number) => {
-      const seedLocation = regionalFallbackLocations[index % regionalFallbackLocations.length]
-      const fallback = `${seedLocation} [fallback-${index + 1}-${locationFallbackNonce}]`
-      return markLocationUsed(fallback)
-    }
-
-    const ensureRealLocation = (value: unknown, index: number) => {
-      const candidate = toSafeString(value, '')
-      if (candidate.length > 0) {
+      for (let offset = 0; offset < aiPlannedLocationPool.length; offset += 1) {
+        const candidate = aiPlannedLocationPool[(index + offset) % aiPlannedLocationPool.length]
         const candidateKey = normalizeLocationKey(candidate)
-        const matchesContentTypeLocationPattern = !requiresContentTypeLocationPattern
-          || locationStyleKeywordsForType.some((keyword: string) => candidateKey.includes(keyword))
-
-        if (
-          isAllowedLocationCountry(candidate)
-          && matchesContentTypeLocationPattern
-          && !blockedLocationKeys.has(candidateKey)
-          && !usedLocationKeysInRun.has(candidateKey)
-        ) {
-          return markLocationUsed(candidate)
+        if (!usedLocationKeysInOutput.has(candidateKey)) {
+          return candidate
         }
       }
-      return pickLocationFallback(index)
+
+      throw new Error(`All AI-selected location candidates are exhausted for keyframe ${index + 1}`)
     }
+
+    const resolveLocationFromPackage = (value: unknown, index: number) => {
+      const candidate = toSafeString(value, '')
+      if (isLocationCandidateAllowed(candidate)) {
+        const candidateKey = normalizeLocationKey(candidate)
+        if (!usedLocationKeysInOutput.has(candidateKey)) {
+          usedLocationKeysInOutput.add(candidateKey)
+          return candidate
+        }
+      }
+
+      const fallbackFromAiPlan = pickAiPlannedLocationFallback(index)
+      usedLocationKeysInOutput.add(normalizeLocationKey(fallbackFromAiPlan))
+      return fallbackFromAiPlan
+    }
+
+    const resolvedKeyframeLocations = rawKeyframes.map((kf: any, i: number) => resolveLocationFromPackage(kf?.location, i))
 
     const fallbackActionByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Confident outfit showcase pose and movement tailored for OOTD storytelling',
@@ -1261,7 +1338,7 @@ Return STRICT JSON only, same schema:
     const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
       const subject = `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`
       const action = toSafeString(kf.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
-      const location = ensureRealLocation(kf.location, i)
+      const location = resolvedKeyframeLocations[i] || resolveLocationFromPackage(kf?.location, i)
       const camera = toSafeString(kf.camera, inferredCameraFallback)
       const lighting = toSafeString(kf.lighting, inferredLightingFallback)
       const style = toSafeString(kf.style, fallbackStyleByType[finalContentType as Exclude<ContentType, 'auto'>])
@@ -1291,10 +1368,17 @@ ASPECT RATIO: ${aspectRatio}`,
       const endSec = Math.round(((i + 1) * duration) / sceneCount)
       const startPose = keyframes[i]?.action || toSafeString(sc.startPose, '')
       const endPose = keyframes[i + 1]?.action || toSafeString(sc.endPose, '')
+      const startLocation = keyframes[i]?.location || resolvedKeyframeLocations[i] || ''
+      const endLocation = keyframes[i + 1]?.location || resolvedKeyframeLocations[i + 1] || startLocation
+      const locationFlow = normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
+        ? `Hold location: ${startLocation}`
+        : `${startLocation} -> ${endLocation}`
       const beatIndex = i % SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>].length
       const narrative = toSafeString(
         sc.narrative,
-        `${SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].name}. The model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
+        normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
+          ? `${SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].name}. Keep the scene fully at ${startLocation} while the model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
+          : `${SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].name}. Transition location naturally from ${startLocation} to ${endLocation} while keeping smooth pose continuity over ${endSec - startSec} seconds.`
       )
       const cameraMovement = toSafeString(
         sc.cameraMovement,
@@ -1309,9 +1393,13 @@ ASPECT RATIO: ${aspectRatio}`,
         startPose,
         endPose,
         cameraMovement,
+        locationFlow,
         fullPrompt: `${narrative}
 START_POSE [KF${i + 1}]: ${startPose}
 END_POSE [KF${i + 2}]: ${endPose}
+      START_LOCATION [KF${i + 1}]: ${startLocation}
+      END_LOCATION [KF${i + 2}]: ${endLocation}
+      LOCATION_FLOW: ${locationFlow}
 CAMERA: ${cameraMovement}
 ASPECT_RATIO: ${aspectRatio}
 DURATION: 8 seconds
@@ -1541,12 +1629,80 @@ function getWorkHistoryActionColor(action: string): string {
   return 'var(--accent-cyan)'
 }
 
-function formatWorkHistoryTimestamp(item: WorkHistoryItem): string {
+function toHistoryRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  return value as Record<string, unknown>
+}
+
+function toHistoryString(value: unknown, fallback = ''): string {
+  if (typeof value !== 'string') return fallback
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : fallback
+}
+
+function toHistoryInteger(value: unknown, fallback = 0): number {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return fallback
+  return Math.max(0, Math.round(numeric))
+}
+
+function toHistoryStringList(value: unknown, maxItems = 20): string[] {
+  if (!Array.isArray(value)) return []
+
+  return Array.from(new Set(
+    value
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0)
+  )).slice(0, maxItems)
+}
+
+function normalizeHistoryContentType(value: unknown, fallback: ContentType = 'ootd'): ContentType {
+  const candidate = toHistoryString(value, fallback).toLowerCase()
+  return CONTENT_TYPE_VALUES.includes(candidate as ContentType)
+    ? candidate as ContentType
+    : fallback
+}
+
+function normalizeHistoryResolvedContentType(value: unknown, fallback: ResolvedContentType = 'outfitideas'): ResolvedContentType {
+  const candidate = toHistoryString(value, fallback).toLowerCase()
+  return RESOLVED_CONTENT_TYPES.includes(candidate as ResolvedContentType)
+    ? candidate as ResolvedContentType
+    : fallback
+}
+
+function normalizeHistoryAspectRatio(value: unknown, fallback: '9:16' | '16:9' = '9:16'): '9:16' | '16:9' {
+  const candidate = toHistoryString(value, fallback)
+  return ASPECT_RATIO_VALUES.includes(candidate as '9:16' | '16:9')
+    ? candidate as '9:16' | '16:9'
+    : fallback
+}
+
+function inferDurationFromPromptCounts(keyframeCount: number, sceneCount: number, fallback = 32): number {
+  const matched = DURATIONS.find((entry) => entry.keyframes === keyframeCount && entry.scenes === sceneCount)
+  return matched ? matched.value : fallback
+}
+
+function normalizeHistoryDuration(value: unknown, fallback = 32): number {
+  const candidate = toHistoryInteger(value, fallback)
+  const matched = DURATIONS.find((entry) => entry.value === candidate)
+  if (matched) return matched.value
+
+  const fallbackMatched = DURATIONS.find((entry) => entry.value === fallback)
+  return fallbackMatched ? fallbackMatched.value : DURATIONS[1].value
+}
+
+function getWorkHistoryTimestampMs(item: WorkHistoryItem): number {
   const msFromNumber = Number.isFinite(item.createdAtMs) ? Number(item.createdAtMs) : NaN
   const msFromString = item.createdAt ? Date.parse(item.createdAt) : NaN
-  const resolvedMs = Number.isFinite(msFromNumber)
-    ? msFromNumber
-    : (Number.isFinite(msFromString) ? msFromString : Date.now())
+
+  if (Number.isFinite(msFromNumber)) return msFromNumber
+  if (Number.isFinite(msFromString)) return msFromString
+  return Date.now()
+}
+
+function formatWorkHistoryTimestamp(item: WorkHistoryItem): string {
+  const resolvedMs = getWorkHistoryTimestampMs(item)
 
   try {
     return new Date(resolvedMs).toLocaleString('vi-VN', { hour12: false })
@@ -1574,6 +1730,286 @@ function formatWorkHistoryValue(value: unknown): string {
   }
 
   return ''
+}
+
+function formatWorkHistoryJson(value: unknown): string {
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return ''
+  }
+}
+
+function getPromptPackageFromMetadata(metadata: Record<string, unknown>): Record<string, unknown> | null {
+  if (!metadata || typeof metadata !== 'object') return null
+
+  const raw = metadata.promptPackage
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+
+  const promptPackage = raw as Record<string, unknown>
+  return Object.keys(promptPackage).length > 0 ? promptPackage : null
+}
+
+function getSeoPackageFromMetadata(metadata: Record<string, unknown>): Record<string, unknown> | null {
+  if (!metadata || typeof metadata !== 'object') return null
+
+  const raw = metadata.seoPackage
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+
+  const seoPackage = raw as Record<string, unknown>
+  return Object.keys(seoPackage).length > 0 ? seoPackage : null
+}
+
+function getVoiceoverPackageFromMetadata(metadata: Record<string, unknown>): Record<string, unknown> | null {
+  if (!metadata || typeof metadata !== 'object') return null
+
+  const raw = metadata.voiceoverPackage
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+
+  const voiceoverPackage = raw as Record<string, unknown>
+  return Object.keys(voiceoverPackage).length > 0 ? voiceoverPackage : null
+}
+
+function buildPromptResultFromHistoryItem(
+  item: WorkHistoryItem,
+  resolvedType: ResolvedContentType,
+  duration: number,
+  aspectRatio: '9:16' | '16:9',
+): GenerateResult {
+  const metadata = toHistoryRecord(item.metadata) || {}
+  const promptPackage = getPromptPackageFromMetadata(metadata)
+  const promptRecord = toHistoryRecord(promptPackage) || {}
+
+  const rawKeyframes = Array.isArray(promptRecord.keyframes) ? promptRecord.keyframes : []
+  const rawScenes = Array.isArray(promptRecord.scenes) ? promptRecord.scenes : []
+  const generatedLocations = toHistoryStringList(metadata.generatedLocations, 12)
+
+  const fallbackDurationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
+  const keyframeCount = Math.max(
+    2,
+    toHistoryInteger(metadata.keyframeCount, 0) || rawKeyframes.length || fallbackDurationInfo.keyframes,
+  )
+  const sceneCount = Math.max(
+    1,
+    toHistoryInteger(metadata.sceneCount, 0) || rawScenes.length || fallbackDurationInfo.scenes,
+  )
+
+  const normalizedKeyframeCount = Math.max(keyframeCount, sceneCount + 1)
+  const normalizedSceneCount = Math.max(sceneCount, normalizedKeyframeCount - 1)
+
+  const fallbackLocation = (index: number) => {
+    if (generatedLocations.length > 0) {
+      return generatedLocations[index % generatedLocations.length]
+    }
+    return 'Mirror fitcheck corner, Hoan Kiem, Hanoi, Vietnam'
+  }
+
+  const keyframes: KeyframePrompt[] = Array.from({ length: normalizedKeyframeCount }, (_, index) => {
+    const raw = toHistoryRecord(rawKeyframes[index]) || {}
+
+    const subject = toHistoryString(
+      raw.subject,
+      `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`,
+    )
+    const action = toHistoryString(raw.action, `Fashion showcase movement beat ${index + 1}`)
+    const location = toHistoryString(raw.location, fallbackLocation(index))
+    const camera = toHistoryString(raw.camera, 'AI-selected framing and lens optimized for TikTok fashion storytelling')
+    const lighting = toHistoryString(raw.lighting, 'Soft cinematic lighting prioritizing product readability')
+    const style = toHistoryString(raw.style, 'TikTok fashion editorial aesthetic with social-native realism')
+    const timestamp = toHistoryString(raw.timestamp, `${Math.round((index * duration) / Math.max(normalizedKeyframeCount - 1, 1))}s`)
+    const fullPrompt = toHistoryString(
+      raw.fullPrompt,
+      `SUBJECT: ${subject}
+ACTION: ${action}
+LOCATION: ${location}
+CAMERA: ${camera}
+LIGHTING: ${lighting}
+STYLE: ${style}
+ASPECT RATIO: ${aspectRatio}`,
+    )
+
+    return {
+      index,
+      timestamp,
+      subject,
+      action,
+      location,
+      camera,
+      lighting,
+      style,
+      fullPrompt,
+    }
+  })
+
+  const scenes: ScenePrompt[] = Array.from({ length: normalizedSceneCount }, (_, index) => {
+    const raw = toHistoryRecord(rawScenes[index]) || {}
+    const startSec = Math.round((index * duration) / normalizedSceneCount)
+    const endSec = Math.round(((index + 1) * duration) / normalizedSceneCount)
+    const startPose = toHistoryString(raw.startPose, keyframes[index]?.action || '')
+    const endPose = toHistoryString(raw.endPose, keyframes[index + 1]?.action || '')
+      const startLocation = keyframes[index]?.location || 'Mirror fitcheck corner, Hoan Kiem, Hanoi, Vietnam'
+      const endLocation = keyframes[index + 1]?.location || startLocation
+      const derivedLocationFlow = normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
+        ? `Hold location: ${startLocation}`
+        : `${startLocation} -> ${endLocation}`
+      const locationFlow = toHistoryString(raw.locationFlow, derivedLocationFlow)
+    const narrative = toHistoryString(
+      raw.narrative,
+      `Retention beat ${index + 1}: smooth transition from keyframe ${index + 1} to keyframe ${index + 2}.`,
+    )
+    const cameraMovement = toHistoryString(raw.cameraMovement, 'Stable cinematic move with clean social-native pacing')
+    const timeRange = toHistoryString(raw.timeRange, `${startSec}s-${endSec}s`)
+    const fullPrompt = toHistoryString(
+      raw.fullPrompt,
+      `${narrative}
+START_POSE [KF${index + 1}]: ${startPose}
+END_POSE [KF${index + 2}]: ${endPose}
+    START_LOCATION [KF${index + 1}]: ${startLocation}
+    END_LOCATION [KF${index + 2}]: ${endLocation}
+    LOCATION_FLOW: ${locationFlow}
+CAMERA: ${cameraMovement}
+ASPECT_RATIO: ${aspectRatio}
+DURATION: 8 seconds
+FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
+    )
+
+    return {
+      index,
+      timeRange,
+      narrative,
+      startPose,
+      endPose,
+      cameraMovement,
+      locationFlow,
+      fullPrompt,
+    }
+  })
+
+  const masterDNA = toHistoryString(promptRecord.masterDNA, buildCharacterDNA(item.notes || '', resolvedType))
+  const createImagePrompt = toHistoryString(
+    promptRecord.createImagePrompt,
+    buildCreateImagePrompt(resolvedType, item.notes || ''),
+  )
+
+  return {
+    masterDNA,
+    keyframes,
+    scenes,
+    createImagePrompt,
+    resolvedContentType: resolvedType,
+    affiliateModeUsed: FIXED_AFFILIATE_MODE,
+    salesTemplateUsed: FIXED_SALES_TEMPLATE,
+  }
+}
+
+function buildSeoResultFromHistoryItem(item: WorkHistoryItem): SeoTaskResult {
+  const metadata = toHistoryRecord(item.metadata) || {}
+  const seoPackage = getSeoPackageFromMetadata(metadata)
+  const seoRecord = toHistoryRecord(seoPackage) || {}
+
+  const productName = toHistoryString(
+    seoRecord.productName,
+    toHistoryString(metadata.productName, 'San pham TikTok Shop'),
+  )
+
+  const rawVariants = Array.isArray(seoRecord.seoVariants) ? seoRecord.seoVariants : []
+  const variantCount = Math.max(1, Math.min(6, toHistoryInteger(metadata.variantCount, rawVariants.length || 3)))
+
+  const normalizeTags = (value: unknown): string[] => {
+    const base = toHistoryStringList(value, 10)
+      .map((tag) => tag.replace(/\s+/g, ''))
+      .map((tag) => (tag.startsWith('#') ? tag : `#${tag.replace(/^#+/, '')}`))
+      .filter((tag) => tag.length > 1)
+
+    const unique = Array.from(new Set(base))
+    const fallbackTags = ['#tiktokshop', '#reviewsanpham', '#xuhuong', '#dealhot', '#muangay']
+
+    for (const fallbackTag of fallbackTags) {
+      if (unique.length >= 5) break
+      if (!unique.includes(fallbackTag)) unique.push(fallbackTag)
+    }
+
+    return unique.slice(0, 5)
+  }
+
+  const variants: SeoVariant[] = Array.from({ length: Math.max(variantCount, rawVariants.length || 0) }, (_, index) => {
+    const raw = toHistoryRecord(rawVariants[index]) || {}
+    const fallbackTitle = `${productName} dang duoc quan tam tren TikTok Shop, de phoi va de mua`
+    const fallbackHook = `${productName} co gi ma duoc nhieu ban luu video?`
+    const fallbackCta = 'Bam gio hang de xem gia va chon phien ban phu hop voi ban.'
+
+    return {
+      index: index + 1,
+      title: toHistoryString(raw.title, fallbackTitle),
+      tags: normalizeTags(raw.tags),
+      hook: toHistoryString(raw.hook, fallbackHook),
+      cta: toHistoryString(raw.cta, fallbackCta),
+    }
+  })
+
+  return {
+    productName,
+    seoVariants: variants.length > 0 ? variants : [
+      {
+        index: 1,
+        title: `${productName} dang duoc quan tam tren TikTok Shop, de phoi va de mua`,
+        tags: ['#tiktokshop', '#reviewsanpham', '#xuhuong', '#dealhot', '#muangay'],
+        hook: `${productName} co gi ma duoc nhieu ban luu video?`,
+        cta: 'Bam gio hang de xem gia va chon phien ban phu hop voi ban.',
+      },
+    ],
+    generatedAt: toHistoryInteger(seoRecord.generatedAt, getWorkHistoryTimestampMs(item)),
+  }
+}
+
+function buildVoiceoverResultFromHistoryItem(item: WorkHistoryItem): VoiceoverTaskResult {
+  const metadata = toHistoryRecord(item.metadata) || {}
+  const voiceoverPackage = getVoiceoverPackageFromMetadata(metadata)
+  const voiceoverRecord = toHistoryRecord(voiceoverPackage) || {}
+  const voiceoverPayload = toHistoryRecord(voiceoverRecord.voiceover) || {}
+
+  const productName = toHistoryString(
+    voiceoverRecord.productName,
+    toHistoryString(metadata.productName, 'San pham TikTok Shop'),
+  )
+
+  const fallbackLines: VoiceoverLine[] = [
+    { timeRange: '0-3s', line: `${productName} dang duoc nhieu ban tim mua vi de mac va de phoi.` },
+    { timeRange: '3-15s', line: 'Chat lieu mem, len form gon va ton dang, mac thoai mai suot ngay ma van dep.' },
+    { timeRange: '15-24s', line: 'Minh da thu trong nhieu boi canh di lam, di choi, di cafe va deu de dung.' },
+    { timeRange: '24-30s', line: 'Neu ban dang can mot mon mac nhieu dip, bam link de xem gia va dat ngay.' },
+  ]
+
+  const rawLines = Array.isArray(voiceoverPayload.lines) ? voiceoverPayload.lines : []
+  const normalizedLines = rawLines
+    .map((entry, index): VoiceoverLine | null => {
+      const raw = toHistoryRecord(entry)
+      if (!raw) return null
+
+      const line = toHistoryString(raw.line, fallbackLines[index]?.line || '')
+      if (!line) return null
+
+      return {
+        timeRange: toHistoryString(raw.timeRange, fallbackLines[index]?.timeRange || `${index * 7}-${index * 7 + 7}s`),
+        line,
+      }
+    })
+    .filter((entry): entry is VoiceoverLine => entry !== null)
+
+  const lines = normalizedLines.length > 0 ? normalizedLines : fallbackLines
+  const computedScript = lines.map((line) => `${line.timeRange}: ${line.line}`).join('\n')
+  const durationSec = Math.max(20, Math.min(60, toHistoryInteger(voiceoverPayload.durationSec, toHistoryInteger(metadata.durationSec, 30))))
+
+  return {
+    productName,
+    voiceover: {
+      style: toHistoryString(voiceoverPayload.style, 'Than thien, thuyet phuc, sat voi ngu canh TikTok ban hang'),
+      durationSec,
+      script: toHistoryString(voiceoverPayload.script, computedScript),
+      lines,
+    },
+    generatedAt: toHistoryInteger(voiceoverRecord.generatedAt, getWorkHistoryTimestampMs(item)),
+  }
 }
 
 async function generateSeoWithGemini(
@@ -2389,6 +2825,7 @@ export default function App() {
   const [workHistoryOffset, setWorkHistoryOffset] = useState(0)
   const [workHistoryHasMore, setWorkHistoryHasMore] = useState(false)
   const [workHistoryTotal, setWorkHistoryTotal] = useState(0)
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null)
   const [historyActionFilter, setHistoryActionFilter] = useState<WorkHistoryActionFilter>('all')
   const [historySearchInput, setHistorySearchInput] = useState('')
   const [historySearchQuery, setHistorySearchQuery] = useState('')
@@ -2504,6 +2941,98 @@ export default function App() {
     }
   }, [historyActionFilter, historySearchQuery, loadWorkHistory])
 
+  const handleOpenHistoryItem = (item: WorkHistoryItem) => {
+    const metadata = toHistoryRecord(item.metadata) || {}
+    const contentTypeFromItem = normalizeHistoryContentType(item.contentType, 'ootd')
+    const resolvedFromItem = normalizeHistoryResolvedContentType(item.contentType, 'outfitideas')
+    const restoredInputType = normalizeHistoryContentType(metadata.inputContentType, contentTypeFromItem)
+    const restoredResolvedType = normalizeHistoryResolvedContentType(metadata.resolvedContentType, resolvedFromItem)
+    const keyframeCount = toHistoryInteger(metadata.keyframeCount, 0)
+    const sceneCount = toHistoryInteger(metadata.sceneCount, 0)
+    const inferredDuration = inferDurationFromPromptCounts(keyframeCount, sceneCount)
+    const restoredDuration = normalizeHistoryDuration(metadata.duration, inferredDuration)
+    const restoredAspectRatio = normalizeHistoryAspectRatio(metadata.aspectRatio, '9:16')
+
+    if (item.model.trim().length > 0) {
+      setModel(item.model.trim())
+    }
+
+    setSelectedHistoryId(item._id)
+    setLoading(false)
+    setSeoLoading(false)
+    setVoiceoverLoading(false)
+    setWorkHistoryError('')
+    setError('')
+    setSeoError('')
+    setVoiceoverError('')
+    setPromptToast(null)
+
+    if (item.action === 'prompt') {
+      const restoredPrompt = buildPromptResultFromHistoryItem(
+        item,
+        restoredResolvedType,
+        restoredDuration,
+        restoredAspectRatio,
+      )
+
+      setDuration(restoredDuration)
+      setAspectRatio(restoredAspectRatio)
+      setNotes(item.notes || '')
+      setContentType(restoredInputType)
+      setSelectedContentType(restoredResolvedType)
+      setResult(restoredPrompt)
+      setSeoResult(null)
+      setVoiceoverResult(null)
+      setSelectedSeoVariantIndex(0)
+      setActiveTab('keyframes')
+      setPromptToast({
+        kind: 'success',
+        message: 'Da mo lai Prompt Package tu lich su.',
+      })
+      return
+    }
+
+    if (item.action === 'seo') {
+      const restoredSeo = buildSeoResultFromHistoryItem(item)
+
+      setContentType(restoredInputType)
+      setSelectedContentType(restoredResolvedType)
+      setSeoProductName(restoredSeo.productName)
+      setSeoNotes(item.notes || '')
+      setSeoResult(restoredSeo)
+      setResult(null)
+      setVoiceoverResult(null)
+      setSelectedSeoVariantIndex(0)
+      setActiveTab('seo')
+      setPromptToast({
+        kind: 'success',
+        message: 'Da mo lai SEO package tu lich su.',
+      })
+      return
+    }
+
+    if (item.action === 'voiceover') {
+      const restoredVoiceover = buildVoiceoverResultFromHistoryItem(item)
+
+      setContentType(restoredInputType)
+      setSelectedContentType(restoredResolvedType)
+      setVoiceoverProductName(restoredVoiceover.productName)
+      setVoiceoverNotes(item.notes || '')
+      setVoiceoverResult(restoredVoiceover)
+      setResult(null)
+      setSeoResult(null)
+      setSelectedSeoVariantIndex(0)
+      setActiveTab('voiceover')
+      setPromptToast({
+        kind: 'success',
+        message: 'Da mo lai Voiceover package tu lich su.',
+      })
+      return
+    }
+
+    setWorkHistoryError('Ban ghi lich su khong hop le de mo lai.')
+  }
+
   // Derived
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const canGenerate = apiKey.trim().length > 0
@@ -2544,6 +3073,7 @@ export default function App() {
   // Generate handler
   const handleGenerate = async () => {
     setLoading(true)
+    setSelectedHistoryId(null)
     setLoadingStageIndex(0)
     setPromptToast({
       kind: 'loading',
@@ -2598,6 +3128,33 @@ export default function App() {
             .filter((location) => location.length > 0)
         )
       )
+
+      const promptPackageForHistory = {
+        masterDNA: res.masterDNA,
+        createImagePrompt: res.createImagePrompt || '',
+        keyframes: res.keyframes.map((keyframe) => ({
+          index: keyframe.index,
+          timestamp: keyframe.timestamp,
+          subject: keyframe.subject,
+          action: keyframe.action,
+          location: keyframe.location,
+          camera: keyframe.camera,
+          lighting: keyframe.lighting,
+          style: keyframe.style,
+          fullPrompt: keyframe.fullPrompt,
+        })),
+        scenes: res.scenes.map((scene) => ({
+          index: scene.index,
+          timeRange: scene.timeRange,
+          narrative: scene.narrative,
+          startPose: scene.startPose,
+          endPose: scene.endPose,
+          cameraMovement: scene.cameraMovement,
+          locationFlow: scene.locationFlow || '',
+          fullPrompt: scene.fullPrompt,
+        })),
+      }
+
       const workHistoryGeneratedAt = Date.now()
 
       if (generatedLocations.length > 0) {
@@ -2638,6 +3195,7 @@ export default function App() {
           generatedLocations: generatedLocations.slice(0, 10),
           hasFaceImage: Boolean(faceImage),
           hasProductImage: Boolean(productImage),
+          promptPackage: promptPackageForHistory,
         },
       })
         .then(() => loadWorkHistory({ silent: true }))
@@ -2662,6 +3220,7 @@ export default function App() {
 
   const handleGenerateSeo = async () => {
     setSeoLoading(true)
+    setSelectedHistoryId(null)
     setSeoError('')
 
     try {
@@ -2697,6 +3256,11 @@ export default function App() {
           productName: trimmedProductName,
           variantCount: generated.seoVariants.length,
           salesTemplate: FIXED_SALES_TEMPLATE,
+          seoPackage: {
+            productName: generated.productName,
+            seoVariants: generated.seoVariants,
+            generatedAt: generated.generatedAt || Date.now(),
+          },
         },
       })
         .then(() => loadWorkHistory({ silent: true }))
@@ -2715,6 +3279,7 @@ export default function App() {
 
   const handleGenerateVoiceover = async () => {
     setVoiceoverLoading(true)
+    setSelectedHistoryId(null)
     setVoiceoverError('')
 
     try {
@@ -2750,6 +3315,11 @@ export default function App() {
           durationSec: generated.voiceover.durationSec,
           lineCount: generated.voiceover.lines.length,
           salesTemplate: FIXED_SALES_TEMPLATE,
+          voiceoverPackage: {
+            productName: generated.productName,
+            voiceover: generated.voiceover,
+            generatedAt: generated.generatedAt || Date.now(),
+          },
         },
       })
         .then(() => loadWorkHistory({ silent: true }))
@@ -3459,6 +4029,7 @@ export default function App() {
                               <strong>NARRATIVE:</strong> {sc.narrative}
                               {'\n'}<strong>START_POSE:</strong> {sc.startPose}
                               {'\n'}<strong>END_POSE:</strong> {sc.endPose}
+                              {'\n'}<strong>LOCATION FLOW:</strong> {sc.locationFlow || '-'}
                               {'\n'}<strong>CAMERA:</strong> {sc.cameraMovement}
                               {'\n'}<strong>FORMAT:</strong> Veo 3.1 first-frame → last-frame (8s)
                             </div>
@@ -3684,18 +4255,56 @@ export default function App() {
                       {workHistory.length > 0 ? (
                         <>
                           {workHistory.map((item) => {
-                            const metadataEntries = Object.entries(item.metadata || {})
-                              .filter(([, value]) => value !== null && value !== undefined && `${value}`.trim().length > 0)
+                            const itemMetadata = toHistoryRecord(item.metadata) || {}
+                            const packagePayload = item.action === 'prompt'
+                              ? getPromptPackageFromMetadata(itemMetadata)
+                              : item.action === 'seo'
+                                ? getSeoPackageFromMetadata(itemMetadata)
+                                : item.action === 'voiceover'
+                                  ? getVoiceoverPackageFromMetadata(itemMetadata)
+                                  : null
+                            const packageJson = packagePayload
+                              ? formatWorkHistoryJson(packagePayload)
+                              : ''
+                            const packageCopyLabel = item.action === 'prompt'
+                              ? 'PROMPT_PACKAGE_JSON'
+                              : item.action === 'seo'
+                                ? 'SEO_PACKAGE_JSON'
+                                : 'VOICEOVER_PACKAGE_JSON'
+                            const packageDisplayLabel = item.action === 'prompt'
+                              ? 'PROMPT PACKAGE JSON'
+                              : item.action === 'seo'
+                                ? 'SEO PACKAGE JSON'
+                                : 'VOICEOVER PACKAGE JSON'
+                            const isSelectedHistoryItem = selectedHistoryId === item._id
+
+                            const metadataEntries = Object.entries(itemMetadata)
+                              .filter(([key, value]) => {
+                                if (key === 'promptPackage' || key === 'seoPackage' || key === 'voiceoverPackage') return false
+                                return value !== null && value !== undefined && `${value}`.trim().length > 0
+                              })
                               .slice(0, 8)
 
                             return (
-                              <div key={item._id} className="prompt-card">
+                              <div
+                                key={item._id}
+                                className={`prompt-card history-item-card ${isSelectedHistoryItem ? 'selected' : ''}`}
+                              >
                                 <div className="prompt-card-header">
                                   <div className="prompt-card-badge" style={{ color: getWorkHistoryActionColor(item.action) }}>
                                     <History size={14} />
                                     {getWorkHistoryActionLabel(item.action)}
                                   </div>
-                                  <span className="prompt-card-time">{formatWorkHistoryTimestamp(item)}</span>
+                                  <div className="history-card-actions">
+                                    <span className="prompt-card-time">{formatWorkHistoryTimestamp(item)}</span>
+                                    <button
+                                      type="button"
+                                      className={`history-open-btn ${isSelectedHistoryItem ? 'active' : ''}`}
+                                      onClick={() => handleOpenHistoryItem(item)}
+                                    >
+                                      {isSelectedHistoryItem ? 'Dang mo' : 'Mo lai'}
+                                    </button>
+                                  </div>
                                 </div>
                                 <div className="prompt-card-body">
                                   <CopyButton
@@ -3708,6 +4317,7 @@ export default function App() {
                                       metadataEntries.length > 0
                                         ? `METADATA:\n${metadataEntries.map(([key, value]) => `${key}: ${formatWorkHistoryValue(value)}`).join('\n')}`
                                         : '',
+                                      packageJson ? `${packageCopyLabel}:\n${packageJson}` : '',
                                     ].filter(Boolean).join('\n')}
                                   />
                                   <div className="prompt-text" style={{ lineHeight: 1.75 }}>
@@ -3723,6 +4333,12 @@ export default function App() {
                                       <>
                                         {'\n\n'}<strong>METADATA:</strong>
                                         {'\n'}{metadataEntries.map(([key, value]) => `${key}: ${formatWorkHistoryValue(value)}`).join('\n')}
+                                      </>
+                                    )}
+                                    {packageJson && (
+                                      <>
+                                        {'\n\n'}<strong>{packageDisplayLabel}:</strong>
+                                        {'\n'}{packageJson}
                                       </>
                                     )}
                                   </div>

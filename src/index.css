@@ -1286,6 +1286,42 @@ body {
   cursor: not-allowed;
 }
 
+.history-item-card.selected {
+  border-color: rgba(59, 130, 246, 0.55);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.22);
+}
+
+.history-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-open-btn {
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.1);
+  color: #bfdbfe;
+  border-radius: var(--radius-full);
+  padding: 4px 10px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.history-open-btn:hover {
+  border-color: rgba(59, 130, 246, 0.6);
+  background: rgba(59, 130, 246, 0.18);
+  color: #dbeafe;
+}
+
+.history-open-btn.active {
+  border-color: rgba(16, 185, 129, 0.7);
+  background: rgba(16, 185, 129, 0.16);
+  color: #6ee7b7;
+}
+
 /* Prompt Card */
 .prompt-card {
   background: var(--bg-glass);
@@ -1656,6 +1692,11 @@ textarea.input-field {
   .history-refresh-btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .history-card-actions {
+    width: 100%;
+    justify-content: space-between;
   }
 
   .history-footer {
