@@ -1128,6 +1128,164 @@ body {
   height: 13px;
 }
 
+.history-toolbar {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: rgba(139, 92, 246, 0.07);
+}
+
+.history-toolbar-text {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.history-toolbar-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.history-filter-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.history-filter-select {
+  min-width: 120px;
+  width: 100%;
+}
+
+.history-filter-input {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.history-filter-btn {
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  background: rgba(139, 92, 246, 0.12);
+  color: #d8b4fe;
+  border-radius: var(--radius-md);
+  padding: 8px 11px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.history-filter-btn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.7);
+  color: #f5e9ff;
+}
+
+.history-filter-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.history-filter-btn.ghost {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+.history-filter-btn.ghost:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.history-refresh-btn {
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  background: rgba(139, 92, 246, 0.12);
+  color: #d8b4fe;
+  border-radius: var(--radius-full);
+  padding: 6px 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-refresh-btn:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.7);
+  color: #e9d5ff;
+}
+
+.history-refresh-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.history-refresh-btn .spin {
+  animation: spin 0.9s linear infinite;
+}
+
+.history-empty {
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: var(--space-md);
+}
+
+.history-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-top: 2px;
+  margin-bottom: var(--space-md);
+}
+
+.history-count-text {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.history-count-text.done {
+  color: var(--text-hint);
+}
+
+.history-load-more-btn {
+  border: 1px solid rgba(6, 182, 212, 0.5);
+  background: rgba(6, 182, 212, 0.12);
+  color: #67e8f9;
+  border-radius: var(--radius-full);
+  padding: 7px 13px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.history-load-more-btn:hover:not(:disabled) {
+  border-color: rgba(6, 182, 212, 0.85);
+  background: rgba(6, 182, 212, 0.2);
+  color: #cffafe;
+}
+
+.history-load-more-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* Prompt Card */
 .prompt-card {
   background: var(--bg-glass);
@@ -1471,6 +1629,42 @@ textarea.input-field {
 
   .chip-group {
     justify-content: flex-start;
+  }
+
+  .history-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-toolbar-top {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .history-filter-row {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+
+  .history-filter-btn,
+  .history-filter-select,
+  .history-filter-input {
+    width: 100%;
+  }
+
+  .history-refresh-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .history-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .history-load-more-btn {
+    width: 100%;
   }
 
   .prompt-card-body {

@@ -51,6 +51,19 @@ function toSafeDate(value) {
   return new Date()
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normalizeActionFilter(value) {
+  const action = toSafeString(value, 40).toLowerCase()
+  if (action === 'prompt' || action === 'seo' || action === 'voiceover') {
+    return action
+  }
+
+  return ''
+}
+
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store')
 
@@ -69,10 +82,40 @@ export default async function handler(req, res) {
         ? Math.min(Math.max(Math.floor(rawLimit), 1), 100)
         : 30
 
-      const items = await collection
-        .find({}, { sort: { createdAt: -1 } })
-        .limit(limit)
-        .toArray()
+      const rawOffset = Number(req.query?.offset)
+      const offset = Number.isFinite(rawOffset)
+        ? Math.min(Math.max(Math.floor(rawOffset), 0), 10000)
+        : 0
+
+      const actionFilter = normalizeActionFilter(req.query?.action)
+      const searchQuery = toSafeString(req.query?.q, 120)
+
+      const filter = {}
+      if (actionFilter) {
+        filter.action = actionFilter
+      }
+
+      if (searchQuery) {
+        const safeRegex = escapeRegex(searchQuery)
+        filter.$or = [
+          { notes: { $regex: safeRegex, $options: 'i' } },
+          { model: { $regex: safeRegex, $options: 'i' } },
+          { contentType: { $regex: safeRegex, $options: 'i' } },
+          { action: { $regex: safeRegex, $options: 'i' } },
+        ]
+      }
+
+      const [items, total] = await Promise.all([
+        collection
+          .find(filter, { sort: { createdAt: -1 } })
+          .skip(offset)
+          .limit(limit)
+          .toArray(),
+        collection.countDocuments(filter),
+      ])
+
+      const nextOffset = offset + items.length
+      const hasMore = nextOffset < total
 
       return sendJson(res, 200, {
         items: items.map((item) => ({
@@ -80,6 +123,11 @@ export default async function handler(req, res) {
           _id: item._id.toString(),
         })),
         count: items.length,
+        total,
+        hasMore,
+        nextOffset,
+        offset,
+        limit,
       })
     }
 

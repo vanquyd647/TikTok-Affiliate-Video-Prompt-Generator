@@ -3,7 +3,7 @@ import {
   Upload, Image as ImageIcon, Sparkles, Film, Camera, Clock,
   Copy, Check, Download, X, Eye, EyeOff, Clapperboard,
   Layers, ArrowRight, Wand2, FileText, AlertCircle, Ratio,
-  Shirt, Star, TrendingUp, MessageSquare, Palette
+  Shirt, Star, TrendingUp, MessageSquare, Palette, History, RefreshCw
 } from 'lucide-react'
 import './index.css'
 
@@ -99,6 +99,33 @@ interface WorkHistoryPayload {
   notes?: string
   generatedAt: number
   metadata?: Record<string, unknown>
+}
+
+interface WorkHistoryItem {
+  _id: string
+  action: string
+  model: string
+  contentType: string
+  notes: string
+  metadata: Record<string, unknown>
+  createdAt?: string
+  createdAtMs?: number
+}
+
+type WorkHistoryActionFilter = 'all' | 'prompt' | 'seo' | 'voiceover'
+
+interface FetchWorkHistoryParams {
+  limit?: number
+  offset?: number
+  action?: WorkHistoryActionFilter
+  q?: string
+}
+
+interface FetchWorkHistoryResult {
+  items: WorkHistoryItem[]
+  total: number
+  hasMore: boolean
+  nextOffset: number
 }
 
 // ═══════════════════════════════════════════════
@@ -1121,6 +1148,119 @@ async function persistWorkHistory(payload: WorkHistoryPayload): Promise<void> {
   }
 }
 
+async function fetchWorkHistory(params: FetchWorkHistoryParams = {}): Promise<FetchWorkHistoryResult> {
+  const safeLimit = Math.min(Math.max(Math.floor(params.limit ?? 30), 1), 100)
+  const safeOffset = Math.min(Math.max(Math.floor(params.offset ?? 0), 0), 10000)
+  const safeAction = params.action && params.action !== 'all' ? params.action : ''
+  const safeQuery = (params.q || '').trim().slice(0, 120)
+
+  const searchParams = new URLSearchParams({
+    limit: String(safeLimit),
+    offset: String(safeOffset),
+  })
+
+  if (safeAction) searchParams.set('action', safeAction)
+  if (safeQuery) searchParams.set('q', safeQuery)
+
+  const response = await fetch(`/api/work-history?${searchParams.toString()}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`History API error (${response.status}): ${errorText.slice(0, 240)}`)
+  }
+
+  const data = await response.json()
+  const rawItems = Array.isArray(data?.items) ? data.items : []
+  const total = Number.isFinite(Number(data?.total)) ? Number(data.total) : rawItems.length
+  const hasMore = Boolean(data?.hasMore)
+  const nextOffset = Number.isFinite(Number(data?.nextOffset))
+    ? Number(data.nextOffset)
+    : safeOffset + rawItems.length
+
+  return {
+    items: rawItems.map((item: any) => ({
+      _id: typeof item?._id === 'string' ? item._id : `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      action: typeof item?.action === 'string' ? item.action : 'prompt',
+      model: typeof item?.model === 'string' ? item.model : '',
+      contentType: typeof item?.contentType === 'string' ? item.contentType : '',
+      notes: typeof item?.notes === 'string' ? item.notes : '',
+      metadata: item?.metadata && typeof item.metadata === 'object' && !Array.isArray(item.metadata)
+        ? item.metadata as Record<string, unknown>
+        : {},
+      createdAt: typeof item?.createdAt === 'string' ? item.createdAt : undefined,
+      createdAtMs: Number.isFinite(Number(item?.createdAtMs)) ? Number(item.createdAtMs) : undefined,
+    })),
+    total,
+    hasMore,
+    nextOffset,
+  }
+}
+
+function mergeWorkHistoryItems(currentItems: WorkHistoryItem[], nextItems: WorkHistoryItem[]): WorkHistoryItem[] {
+  const merged = [...currentItems]
+  const seenIds = new Set(currentItems.map((item) => item._id))
+
+  for (const item of nextItems) {
+    if (seenIds.has(item._id)) continue
+    merged.push(item)
+    seenIds.add(item._id)
+  }
+
+  return merged
+}
+
+function getWorkHistoryActionLabel(action: string): string {
+  if (action === 'seo') return 'SEO TikTok'
+  if (action === 'voiceover') return 'Voiceover Script'
+  return 'Prompt Package'
+}
+
+function getWorkHistoryActionColor(action: string): string {
+  if (action === 'seo') return 'var(--accent-emerald)'
+  if (action === 'voiceover') return 'var(--accent-amber)'
+  return 'var(--accent-cyan)'
+}
+
+function formatWorkHistoryTimestamp(item: WorkHistoryItem): string {
+  const msFromNumber = Number.isFinite(item.createdAtMs) ? Number(item.createdAtMs) : NaN
+  const msFromString = item.createdAt ? Date.parse(item.createdAt) : NaN
+  const resolvedMs = Number.isFinite(msFromNumber)
+    ? msFromNumber
+    : (Number.isFinite(msFromString) ? msFromString : Date.now())
+
+  try {
+    return new Date(resolvedMs).toLocaleString('vi-VN', { hour12: false })
+  } catch {
+    return ''
+  }
+}
+
+function formatWorkHistoryValue(value: unknown): string {
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 5)
+      .map((item) => formatWorkHistoryValue(item))
+      .join(', ')
+  }
+
+  if (value && typeof value === 'object') {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return '[object]'
+    }
+  }
+
+  return ''
+}
+
 async function generateSeoWithGemini(
   apiKey: string,
   model: string,
@@ -1920,13 +2060,23 @@ export default function App() {
   const [result, setResult] = useState<GenerateResult | null>(null)
   const [seoResult, setSeoResult] = useState<SeoTaskResult | null>(null)
   const [voiceoverResult, setVoiceoverResult] = useState<VoiceoverTaskResult | null>(null)
-  const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image' | 'seo' | 'voiceover'>('keyframes')
+  const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image' | 'seo' | 'voiceover' | 'history'>('keyframes')
   const [selectedContentType, setSelectedContentType] = useState<ResolvedContentType>('ootd')
   const [seoProductName, setSeoProductName] = useState('')
   const [seoNotes, setSeoNotes] = useState('')
   const [voiceoverProductName, setVoiceoverProductName] = useState('')
   const [voiceoverNotes, setVoiceoverNotes] = useState('')
   const [selectedSeoVariantIndex, setSelectedSeoVariantIndex] = useState(0)
+  const [workHistory, setWorkHistory] = useState<WorkHistoryItem[]>([])
+  const [workHistoryLoading, setWorkHistoryLoading] = useState(false)
+  const [workHistoryLoadingMore, setWorkHistoryLoadingMore] = useState(false)
+  const [workHistoryError, setWorkHistoryError] = useState('')
+  const [workHistoryOffset, setWorkHistoryOffset] = useState(0)
+  const [workHistoryHasMore, setWorkHistoryHasMore] = useState(false)
+  const [workHistoryTotal, setWorkHistoryTotal] = useState(0)
+  const [historyActionFilter, setHistoryActionFilter] = useState<WorkHistoryActionFilter>('all')
+  const [historySearchInput, setHistorySearchInput] = useState('')
+  const [historySearchQuery, setHistorySearchQuery] = useState('')
   const [productLocationHistory, setProductLocationHistory] = useState<ProductLocationHistoryMap>(() => loadProductLocationHistory())
   const [outfitTypeLocationHistory, setOutfitTypeLocationHistory] = useState<OutfitTypeLocationHistoryMap>(() => loadOutfitTypeLocationHistory())
 
@@ -1960,6 +2110,85 @@ export default function App() {
     return () => window.clearTimeout(timer)
   }, [promptToast])
 
+  const loadWorkHistory = useCallback(async (options?: {
+    silent?: boolean
+    append?: boolean
+    offset?: number
+  }) => {
+    const silent = options?.silent === true
+    const append = options?.append === true
+    const offset = Number.isFinite(Number(options?.offset)) ? Number(options?.offset) : 0
+
+    if (append) {
+      setWorkHistoryLoadingMore(true)
+    } else if (!silent) {
+      setWorkHistoryLoading(true)
+    }
+
+    setWorkHistoryError('')
+
+    try {
+      const historyResponse = await fetchWorkHistory({
+        limit: 20,
+        offset,
+        action: historyActionFilter,
+        q: historySearchQuery,
+      })
+
+      setWorkHistory((prev) => (append
+        ? mergeWorkHistoryItems(prev, historyResponse.items)
+        : historyResponse.items))
+      setWorkHistoryOffset(historyResponse.nextOffset)
+      setWorkHistoryHasMore(historyResponse.hasMore)
+      setWorkHistoryTotal(historyResponse.total)
+    } catch (historyErr: any) {
+      const message = historyErr?.message || 'Khong the tai lich su tu MongoDB API'
+      setWorkHistoryError(message)
+      if (!append) {
+        setWorkHistory([])
+        setWorkHistoryOffset(0)
+        setWorkHistoryHasMore(false)
+        setWorkHistoryTotal(0)
+      }
+    } finally {
+      if (append) {
+        setWorkHistoryLoadingMore(false)
+      } else if (!silent) {
+        setWorkHistoryLoading(false)
+      }
+    }
+  }, [historyActionFilter, historySearchQuery])
+
+  useEffect(() => {
+    void loadWorkHistory()
+  }, [loadWorkHistory])
+
+  useEffect(() => {
+    if (result || seoResult || voiceoverResult) return
+    if (activeTab === 'history') return
+    if (workHistoryLoading || workHistory.length > 0 || workHistoryError.trim().length > 0) {
+      setActiveTab('history')
+    }
+  }, [activeTab, result, seoResult, voiceoverResult, workHistory.length, workHistoryError, workHistoryLoading])
+
+  const applyWorkHistoryFilters = useCallback(() => {
+    const nextQuery = historySearchInput.trim()
+    setHistorySearchQuery(nextQuery)
+    if (nextQuery === historySearchQuery) {
+      void loadWorkHistory()
+    }
+  }, [historySearchInput, historySearchQuery, loadWorkHistory])
+
+  const clearWorkHistoryFilters = useCallback(() => {
+    const shouldReload = historyActionFilter === 'all' && historySearchQuery.length === 0
+    setHistoryActionFilter('all')
+    setHistorySearchInput('')
+    setHistorySearchQuery('')
+    if (shouldReload) {
+      void loadWorkHistory()
+    }
+  }, [historyActionFilter, historySearchQuery, loadWorkHistory])
+
   // Derived
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const canGenerate = apiKey.trim().length > 0
@@ -1969,6 +2198,11 @@ export default function App() {
   const hasSeoResult = seoResult !== null
   const hasVoiceoverResult = voiceoverResult !== null
   const hasAnyResult = hasPromptResult || hasSeoResult || hasVoiceoverResult
+  const hasWorkHistory = workHistory.length > 0
+  const hasHistoryPanelData = hasWorkHistory || workHistoryLoading || workHistoryError.trim().length > 0
+  const hasResultsPanelContent = hasAnyResult || hasHistoryPanelData
+  const activeWorkHistoryFilters = historyActionFilter !== 'all' || historySearchQuery.length > 0
+  const historyShownCount = workHistory.length
   const promptStatusKind = loading ? 'loading' : error ? 'error' : hasPromptResult ? 'success' : 'idle'
   const promptLoadingStep = PROMPT_LOADING_STAGES[Math.min(loadingStageIndex, PROMPT_LOADING_STAGES.length - 1)]
   const promptLoadingProgress = loading ? Math.min(90, 24 + loadingStageIndex * 22) : 100
@@ -1984,11 +2218,13 @@ export default function App() {
   const selectedSeoVariant = seoResult
     ? seoResult.seoVariants[Math.min(selectedSeoVariantIndex, seoResult.seoVariants.length - 1)]
     : null
-  const resultsHeader = result
-    ? `Prompt Package — ${duration}s / ${aspectRatio}`
-    : activeTab === 'voiceover'
-      ? 'Nhiệm vụ 2 — Kịch bản lồng tiếng'
-      : 'Nhiệm vụ 1 — SEO TikTok'
+  const resultsHeader = activeTab === 'history'
+    ? 'Lich su da luu (MongoDB)'
+    : result
+      ? `Prompt Package — ${duration}s / ${aspectRatio}`
+      : activeTab === 'voiceover'
+        ? 'Nhiệm vụ 2 — Kịch bản lồng tiếng'
+        : 'Nhiệm vụ 1 — SEO TikTok'
 
   // Generate handler
   const handleGenerate = async () => {
@@ -2088,12 +2324,14 @@ export default function App() {
           hasFaceImage: Boolean(faceImage),
           hasProductImage: Boolean(productImage),
         },
-      }).catch((saveError) => {
-        console.warn(
-          'Could not save prompt work history:',
-          saveError instanceof Error ? saveError.message : saveError
-        )
       })
+        .then(() => loadWorkHistory({ silent: true }))
+        .catch((saveError) => {
+          console.warn(
+            'Could not save prompt work history:',
+            saveError instanceof Error ? saveError.message : saveError
+          )
+        })
     } catch (err: any) {
       const message = err?.message || 'Failed to generate prompts'
       setError(message)
@@ -2145,12 +2383,14 @@ export default function App() {
           variantCount: generated.seoVariants.length,
           salesTemplate: FIXED_SALES_TEMPLATE,
         },
-      }).catch((saveError) => {
-        console.warn(
-          'Could not save SEO work history:',
-          saveError instanceof Error ? saveError.message : saveError
-        )
       })
+        .then(() => loadWorkHistory({ silent: true }))
+        .catch((saveError) => {
+          console.warn(
+            'Could not save SEO work history:',
+            saveError instanceof Error ? saveError.message : saveError
+          )
+        })
     } catch (err: any) {
       setSeoError(err?.message || 'Failed to generate SEO variants')
     } finally {
@@ -2196,12 +2436,14 @@ export default function App() {
           lineCount: generated.voiceover.lines.length,
           salesTemplate: FIXED_SALES_TEMPLATE,
         },
-      }).catch((saveError) => {
-        console.warn(
-          'Could not save voiceover work history:',
-          saveError instanceof Error ? saveError.message : saveError
-        )
       })
+        .then(() => loadWorkHistory({ silent: true }))
+        .catch((saveError) => {
+          console.warn(
+            'Could not save voiceover work history:',
+            saveError instanceof Error ? saveError.message : saveError
+          )
+        })
     } catch (err: any) {
       setVoiceoverError(err?.message || 'Failed to generate voiceover script')
     } finally {
@@ -2730,7 +2972,7 @@ export default function App() {
           {/* ─── RESULTS PANEL ─── */}
           <div className="results-panel fade-in">
             <div className="card results-card">
-              {!hasAnyResult ? (
+              {!hasResultsPanelContent ? (
                 <div className="results-empty">
                   <Film className="results-empty-icon" />
                   <p className="results-empty-text">Chưa có prompt nào</p>
@@ -2756,12 +2998,12 @@ export default function App() {
                 <>
                   <div className="card-title">
                     <Sparkles /> {resultsHeader}
-                    {result && (
+                    {result && activeTab !== 'history' && (
                       <span style={{ marginLeft: 12, fontSize: '0.75rem', opacity: 0.8 }}>
                         (Type: {selectedContentType.toUpperCase()})
                       </span>
                     )}
-                    {result && (
+                    {result && activeTab !== 'history' && (
                       <span style={{ marginLeft: 8, fontSize: '0.75rem', opacity: 0.7 }}>
                         [{(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()} • {(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}]
                       </span>
@@ -2839,6 +3081,12 @@ export default function App() {
                         <Layers /> Tất cả
                       </button>
                     )}
+                    <button
+                      className={`tab ${activeTab === 'history' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('history')}
+                    >
+                      <History /> Lich su ({workHistory.length})
+                    </button>
                   </div>
 
                   {/* Content */}
@@ -3043,15 +3291,168 @@ export default function App() {
                     </>
                   )}
 
+                  {(activeTab === 'history' || activeTab === 'all') && (
+                    <>
+                      {activeTab === 'all' && (
+                        <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-purple)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          📚 Lich su da luu (MongoDB)
+                        </h3>
+                      )}
+
+                      <div className="history-toolbar">
+                        <div className="history-toolbar-top">
+                          <p className="history-toolbar-text">
+                            Dong bo lich su tu API <strong>/api/work-history</strong>
+                            {activeWorkHistoryFilters ? ` • loc: ${historyActionFilter.toUpperCase()}${historySearchQuery ? ` • "${historySearchQuery}"` : ''}` : ''}
+                          </p>
+                          <button
+                            type="button"
+                            className="history-refresh-btn"
+                            onClick={() => void loadWorkHistory()}
+                            disabled={workHistoryLoading || workHistoryLoadingMore}
+                          >
+                            <RefreshCw size={13} className={(workHistoryLoading || workHistoryLoadingMore) ? 'spin' : ''} />
+                            {(workHistoryLoading || workHistoryLoadingMore) ? 'Dang tai...' : 'Lam moi'}
+                          </button>
+                        </div>
+
+                        <div className="history-filter-row">
+                          <select
+                            className="select-field history-filter-select"
+                            value={historyActionFilter}
+                            onChange={(e) => setHistoryActionFilter(e.target.value as WorkHistoryActionFilter)}
+                          >
+                            <option value="all">Tat ca</option>
+                            <option value="prompt">Prompt</option>
+                            <option value="seo">SEO</option>
+                            <option value="voiceover">Voiceover</option>
+                          </select>
+
+                          <input
+                            className="input-field history-filter-input"
+                            value={historySearchInput}
+                            onChange={(e) => setHistorySearchInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                applyWorkHistoryFilters()
+                              }
+                            }}
+                            placeholder="Tim theo notes, model, content type..."
+                          />
+
+                          <button
+                            type="button"
+                            className="history-filter-btn"
+                            onClick={applyWorkHistoryFilters}
+                          >
+                            Ap dung
+                          </button>
+
+                          <button
+                            type="button"
+                            className="history-filter-btn ghost"
+                            onClick={clearWorkHistoryFilters}
+                            disabled={!activeWorkHistoryFilters && historySearchInput.trim().length === 0}
+                          >
+                            Xoa loc
+                          </button>
+                        </div>
+                      </div>
+
+                      {workHistoryError && (
+                        <div className="error-message" style={{ marginBottom: 12 }}>
+                          <AlertCircle size={16} />
+                          {workHistoryError}
+                        </div>
+                      )}
+
+                      {workHistory.length > 0 ? (
+                        <>
+                          {workHistory.map((item) => {
+                            const metadataEntries = Object.entries(item.metadata || {})
+                              .filter(([, value]) => value !== null && value !== undefined && `${value}`.trim().length > 0)
+                              .slice(0, 8)
+
+                            return (
+                              <div key={item._id} className="prompt-card">
+                                <div className="prompt-card-header">
+                                  <div className="prompt-card-badge" style={{ color: getWorkHistoryActionColor(item.action) }}>
+                                    <History size={14} />
+                                    {getWorkHistoryActionLabel(item.action)}
+                                  </div>
+                                  <span className="prompt-card-time">{formatWorkHistoryTimestamp(item)}</span>
+                                </div>
+                                <div className="prompt-card-body">
+                                  <CopyButton
+                                    text={[
+                                      `ACTION: ${item.action || '-'}`,
+                                      `MODEL: ${item.model || '-'}`,
+                                      `CONTENT_TYPE: ${item.contentType || '-'}`,
+                                      `TIME: ${formatWorkHistoryTimestamp(item)}`,
+                                      item.notes ? `NOTES: ${item.notes}` : '',
+                                      metadataEntries.length > 0
+                                        ? `METADATA:\n${metadataEntries.map(([key, value]) => `${key}: ${formatWorkHistoryValue(value)}`).join('\n')}`
+                                        : '',
+                                    ].filter(Boolean).join('\n')}
+                                  />
+                                  <div className="prompt-text" style={{ lineHeight: 1.75 }}>
+                                    <strong>ACTION:</strong> {item.action || '-'}
+                                    {'\n'}<strong>MODEL:</strong> {item.model || '-'}
+                                    {'\n'}<strong>CONTENT TYPE:</strong> {item.contentType || '-'}
+                                    {item.notes && (
+                                      <>
+                                        {'\n'}<strong>NOTES:</strong> {item.notes}
+                                      </>
+                                    )}
+                                    {metadataEntries.length > 0 && (
+                                      <>
+                                        {'\n\n'}<strong>METADATA:</strong>
+                                        {'\n'}{metadataEntries.map(([key, value]) => `${key}: ${formatWorkHistoryValue(value)}`).join('\n')}
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+
+                          <div className="history-footer">
+                            <p className="history-count-text">
+                              Hien thi {historyShownCount} / {workHistoryTotal} ban ghi
+                            </p>
+                            {workHistoryHasMore ? (
+                              <button
+                                type="button"
+                                className="history-load-more-btn"
+                                onClick={() => void loadWorkHistory({ append: true, offset: workHistoryOffset })}
+                                disabled={workHistoryLoadingMore || workHistoryLoading}
+                              >
+                                {workHistoryLoadingMore ? 'Dang tai them...' : 'Load more'}
+                              </button>
+                            ) : (
+                              <span className="history-count-text done">Da hien thi het</span>
+                            )}
+                          </div>
+                        </>
+                      ) : workHistoryLoading ? (
+                        <div className="history-empty">Dang tai lich su tu MongoDB...</div>
+                      ) : (
+                        <div className="history-empty">Chua co ban ghi nao trong work_history.</div>
+                      )}
+                    </>
+                  )}
+
                   {/* Export Bar */}
-                  <div className="export-bar">
-                    <button className="btn-export" onClick={handleCopyAll} id="copy-all-btn">
-                      <Copy /> Copy All
-                    </button>
-                    <button className="btn-export" onClick={handleExportAll} id="export-btn">
-                      <Download /> Export .txt
-                    </button>
-                  </div>
+                  {hasAnyResult && (
+                    <div className="export-bar">
+                      <button className="btn-export" onClick={handleCopyAll} id="copy-all-btn">
+                        <Copy /> Copy All
+                      </button>
+                      <button className="btn-export" onClick={handleExportAll} id="export-btn">
+                        <Download /> Export .txt
+                      </button>
+                    </div>
+                  )}
                   </div>
                 </>
               )}

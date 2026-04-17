@@ -44,6 +44,12 @@ Ung dung da co san API de luu lich su tao noi dung vao MongoDB:
 - `POST /api/work-history`: Luu 1 ban ghi (`prompt`, `seo`, `voiceover`).
 - `GET /api/work-history?limit=30`: Lay danh sach lich su moi nhat.
 
+API `GET /api/work-history` ho tro them query de filter/paginate:
+
+- `offset`: bo qua N ban ghi dau (de load more)
+- `action`: `prompt` | `seo` | `voiceover`
+- `q`: tim theo `notes`, `model`, `contentType`, `action`
+
 Can cau hinh bien moi truong tren Vercel (hoac local):
 
 - `MONGODB_URI` (bat buoc)
