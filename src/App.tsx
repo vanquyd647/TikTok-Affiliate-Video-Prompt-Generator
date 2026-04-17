@@ -1290,11 +1290,16 @@ ${TIKTOK_OBSERVED_SIGNAL_BASELINE}
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
+USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
+${notes ? notes : 'None'}
+
 RULES:
 - Location scope: Vietnam, China, South Korea only.
 - No duplicate locations against history lists above.
 - AI must self-select fresh real-world locations. Do not use fixed/preset location pools.
 - Choose ONE primary location and keep it consistent across all keyframes/scenes.
+- USER NOTES PRIORITY: If user notes are provided, treat them as the highest-priority creative direction and follow them first.
+- Only deviate from user notes when mandatory constraints require it (schema, safety guardrails, location scope, interpolation continuity).
 - For OOTDMIRROR, enforce mirror-fitcheck setup across all scenes.
 - For OOTD, enforce single-corner studio setup across all scenes.
 - For OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
@@ -1616,6 +1621,9 @@ ${primaryPlannedLocation.length > 0
   ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
   : 'Select one valid real-world location in Vietnam/China/South Korea and keep it identical across all keyframes/scenes.'}
 
+USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
+${notes ? notes : 'None'}
+
 CRITICAL RULES (NON-NEGOTIABLE):
 1. Each scene is exactly 8 seconds, using Veo 3.1 first-frame + last-frame interpolation.
 2. Keyframe chain must be SEAMLESS: last frame of scene N = first frame of scene N+1.
@@ -1646,8 +1654,7 @@ CRITICAL RULES (NON-NEGOTIABLE):
 27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes.
 28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition.
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
-
-${notes ? `USER NOTES: ${notes}` : ''}
+30. USER NOTES PRIORITY LOCK - When USER NOTES are provided, prioritize and preserve those instructions first across narrative/action/camera/style choices; only override if a mandatory non-negotiable rule, schema, or safety/location constraint conflicts.
 
 Return STRICT COMPACT JSON only in this schema:
 {
@@ -1707,12 +1714,13 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
       const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
 
   Validate and repair the draft package to satisfy all constraints below:
-  - Enforce CRITICAL RULES 1..29 exactly as defined in package generation stage.
+  - Enforce CRITICAL RULES 1..30 exactly as defined in package generation stage.
   - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
   - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
   - AI must choose fresh locations itself and must avoid all locations listed in location-history constraints.
   - Keep camera grammar coherent and avoid chaotic mixed movement in one scene.
   - Preserve character identity and garment fidelity with zero drift.
+  - Treat USER NOTES as highest-priority intent and preserve them over default creative choices unless mandatory constraints conflict.
   - Enforce style lock by type: OOTDMIRROR mirror-only, OOTD studio-only, OutfitIdeas fixed to its chosen setup unless narrative explicitly transitions.
   - Keep product-first composition and TikTok retention pacing.
   - Use the same primary location lock in all keyframes/scenes.
@@ -1722,6 +1730,9 @@ PRIMARY LOCATION LOCK (MANDATORY):
 ${primaryPlannedLocation.length > 0
     ? primaryPlannedLocation
     : 'No pre-selected lock available. Keep one location consistent across all keyframes/scenes.'}
+
+USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
+${notes ? notes : 'None'}
 
 DRAFT PACKAGE JSON:
 ${safeJsonStringify(draftPackage)}
