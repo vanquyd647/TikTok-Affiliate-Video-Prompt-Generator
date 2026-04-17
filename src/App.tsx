@@ -1053,23 +1053,15 @@ Output STRICT JSON only:
       [...normalizedUsedLocationsForProduct, ...usedLocationsForFinalOutfitType]
         .map((location) => normalizeLocationKey(location))
     )
-    const matchedContentType = CONTENT_TYPES.find((type) => type.value === finalContentType)
-    const locationStyleKeywordsForType: string[] = matchedContentType && 'locationStyleKeywords' in matchedContentType
-      ? [...matchedContentType.locationStyleKeywords]
-      : []
-    const requiresContentTypeLocationPattern = locationStyleKeywordsForType.length > 0
 
     const isLocationCandidateAllowed = (location: string) => {
       const candidate = location.trim()
       if (candidate.length === 0) return false
 
       const candidateKey = normalizeLocationKey(candidate)
-      const matchesContentTypeLocationPattern = !requiresContentTypeLocationPattern
-        || locationStyleKeywordsForType.some((keyword: string) => candidateKey.includes(keyword))
 
       return (
         isAllowedLocationCountry(candidate)
-        && matchesContentTypeLocationPattern
         && !blockedLocationKeys.has(candidateKey)
       )
     }
@@ -1077,7 +1069,7 @@ Output STRICT JSON only:
     const aiPlannedLocationPool = planningResult.locationCandidates
       .filter((location) => isLocationCandidateAllowed(location))
 
-    const validatePackageLocations = (value: Record<string, unknown>): { ok: boolean; reason?: string } => {
+    const validatePackageLocationsBasic = (value: Record<string, unknown>): { ok: boolean; reason?: string } => {
       const keyframes = Array.isArray(value.keyframes) ? value.keyframes : []
       if (keyframes.length !== keyframeCount) {
         return { ok: false, reason: `location validation keyframe mismatch ${keyframes.length}/${keyframeCount}` }
@@ -1090,8 +1082,38 @@ Output STRICT JSON only:
         }
 
         const location = toSafeText(keyframe.location, '')
+        if (location.length === 0) {
+          return { ok: false, reason: `keyframe[${i}] missing location` }
+        }
+
+      }
+
+      return { ok: true }
+    }
+
+    const validatePackageLocationsStrict = (value: Record<string, unknown>): { ok: boolean; reason?: string } => {
+      const keyframes = Array.isArray(value.keyframes) ? value.keyframes : []
+      if (keyframes.length !== keyframeCount) {
+        return { ok: false, reason: `strict location validation keyframe mismatch ${keyframes.length}/${keyframeCount}` }
+      }
+
+      for (let i = 0; i < keyframes.length; i += 1) {
+        const keyframe = asRecord(keyframes[i]) ? keyframes[i] as Record<string, unknown> : null
+        if (!keyframe) {
+          return { ok: false, reason: `keyframe[${i}] is not an object` }
+        }
+
+        const location = toSafeText(keyframe.location, '')
+        if (location.length === 0) {
+          return { ok: false, reason: `keyframe[${i}] missing location` }
+        }
+
+        if (!isAllowedLocationCountry(location)) {
+          return { ok: false, reason: `keyframe[${i}] location out of VN/CN/KR scope` }
+        }
+
         if (!isLocationCandidateAllowed(location)) {
-          return { ok: false, reason: `keyframe[${i}] invalid/blocked location` }
+          return { ok: false, reason: `keyframe[${i}] location blocked by history constraints` }
         }
       }
 
@@ -1104,7 +1126,16 @@ Output STRICT JSON only:
     ): { ok: boolean; reason?: string } => {
       const shapeValidation = validatePackageShape(value, keyframeCount, sceneCount, minScore)
       if (!shapeValidation.ok) return shapeValidation
-      return validatePackageLocations(value)
+      return validatePackageLocationsBasic(value)
+    }
+
+    const validatePackageShapeAndLocationsStrict = (
+      value: Record<string, unknown>,
+      minScore: number,
+    ): { ok: boolean; reason?: string } => {
+      const shapeValidation = validatePackageShape(value, keyframeCount, sceneCount, minScore)
+      if (!shapeValidation.ok) return shapeValidation
+      return validatePackageLocationsStrict(value)
     }
 
     // STAGE 3 — PACKAGE GENERATION
@@ -1247,6 +1278,55 @@ Return STRICT JSON only, same schema:
     } catch {
       // If QA repair fails, fallback to draft package to keep generation flow resilient.
       parsed = draftPackage
+    }
+
+    const strictLocationValidation = validatePackageLocationsStrict(parsed)
+    if (!strictLocationValidation.ok) {
+      const locationRepairPrompt = `You are a strict location-only repair model for TikTok fashion video prompt packages.
+
+TASK:
+- Repair ONLY location-related fields so the package satisfies constraints.
+- Keep masterDNA, actions, camera, lighting, style, and scene pacing unchanged unless absolutely necessary for continuity.
+
+LOCATION CONSTRAINTS:
+- Scope strictly Vietnam/China/South Korea.
+- Avoid all locations in history lists below.
+- Keep real-world venues only.
+
+LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
+${usedLocationsProductPrompt}
+
+LOCATIONS ALREADY USED FOR SAME OUTFIT TYPE (MUST AVOID REUSE):
+${usedLocationsOutfitTypePrompt}
+
+AI-PLANNED LOCATION CANDIDATES (PREFERRED):
+${aiPlannedLocationPool.length > 0 ? aiPlannedLocationPool.join('\n') : 'None'}
+
+FAILED VALIDATION REASON:
+${strictLocationValidation.reason || 'unknown'}
+
+DRAFT PACKAGE JSON:
+${safeJsonStringify(parsed)}
+
+Return STRICT JSON only, same schema:
+{
+  "masterDNA": "...",
+  "keyframes": [ ... ],
+  "scenes": [ ... ]
+}`
+
+      try {
+        const locationRepairedPackage = await runStage(
+          'location_repair',
+          [0.28, 0.18],
+          8192,
+          (temperature, maxTokens) => requestGeminiJson(apiKey, model, locationRepairPrompt, temperature, maxTokens),
+          (value) => validatePackageShapeAndLocationsStrict(value, 0.60),
+        )
+        parsed = locationRepairedPackage
+      } catch {
+        // Keep current package; local location resolver will apply best-effort fixing.
+      }
     }
 
     const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
