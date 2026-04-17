@@ -682,26 +682,311 @@ AFFILIATE EXECUTION RULES:
         ? formatLocationsForPrompt(locations)
         : `None yet for outfit type ${selectedType.toUpperCase()}`
     })()
+  const safeJsonStringify = (value: unknown) => {
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch {
+      return '{}'
+    }
+  }
 
-  // Build the master prompt for Gemini
-  const systemPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos (OOTD, GRWM, TikTok Shop, Outfit Ideas, Review). 
+  const pipelineStartedAt = Date.now()
+  const stageMetrics: Array<{ stage: string; attempt: number; durationMs: number; ok: boolean; note?: string }> = []
+  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury']
 
-Your task: Generate a COMPLETE prompt package for a ${duration}-second video with:
-- ${keyframeCount} keyframe image prompts (n+1 algorithm: ${sceneCount} scenes need ${keyframeCount} images)
-- ${sceneCount} scene prompts for Veo 3.1 (first-frame → last-frame video generation, 8s each)
+  const asRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
+
+  const toSafeText = (value: unknown, fallback = '') => {
+    if (typeof value !== 'string') return fallback
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : fallback
+  }
+
+  const toSafeTextList = (value: unknown, maxItems = 12): string[] => {
+    if (!Array.isArray(value)) return []
+
+    return Array.from(new Set(
+      value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    )).slice(0, maxItems)
+  }
+
+  const validateVisualExtract = (value: Record<string, unknown>): { ok: boolean; reason?: string } => {
+    if (!asRecord(value)) return { ok: false, reason: 'visual extract is not an object' }
+
+    const garmentFacts = asRecord(value.garmentFacts) ? value.garmentFacts : null
+    if (!garmentFacts) return { ok: false, reason: 'missing garmentFacts' }
+
+    const hasCategory = toSafeText(garmentFacts.category).length > 0
+    const hasColor = toSafeText(garmentFacts.primaryColor).length > 0
+    const hasDetails = toSafeTextList(garmentFacts.keyDetails).length > 0
+
+    if (!hasCategory || !hasColor || !hasDetails) {
+      return { ok: false, reason: 'garmentFacts lacks category/color/keyDetails' }
+    }
+
+    return { ok: true }
+  }
+
+  const normalizeVisualExtract = (value: Record<string, unknown>) => {
+    const record = asRecord(value) ? value : {}
+    const garmentFactsRaw = asRecord(record.garmentFacts) ? record.garmentFacts : {}
+
+    return {
+      faceIdentity: toSafeText(record.faceIdentity, 'Preserve face identity consistently across all keyframes.'),
+      bodyProfile: toSafeText(record.bodyProfile, 'Maintain stable body proportions and natural posture consistency.'),
+      garmentFacts: {
+        category: toSafeText(garmentFactsRaw.category, 'fashion garment'),
+        primaryColor: toSafeText(garmentFactsRaw.primaryColor, 'preserve reference color exactly'),
+        secondaryColors: toSafeTextList(garmentFactsRaw.secondaryColors, 5),
+        material: toSafeText(garmentFactsRaw.material, 'preserve reference material texture'),
+        silhouette: toSafeText(garmentFactsRaw.silhouette, 'preserve reference silhouette'),
+        keyDetails: toSafeTextList(garmentFactsRaw.keyDetails, 10),
+        doNotAlter: toSafeTextList(garmentFactsRaw.doNotAlter, 10),
+      },
+      styleSignals: toSafeTextList(record.styleSignals, 12),
+      riskFlags: toSafeTextList(record.riskFlags, 12),
+    }
+  }
+
+  const normalizePlanningResult = (value: Record<string, unknown>) => {
+    const record = asRecord(value) ? value : {}
+    const recommendedRaw = toSafeText(record.recommendedContentType, '').toLowerCase()
+    const recommendedContentType = validResolvedTypes.includes(recommendedRaw as ResolvedContentType)
+      ? recommendedRaw
+      : ''
+
+    const styleLockRaw = toSafeText(record.styleLock, 'flex').toLowerCase()
+    const styleLock = ['mirror', 'studio', 'flex'].includes(styleLockRaw) ? styleLockRaw : 'flex'
+
+    return {
+      recommendedContentType,
+      creativeDirection: toSafeText(record.creativeDirection, ''),
+      storyArc: toSafeTextList(record.storyArc, 6),
+      locationCandidates: toSafeTextList(record.locationCandidates, 10),
+      cameraLanguage: toSafeTextList(record.cameraLanguage, 10),
+      lightingDirection: toSafeText(record.lightingDirection, ''),
+      styleLock,
+      mustInclude: toSafeTextList(record.mustInclude, 12),
+      avoid: toSafeTextList(record.avoid, 12),
+    }
+  }
+
+  const validatePlanningResult = (value: Record<string, unknown>): { ok: boolean; reason?: string } => {
+    if (!asRecord(value)) return { ok: false, reason: 'planning result is not an object' }
+
+    const normalized = normalizePlanningResult(value)
+    const hasDirection = normalized.creativeDirection.length > 0 || normalized.storyArc.length >= 3
+    const hasLocationPlan = normalized.locationCandidates.length > 0
+    const hasCameraOrLighting = normalized.cameraLanguage.length > 0 || normalized.lightingDirection.length > 0
+
+    if (!hasDirection) {
+      return { ok: false, reason: 'planning lacks creative direction/story arc' }
+    }
+
+    if (!hasLocationPlan) {
+      return { ok: false, reason: 'planning lacks location candidates' }
+    }
+
+    if (!hasCameraOrLighting) {
+      return { ok: false, reason: 'planning lacks camera/lighting strategy' }
+    }
+
+    return { ok: true }
+  }
+
+  const getPackageCompletenessScore = (
+    value: Record<string, unknown>,
+    expectedKeyframes: number,
+    expectedScenes: number,
+  ): number => {
+    if (!asRecord(value)) return 0
+    const keyframes = Array.isArray(value.keyframes) ? value.keyframes : []
+    const scenes = Array.isArray(value.scenes) ? value.scenes : []
+    if (keyframes.length === 0 || scenes.length === 0) return 0
+
+    const keyframeShapeScore = Math.min(keyframes.length / expectedKeyframes, 1)
+    const sceneShapeScore = Math.min(scenes.length / expectedScenes, 1)
+
+    const keyframeFieldCoverage = keyframes.reduce((acc, item) => {
+      if (!asRecord(item)) return acc
+      let score = 0
+      if (toSafeText(item.action).length > 0) score += 1
+      if (toSafeText(item.location).length > 0) score += 1
+      if (toSafeText(item.camera).length > 0) score += 1
+      if (toSafeText(item.lighting).length > 0) score += 1
+      if (toSafeText(item.style).length > 0) score += 1
+      return acc + score / 5
+    }, 0) / Math.max(keyframes.length, 1)
+
+    const sceneFieldCoverage = scenes.reduce((acc, item) => {
+      if (!asRecord(item)) return acc
+      let score = 0
+      if (toSafeText(item.narrative).length > 0) score += 1
+      if (toSafeText(item.cameraMovement).length > 0) score += 1
+      if (toSafeText(item.startPose).length > 0) score += 1
+      if (toSafeText(item.endPose).length > 0) score += 1
+      return acc + score / 4
+    }, 0) / Math.max(scenes.length, 1)
+
+    return (keyframeShapeScore * 0.3) + (sceneShapeScore * 0.2) + (keyframeFieldCoverage * 0.25) + (sceneFieldCoverage * 0.25)
+  }
+
+  const validatePackageShape = (
+    value: Record<string, unknown>,
+    expectedKeyframes: number,
+    expectedScenes: number,
+    minScore = 0.62,
+  ): { ok: boolean; reason?: string } => {
+    const keyframes = Array.isArray(value.keyframes) ? value.keyframes : []
+    const scenes = Array.isArray(value.scenes) ? value.scenes : []
+
+    if (keyframes.length !== expectedKeyframes || scenes.length !== expectedScenes) {
+      return {
+        ok: false,
+        reason: `shape mismatch keyframes=${keyframes.length}/${expectedKeyframes}, scenes=${scenes.length}/${expectedScenes}`,
+      }
+    }
+
+    const score = getPackageCompletenessScore(value, expectedKeyframes, expectedScenes)
+    if (score < minScore) {
+      return { ok: false, reason: `low completeness score ${score.toFixed(2)} < ${minScore}` }
+    }
+
+    return { ok: true }
+  }
+
+  const runStage = async (
+    stage: string,
+    temperatures: number[],
+    maxOutputTokens: number,
+    caller: (temperature: number, maxTokens: number) => Promise<Record<string, unknown>>,
+    validator?: (value: Record<string, unknown>) => { ok: boolean; reason?: string },
+  ): Promise<Record<string, unknown>> => {
+    let lastError: unknown = null
+
+    for (let i = 0; i < temperatures.length; i += 1) {
+      const temperature = temperatures[i]
+      const attempt = i + 1
+      const started = Date.now()
+
+      try {
+        const output = await caller(temperature, maxOutputTokens)
+        const validation = validator ? validator(output) : { ok: true }
+        if (!validation.ok) {
+          throw new Error(validation.reason || `${stage} validation failed`)
+        }
+
+        stageMetrics.push({
+          stage,
+          attempt,
+          durationMs: Date.now() - started,
+          ok: true,
+          note: `temp=${temperature.toFixed(2)}`,
+        })
+
+        return output
+      } catch (error) {
+        lastError = error
+        stageMetrics.push({
+          stage,
+          attempt,
+          durationMs: Date.now() - started,
+          ok: false,
+          note: error instanceof Error ? error.message : `${error}`,
+        })
+      }
+    }
+
+    const reason = lastError instanceof Error ? lastError.message : `${lastError || 'unknown error'}`
+    throw new Error(`${stage} failed after ${temperatures.length} attempts: ${reason}`)
+  }
+
+  // Shared image references for multimodal calls.
+  const referenceParts: GeminiContentPart[] = []
+  if (faceImage) {
+    const base64 = faceImage.split(',')[1] || faceImage
+    referenceParts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64,
+      },
+    })
+    referenceParts.push({
+      text: 'FACE REFERENCE: identity-only. Preserve facial features, skin tone, hairstyle. Ignore background/location/props from this image.',
+    })
+  }
+
+  if (productImage) {
+    const base64 = productImage.split(',')[1] || productImage
+    referenceParts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64,
+      },
+    })
+    referenceParts.push({
+      text: 'GARMENT REFERENCE: preserve exact product details (color/material/silhouette/key details) in all keyframes.',
+    })
+  }
+
+  try {
+    // STAGE 1 — VISUAL EXTRACT
+    const visualExtractPrompt = `You are a senior fashion vision analyst.
+
+Analyze the provided face + garment references and return STRICT JSON only:
+{
+  "faceIdentity": "short identity lock summary",
+  "bodyProfile": "short body proportion and posture lock summary",
+  "garmentFacts": {
+    "category": "...",
+    "primaryColor": "...",
+    "secondaryColors": ["..."],
+    "material": "...",
+    "silhouette": "...",
+    "keyDetails": ["..."],
+    "doNotAlter": ["..."]
+  },
+  "styleSignals": ["..."],
+  "riskFlags": ["..."]
+}
+
+Rules:
+- Be concrete and concise.
+- Do not invent unavailable details.
+- Focus on preserving identity and garment fidelity.
+${notes ? `USER NOTES: ${notes}` : ''}`
+
+    const visualAnalysisRaw = await runStage(
+      'visual_extract',
+      [0.35, 0.24],
+      3072,
+      (temperature, maxTokens) => requestGeminiJsonWithParts(
+        apiKey,
+        model,
+        [...referenceParts, { text: visualExtractPrompt }],
+        temperature,
+        maxTokens,
+      ),
+      validateVisualExtract,
+    )
+    const visualAnalysis = normalizeVisualExtract(visualAnalysisRaw)
+
+    // STAGE 2 — CREATIVE PLAN
+    const planningPrompt = `You are a TikTok affiliate fashion creative planner.
+
+INPUT CONTEXT:
+- Duration: ${duration}s
 - Aspect ratio: ${aspectRatio}
+- Requested content type: ${contentTypeForPrompt}
+- Affiliate mode: ${affiliateModeLabel}
+- Sales template: ${salesTemplateLabel}
 - Diversity seed: ${diversitySeed}
 
-CONTENT TYPE: ${contentTypeForPrompt}
-${isAuto ? `Since content type is set to AUTO, you MUST first analyze the provided product/garment image and determine which content type is MOST SUITABLE based on:
-- Garment category (outfit piece, sportswear, luxury item, collection item, etc.)
-- Visual characteristics and best presentation style
-- Trending TikTok content format for this product
-Valid types: ootd, grwm, outfitideas, fyp, review, tiktokshop, athleisure, haul, styling, luxury
-Include your recommended type in the JSON response as "recommendedContentType".
-${autoModeRule}` : ''}
-
-${affiliateExecutionRules}
+VISUAL ANALYSIS JSON:
+${safeJsonStringify(visualAnalysis)}
 
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsProductPrompt}
@@ -709,169 +994,41 @@ ${usedLocationsProductPrompt}
 LOCATIONS ALREADY USED FOR SAME OUTFIT TYPE (MUST AVOID REUSE):
 ${usedLocationsOutfitTypePrompt}
 
-CRITICAL RULES:
-1. Each scene is exactly 8 seconds, using Veo 3.1 first-frame + last-frame interpolation.
-2. Keyframe chain must be SEAMLESS: last frame of scene N = first frame of scene N+1.
-3. Character identity must be perfectly consistent across all keyframes (face, body proportions, hair, skin tone).
-4. Product/garment must be EXACTLY preserved from the reference image (color, silhouette, material, details).
-5. Follow TikTok retention arc across timeline: Hook (0-3s) → Value → Proof → CTA.
-6. Scene 1 must create a strong visual hook in the first 1-3 seconds with immediate product readability.
-7. Infer scene context from garment/product characteristics, content type, and user notes; avoid generic preset randomness.
-8. NEVER use background, location, props, or lighting from the FACE reference image. Face image is identity-only.
-9. Keep scene context coherent; only change location when there is a clear narrative transition.
-10. Prompt detail quality must follow Veo best practice: each keyframe/scenes should be specific on Subject, Action, Camera, Composition, Style, and Ambiance/Lighting.
-11. Camera grammar must stay coherent: one dominant camera move per 8s scene, no chaotic mixed camera instructions.
-12. Motion continuity is mandatory across scene boundaries: maintain compatible direction, speed feel, and body orientation to reduce interpolation artifacts.
-13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
-14. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments.
-15. **LOCATION SCOPE = VIETNAM, CHINA, SOUTH KOREA ONLY** — Every location must be in Vietnam, China, or South Korea, and must include concrete city/area + venue details.
-16. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID + SAME OUTFIT TYPE** — Never reuse locations listed in either location-history section above.
-17. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed to generate fresh concepts; do not duplicate ACTION, LOCATION, CAMERA, NARRATIVE in one output.
-18. **PRODUCT-FIRST COMPOSITION** — Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
-19. **MOBILE SAFE-FRAME RULE** — Keep hero subject in a central safe area and avoid placing critical details at extreme top/bottom edges where TikTok UI/captions can cover them.
-20. **RETENTION PACING RULE** — Avoid static visuals for too long; every ~1-2 seconds should include meaningful subject or camera progression.
-21. **NO VOICE REQUIREMENT** — The video must work fully without voiceover/dialogue. Do not rely on spoken lines to deliver value, proof, or CTA.
-22. **AUDIO IS OPTIONAL (IF USED)** — Prefer silent-first visual storytelling. If adding SFX/ambience, describe it clearly but keep comprehension independent from audio.
-23. **AUTHENTICITY + TRUST** — Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
-24. **CTA-SAFE ENDING + TEMPLATE CONSISTENCY** — Final scene must naturally set up conversion CTA while keeping tone and pressure aligned with selected Sales Template.
-25. **OOTD/OUTFITIDEAS TREND FORMAT (TIKTOK-ALIGNED)** — For content type OOTD or OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow.
-26. **MIRROR FITCHECK SPEC** — Use full-body mirror framing, vertical social-native phone aesthetic, visible head-to-toe outfit readability, and ensure no camera/tripod/operator reflection appears in the mirror.
-27. **SINGLE-CORNER STUDIO SPEC** — Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes.
-28. **STYLE CONSISTENCY LOCK** — Once mirror or studio setup is chosen for OOTD/OutfitIdeas, keep that setup consistent across all scenes unless there is an explicit narrative reason to transition.
+RULES:
+- Location scope: Vietnam, China, South Korea only.
+- No duplicate locations against history lists above.
+- For OOTD/OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
+- Plan for retention arc: Hook -> Value -> Proof -> CTA.
 
-${notes ? `USER NOTES: ${notes}` : ''}
-
-Output as JSON with this exact structure:
+Output STRICT JSON only:
 {
-  "masterDNA": "character consistency description",
-  ${isAuto ? '"recommendedContentType": "ootd|grwm|outfitideas|fyp|review|tiktokshop|athleisure|haul|styling|luxury",' : ''}
-  "keyframes": [
-    {
-      "index": 0,
-      "timestamp": "0s",
-      "subject": "face preservation instruction",
-      "action": "pose/movement description",
-      "location": "real location (city/area + venue details in Vietnam, China, or South Korea)",
-      "camera": "lens, shot type, angle",
-      "lighting": "lighting setup",
-      "style": "photography style"
-    }
-  ],
-  "scenes": [
-    {
-      "index": 0,
-      "timeRange": "0s-8s",
-      "narrative": "scene description with TikTok beat",
-      "startPose": "starting keyframe pose",
-      "endPose": "ending keyframe pose",
-      "cameraMovement": "camera movement description"
-    }
-  ]
+  ${isAuto ? '"recommendedContentType": "ootd|grwm|outfitideas|fyp|review|tiktokshop|athleisure|haul|styling|luxury",' : '"recommendedContentType": "same-as-requested",'}
+  "creativeDirection": "...",
+  "storyArc": ["hook", "value", "proof", "cta"],
+  "locationCandidates": ["..."],
+  "cameraLanguage": ["..."],
+  "lightingDirection": "...",
+  "styleLock": "mirror|studio|flex",
+  "mustInclude": ["..."],
+  "avoid": ["..."]
 }`
 
-  // Build content parts
-  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = []
-
-  if (faceImage) {
-    const base64 = faceImage.split(',')[1] || faceImage
-    parts.push({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: base64,
-      }
-    })
-    parts.push({ text: 'This is the FACE REFERENCE image. Use it ONLY for face identity preservation (facial features, skin tone, hairstyle). Ignore its background, location, props, and lighting.' })
-  }
-
-  if (productImage) {
-    const base64 = productImage.split(',')[1] || productImage
-    parts.push({
-      inlineData: {
-        mimeType: 'image/jpeg',
-        data: base64,
-      }
-    })
-    parts.push({ text: 'This is the PRODUCT/GARMENT REFERENCE image. Preserve this exact garment in all keyframes.' })
-  }
-
-  parts.push({ text: systemPrompt })
-
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts }],
-          generationConfig: {
-            temperature: 0.85,
-            topP: 0.95,
-            maxOutputTokens: 8192,
-            responseMimeType: 'application/json',
-          },
-        }),
-      }
+    const planningResultRaw = await runStage(
+      'creative_plan',
+      [0.68, 0.52],
+      4096,
+      (temperature, maxTokens) => requestGeminiJson(apiKey, model, planningPrompt, temperature, maxTokens),
+      validatePlanningResult,
     )
+    const planningResult = normalizePlanningResult(planningResultRaw)
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Gemini API error (${response.status}): ${errorText.slice(0, 300)}`)
-    }
-
-    const data = await response.json()
-    const candidateParts = data?.candidates?.[0]?.content?.parts
-    const textParts = Array.isArray(candidateParts)
-      ? candidateParts
-        .filter((part: any) => typeof part?.text === 'string' && part.text.trim().length > 0)
-        .map((part: any) => part.text.trim())
-      : []
-
-    const mergedText = textParts.join('\n').trim()
-    if (!mergedText) {
-      throw new Error('Gemini returned empty content')
-    }
-
-    const parseJsonFromText = (raw: string) => {
-      const stripCodeFence = raw
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim()
-
-      const tryParse = (value: string) => {
-        try {
-          return JSON.parse(value)
-        } catch {
-          return null
-        }
-      }
-
-      const direct = tryParse(stripCodeFence)
-      if (direct && typeof direct === 'object') return direct
-
-      const start = stripCodeFence.indexOf('{')
-      const end = stripCodeFence.lastIndexOf('}')
-      if (start >= 0 && end > start) {
-        const extracted = stripCodeFence.slice(start, end + 1)
-        const extractedParsed = tryParse(extracted)
-        if (extractedParsed && typeof extractedParsed === 'object') return extractedParsed
-      }
-
-      throw new Error(`Could not parse JSON from Gemini response: ${stripCodeFence.slice(0, 240)}`)
-    }
-
-    const parsed = parseJsonFromText(mergedText)
-
-    // If auto mode, use the recommended content type
     let finalContentType: ContentType = contentType as ContentType
-    if (isAuto && typeof parsed.recommendedContentType === 'string') {
-      const recommended = parsed.recommendedContentType.toLowerCase()
-      const validTypes: ContentType[] = ['ootd', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury']
-      if (validTypes.includes(recommended as ContentType)) {
+    if (isAuto && planningResult.recommendedContentType.length > 0) {
+      const recommended = planningResult.recommendedContentType.toLowerCase()
+      if (validResolvedTypes.includes(recommended as ResolvedContentType)) {
         finalContentType = recommended as ContentType
       }
 
-      // FYP is a distribution label; in AUTO affiliate mode, remap to a concrete commerce format.
       if (finalContentType === 'fyp') {
         finalContentType = 'outfitideas'
       }
@@ -883,6 +1040,125 @@ Output as JSON with this exact structure:
 
     if (finalContentType === 'auto') {
       finalContentType = affiliateMode === 'strict' ? 'tiktokshop' : 'outfitideas'
+    }
+
+    const affiliateObjectiveForFinal = AFFILIATE_VIDEO_OBJECTIVES[finalContentType as ResolvedContentType]
+
+    // STAGE 3 — PACKAGE GENERATION
+    const generationPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos.
+
+Generate a COMPLETE prompt package for a ${duration}-second video with:
+- ${keyframeCount} keyframe image prompts (${sceneCount} scenes => n+1 keyframes)
+- ${sceneCount} scene prompts for Veo 3.1 (8s each, first-frame -> last-frame)
+- Aspect ratio: ${aspectRatio}
+- LOCKED content type: ${finalContentType.toUpperCase()}
+
+AFFILIATE OBJECTIVE:
+${affiliateObjectiveForFinal}
+
+${affiliateExecutionRules}
+
+VISUAL ANALYSIS JSON:
+${safeJsonStringify(visualAnalysis)}
+
+CREATIVE PLAN JSON:
+${safeJsonStringify(planningResult)}
+
+LOCATION CONSTRAINTS:
+- Scope must remain Vietnam, China, South Korea.
+- Avoid all used locations in history.
+- Keep location continuity unless a clear narrative transition is needed.
+
+QUALITY RULES:
+1. Character identity must be consistent across all keyframes.
+2. Garment fidelity must be exact from product reference.
+3. Camera grammar must be coherent (one dominant move per scene).
+4. Motion continuity across scene boundaries is mandatory.
+5. Product readability must stay high in every scene.
+6. Retention pacing: meaningful progression every 1-2 seconds.
+7. OOTD/OutfitIdeas must keep mirror or studio lock consistently.
+
+${notes ? `USER NOTES: ${notes}` : ''}
+
+Return STRICT JSON only in this schema:
+{
+  "masterDNA": "character consistency description",
+  "keyframes": [
+    {
+      "index": 0,
+      "timestamp": "0s",
+      "subject": "face/body preservation instruction",
+      "action": "pose/movement description",
+      "location": "real location (city/area + venue details in Vietnam/China/South Korea)",
+      "camera": "lens, shot type, angle",
+      "lighting": "lighting setup",
+      "style": "photography style"
+    }
+  ],
+  "scenes": [
+    {
+      "index": 0,
+      "timeRange": "0s-8s",
+      "narrative": "scene description with retention beat",
+      "startPose": "starting keyframe pose",
+      "endPose": "ending keyframe pose",
+      "cameraMovement": "camera movement description"
+    }
+  ]
+}`
+
+    const draftPackage = await runStage(
+      'package_generation',
+      [0.82, 0.74],
+      8192,
+      (temperature, maxTokens) => requestGeminiJsonWithParts(
+        apiKey,
+        model,
+        [...referenceParts, { text: generationPrompt }],
+        temperature,
+        maxTokens,
+      ),
+      (value) => validatePackageShape(value, keyframeCount, sceneCount, 0.62),
+    )
+
+    // STAGE 4 — QA + REPAIR
+    const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
+
+Validate and repair the draft package to satisfy all constraints:
+- location scope must be Vietnam/China/South Korea
+- no obvious duplicate location/action/camera repetition
+- continuity between keyframes and scenes
+- product readability and conversion framing quality
+- mirror/studio consistency for OOTD/OutfitIdeas
+
+DRAFT PACKAGE JSON:
+${safeJsonStringify(draftPackage)}
+
+Return STRICT JSON only, same schema:
+{
+  "masterDNA": "...",
+  "keyframes": [ ... ],
+  "scenes": [ ... ]
+}`
+
+    const draftQualityScore = getPackageCompletenessScore(draftPackage, keyframeCount, sceneCount)
+    let parsed: Record<string, unknown> = draftPackage
+    try {
+      const repairedPackage = await runStage(
+        'qa_repair',
+        [0.45, 0.32],
+        8192,
+        (temperature, maxTokens) => requestGeminiJson(apiKey, model, qaRepairPrompt, temperature, maxTokens),
+        (value) => validatePackageShape(value, keyframeCount, sceneCount, 0.65),
+      )
+      const repairedQualityScore = getPackageCompletenessScore(repairedPackage, keyframeCount, sceneCount)
+
+      if (repairedQualityScore >= draftQualityScore - 0.02) {
+        parsed = repairedPackage
+      }
+    } catch {
+      // If QA repair fails, fallback to draft package to keep generation flow resilient.
+      parsed = draftPackage
     }
 
     const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
@@ -1043,8 +1319,21 @@ FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
       }
     })
 
+    const totalPipelineMs = Date.now() - pipelineStartedAt
+    console.info('[GeminiVideoPipeline] success', {
+      model,
+      duration,
+      aspectRatio,
+      requestedContentType: contentType,
+      resolvedContentType: finalContentType,
+      totalPipelineMs,
+      stageMetrics,
+    })
+
     return {
-      masterDNA: parsed.masterDNA || buildCharacterDNA(notes, finalContentType as Exclude<ContentType, 'auto'>),
+      masterDNA: typeof parsed.masterDNA === 'string' && parsed.masterDNA.trim().length > 0
+        ? parsed.masterDNA
+        : buildCharacterDNA(notes, finalContentType as Exclude<ContentType, 'auto'>),
       keyframes,
       scenes,
       resolvedContentType: finalContentType as ResolvedContentType,
@@ -1052,6 +1341,16 @@ FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
       salesTemplateUsed: salesTemplate,
     }
   } catch (error: any) {
+    const totalPipelineMs = Date.now() - pipelineStartedAt
+    console.error('[GeminiVideoPipeline] failure', {
+      model,
+      duration,
+      aspectRatio,
+      requestedContentType: contentType,
+      totalPipelineMs,
+      stageMetrics,
+      error: error instanceof Error ? error.message : `${error}`,
+    })
     throw new Error(error?.message || 'Gemini generation failed')
   }
 }
@@ -1086,15 +1385,15 @@ function parseGeminiJsonFromText(raw: string): Record<string, unknown> {
   throw new Error(`Could not parse JSON from Gemini response: ${stripCodeFence.slice(0, 240)}`)
 }
 
-async function requestGeminiJson(
+type GeminiContentPart = { text: string } | { inlineData: { mimeType: string; data: string } }
+
+async function requestGeminiJsonWithParts(
   apiKey: string,
   model: string,
-  systemPrompt: string,
+  parts: GeminiContentPart[],
   temperature = 0.9,
   maxOutputTokens = 4096
 ): Promise<Record<string, unknown>> {
-  const parts: Array<{ text: string }> = [{ text: systemPrompt }]
-
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
     {
@@ -1131,6 +1430,22 @@ async function requestGeminiJson(
   }
 
   return parseGeminiJsonFromText(mergedText)
+}
+
+async function requestGeminiJson(
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  temperature = 0.9,
+  maxOutputTokens = 4096
+): Promise<Record<string, unknown>> {
+  return requestGeminiJsonWithParts(
+    apiKey,
+    model,
+    [{ text: systemPrompt }],
+    temperature,
+    maxOutputTokens,
+  )
 }
 
 async function persistWorkHistory(payload: WorkHistoryPayload): Promise<void> {
