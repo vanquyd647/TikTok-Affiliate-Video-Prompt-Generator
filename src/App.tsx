@@ -169,6 +169,44 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
 
 const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfitideas', 'review', 'ootd']
 
+const ALLOWED_LOCATION_KEYWORDS = [
+  'vietnam',
+  'viet nam',
+  'hanoi',
+  'ho chi minh',
+  'saigon',
+  'da nang',
+  'danang',
+  'nha trang',
+  'hai phong',
+  'can tho',
+  'hue',
+  'china',
+  'trung quoc',
+  'beijing',
+  'shanghai',
+  'guangzhou',
+  'shenzhen',
+  'chengdu',
+  'hangzhou',
+  'chongqing',
+  'wuhan',
+  'nanjing',
+  'xiamen',
+  'tianjin',
+  'south korea',
+  'han quoc',
+  'seoul',
+  'busan',
+  'incheon',
+  'daegu',
+  'daejeon',
+  'gwangju',
+  'jeju',
+  'suwon',
+  'ulsan',
+]
+
 const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
   ootd: 'Prioritize clean outfit readability and aspirational styling while keeping product details purchase-relevant.',
   grwm: 'Build trust through natural routine storytelling, then transition clearly to product desire and purchase intent.',
@@ -374,6 +412,13 @@ function normalizeLocationKey(value: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
+}
+
+function isAllowedLocationCountry(value: string): boolean {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return false
+
+  return ALLOWED_LOCATION_KEYWORDS.some((keyword) => normalized.includes(keyword))
 }
 
 function createProductImageId(dataUrl: string): string {
@@ -597,7 +642,7 @@ CRITICAL RULES:
 12. Motion continuity is mandatory across scene boundaries: maintain compatible direction, speed feel, and body orientation to reduce interpolation artifacts.
 13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
 14. **LOCATION MUST BE REAL-WORLD VENUES ONLY** — Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments.
-15. **LOCATION SCOPE = GLOBAL REAL LOCATIONS** — Any country is allowed, but always provide concrete city/area + venue details.
+15. **LOCATION SCOPE = VIETNAM, CHINA, SOUTH KOREA ONLY** — Every location must be in Vietnam, China, or South Korea, and must include concrete city/area + venue details.
 16. **AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID + SAME OUTFIT TYPE** — Never reuse locations listed in either location-history section above.
 17. **ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT** — Use the Diversity seed to generate fresh concepts; do not duplicate ACTION, LOCATION, CAMERA, NARRATIVE in one output.
 18. **PRODUCT-FIRST COMPOSITION** — Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
@@ -620,7 +665,7 @@ Output as JSON with this exact structure:
       "timestamp": "0s",
       "subject": "face preservation instruction",
       "action": "pose/movement description",
-      "location": "real location (city/area + venue details, any country)",
+      "location": "real location (city/area + venue details in Vietnam, China, or South Korea)",
       "camera": "lens, shot type, angle",
       "lighting": "lighting setup",
       "style": "photography style"
@@ -782,17 +827,17 @@ Output as JSON with this exact structure:
       return location
     }
 
-    const globalFallbackLocations = [
+    const regionalFallbackLocations = [
       'Old Quarter cafe lane, Hanoi, Vietnam',
-      'Shibuya Center-Gai fashion street, Tokyo, Japan',
+      'Nguyen Hue walking street, Ho Chi Minh City, Vietnam',
+      'Xintiandi fashion district, Shanghai, China',
+      'Sanlitun shopping quarter, Beijing, China',
       'Myeongdong retail district, Seoul, South Korea',
-      'Orchard Road shopping belt, Singapore',
-      'Le Marais fashion lane, Paris, France',
-      'Soho shopping street, London, United Kingdom',
+      'Haeundae seaside promenade, Busan, South Korea',
     ]
 
     const pickLocationFallback = (index: number) => {
-      const seedLocation = globalFallbackLocations[index % globalFallbackLocations.length]
+      const seedLocation = regionalFallbackLocations[index % regionalFallbackLocations.length]
       const fallback = `${seedLocation} [fallback-${index + 1}-${locationFallbackNonce}]`
       return markLocationUsed(fallback)
     }
@@ -801,7 +846,7 @@ Output as JSON with this exact structure:
       const candidate = toSafeString(value, '')
       if (candidate.length > 0) {
         const candidateKey = normalizeLocationKey(candidate)
-        if (!blockedLocationKeys.has(candidateKey) && !usedLocationKeysInRun.has(candidateKey)) {
+        if (isAllowedLocationCountry(candidate) && !blockedLocationKeys.has(candidateKey) && !usedLocationKeysInRun.has(candidateKey)) {
           return markLocationUsed(candidate)
         }
       }
