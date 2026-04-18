@@ -78,6 +78,28 @@ interface VoiceoverTaskResult {
   generatedAt: number
 }
 
+interface TikTokScriptBeat {
+  index: number
+  timestamp: string
+  beatName: string
+  description: string
+  cameraHint: string
+  narrationHint: string
+}
+
+interface TikTokAnalysisResult {
+  detectedContentType: string
+  detectedDurationSec: number
+  hookStyle: string
+  narrativeStructure: string
+  ctaStyle: string
+  colorGrade: string
+  pacing: string
+  sceneBeats: TikTokScriptBeat[]
+  generatedScript: string
+  generatedAt: number
+}
+
 interface PromptToastState {
   kind: 'loading' | 'success' | 'error'
   message: string
@@ -2927,6 +2949,115 @@ Return JSON only with this exact schema:
   }
 }
 
+async function analyzeTikTokWithGemini(
+  apiKey: string,
+  model: string,
+  videoBase64: string,
+  videoMimeType: string,
+  extraNotes: string,
+): Promise<TikTokAnalysisResult> {
+  const trimmedNotes = extraNotes.trim()
+
+  const analyzePrompt = `You are a senior TikTok content strategist and video director.
+
+Analyze the provided TikTok video carefully and return STRICT JSON only.
+
+${trimmedNotes ? `Additional context from user: ${trimmedNotes}` : ''}
+
+ANALYSIS TASKS:
+1. Identify the content type (ootd, grwm, review, haul, tiktokshop, fyp, styling, athleisure, outfitideas, luxury, or describe a custom type).
+2. Estimate the total video duration in seconds.
+3. Describe the hook style (how the video grabs attention in the first 2 seconds).
+4. Describe the narrative structure (how the video flows from hook to close).
+5. Describe the CTA style (how the video ends or drives action).
+6. Describe the visual/color grade (bright, warm, moody, etc.).
+7. Describe the overall pacing (fast-cut, slow cinematic, mid-pace, etc.).
+8. Break down the video into 3-6 scene beats. For each beat provide:
+   - timestamp (e.g. "0s-4s")
+   - beatName (short descriptive label)
+   - description (what is happening visually)
+   - cameraHint (camera movement / framing observed)
+   - narrationHint (what would be said or implied in narration)
+9. Based on the analysis, generate a ready-to-use Vietnamese kịch bản (script) for creating a SIMILAR video for a new fashion/affiliate product. The script must:
+   - Follow the same structural pattern and pacing as the analyzed video
+   - Be written in natural Vietnamese
+   - Include stage directions in brackets e.g. [Camera: full-body reveal]
+   - Cover hook → showcase → close structure
+   - Be 150-250 words total
+
+Return this exact JSON schema (no extra keys, no markdown wrapping):
+{
+  "detectedContentType": "...",
+  "detectedDurationSec": 30,
+  "hookStyle": "...",
+  "narrativeStructure": "...",
+  "ctaStyle": "...",
+  "colorGrade": "...",
+  "pacing": "...",
+  "sceneBeats": [
+    {
+      "index": 0,
+      "timestamp": "0s-4s",
+      "beatName": "...",
+      "description": "...",
+      "cameraHint": "...",
+      "narrationHint": "..."
+    }
+  ],
+  "generatedScript": "..."
+}`
+
+  try {
+    const parts: GeminiContentPart[] = [
+      {
+        inlineData: {
+          mimeType: videoMimeType,
+          data: videoBase64,
+        },
+      },
+      { text: analyzePrompt },
+    ]
+
+    const parsed = await requestGeminiJsonWithParts(apiKey, model, parts, 0.7, 4096)
+
+    const toStr = (v: unknown, fallback: string) => {
+      if (typeof v !== 'string') return fallback
+      const t = v.trim()
+      return t.length > 0 ? t : fallback
+    }
+
+    const toNum = (v: unknown, fallback: number) => {
+      const n = Number(v)
+      return Number.isFinite(n) && n > 0 ? Math.round(n) : fallback
+    }
+
+    const rawBeats = Array.isArray((parsed as any).sceneBeats) ? (parsed as any).sceneBeats : []
+    const sceneBeats: TikTokScriptBeat[] = rawBeats.slice(0, 8).map((beat: any, i: number) => ({
+      index: i,
+      timestamp: toStr(beat?.timestamp, `${i * 5}s-${(i + 1) * 5}s`),
+      beatName: toStr(beat?.beatName, `Beat ${i + 1}`),
+      description: toStr(beat?.description, ''),
+      cameraHint: toStr(beat?.cameraHint, ''),
+      narrationHint: toStr(beat?.narrationHint, ''),
+    }))
+
+    return {
+      detectedContentType: toStr((parsed as any).detectedContentType, 'unknown'),
+      detectedDurationSec: toNum((parsed as any).detectedDurationSec, 30),
+      hookStyle: toStr((parsed as any).hookStyle, ''),
+      narrativeStructure: toStr((parsed as any).narrativeStructure, ''),
+      ctaStyle: toStr((parsed as any).ctaStyle, ''),
+      colorGrade: toStr((parsed as any).colorGrade, ''),
+      pacing: toStr((parsed as any).pacing, ''),
+      sceneBeats,
+      generatedScript: toStr((parsed as any).generatedScript, ''),
+      generatedAt: Date.now(),
+    }
+  } catch (error: any) {
+    throw new Error(error?.message || 'Gemini TikTok analysis failed')
+  }
+}
+
 // ═══════════════════════════════════════════════
 // UTILITIES
 // ═══════════════════════════════════════════════
@@ -3466,7 +3597,7 @@ export default function App() {
   const [result, setResult] = useState<GenerateResult | null>(null)
   const [seoResult, setSeoResult] = useState<SeoTaskResult | null>(null)
   const [voiceoverResult, setVoiceoverResult] = useState<VoiceoverTaskResult | null>(null)
-  const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image' | 'seo' | 'voiceover' | 'history'>('keyframes')
+  const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image' | 'seo' | 'voiceover' | 'history' | 'tiktokanalysis'>('keyframes')
   const [selectedContentType, setSelectedContentType] = useState<ResolvedContentType>('ootd')
   const [seoProductName, setSeoProductName] = useState('')
   const [seoNotes, setSeoNotes] = useState('')
@@ -3486,6 +3617,15 @@ export default function App() {
   const [historySearchQuery, setHistorySearchQuery] = useState('')
   const [productLocationHistory, setProductLocationHistory] = useState<ProductLocationHistoryMap>(() => loadProductLocationHistory())
   const [outfitTypeLocationHistory, setOutfitTypeLocationHistory] = useState<OutfitTypeLocationHistoryMap>(() => loadOutfitTypeLocationHistory())
+
+  // TikTok Video Analysis
+  const [tiktokVideoFile, setTiktokVideoFile] = useState<File | null>(null)
+  const [tiktokVideoBase64, setTiktokVideoBase64] = useState<string | null>(null)
+  const [tiktokVideoMimeType, setTiktokVideoMimeType] = useState<string>('video/mp4')
+  const [tiktokAnalysisNotes, setTiktokAnalysisNotes] = useState('')
+  const [tiktokAnalysisLoading, setTiktokAnalysisLoading] = useState(false)
+  const [tiktokAnalysisError, setTiktokAnalysisError] = useState('')
+  const [tiktokAnalysisResult, setTiktokAnalysisResult] = useState<TikTokAnalysisResult | null>(null)
 
   // Persist settings
   useEffect(() => { localStorage.setItem('aff_api_key', apiKey) }, [apiKey])
@@ -3991,6 +4131,69 @@ export default function App() {
     }
   }
 
+  const handleTiktokVideoFileChange = async (file: File | null) => {
+    setTiktokVideoFile(file)
+    setTiktokVideoBase64(null)
+    setTiktokAnalysisError('')
+    setTiktokAnalysisResult(null)
+
+    if (!file) return
+
+    const MAX_VIDEO_MB = 18
+    if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+      setTiktokAnalysisError(`Video quá lớn (${(file.size / 1024 / 1024).toFixed(1)} MB). Vui lòng chọn video dưới ${MAX_VIDEO_MB} MB.`)
+      setTiktokVideoFile(null)
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const result = e.target?.result as string
+      if (result) {
+        const base64 = result.split(',')[1] || result
+        setTiktokVideoBase64(base64)
+        setTiktokVideoMimeType(file.type || 'video/mp4')
+      }
+    }
+    reader.onerror = () => {
+      setTiktokAnalysisError('Không thể đọc file video. Vui lòng thử lại.')
+      setTiktokVideoFile(null)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleAnalyzeTikTok = async () => {
+    if (!tiktokVideoBase64) {
+      setTiktokAnalysisError('Vui lòng chọn file video TikTok trước khi phân tích.')
+      return
+    }
+
+    setTiktokAnalysisLoading(true)
+    setTiktokAnalysisError('')
+    setTiktokAnalysisResult(null)
+
+    try {
+      if (!apiKey.trim()) {
+        throw new Error('Vui lòng nhập Gemini API Key để phân tích video.')
+      }
+
+      const result = await analyzeTikTokWithGemini(
+        apiKey,
+        model,
+        tiktokVideoBase64,
+        tiktokVideoMimeType,
+        tiktokAnalysisNotes,
+      )
+
+      setTiktokAnalysisResult(result)
+      setActiveTab('tiktokanalysis')
+    } catch (err: any) {
+      setTiktokAnalysisError(err?.message || 'Phân tích video thất bại. Vui lòng thử lại.')
+    } finally {
+      setTiktokAnalysisLoading(false)
+    }
+  }
+
   // Export All
   const handleExportAll = () => {
     if (!hasAnyResult) return
@@ -4450,6 +4653,118 @@ export default function App() {
               )}
             </div>
 
+            {/* Task 3: TikTok Video Analysis */}
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-title">
+                <Film /> Phân tích Video TikTok → Kịch bản
+              </div>
+              <p className="ai-task-hint">
+                Upload video TikTok (MP4/MOV, tối đa 18 MB). AI sẽ phân tích cấu trúc, scene beats, hook, CTA rồi tạo kịch bản mẫu để quay lại video tương tự.
+              </p>
+
+              <div className="input-group">
+                <label className="input-label" htmlFor="tiktok-video-input">File video TikTok</label>
+                <div
+                  style={{
+                    border: '1.5px dashed var(--border)',
+                    borderRadius: 8,
+                    padding: '12px 14px',
+                    background: 'rgba(255,255,255,0.02)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}
+                  onClick={() => document.getElementById('tiktok-video-input')?.click()}
+                >
+                  <Film size={18} color="var(--accent-cyan)" style={{ flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {tiktokVideoFile ? (
+                      <>
+                        <p style={{ fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {tiktokVideoFile.name}
+                        </p>
+                        <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                          {(tiktokVideoFile.size / 1024 / 1024).toFixed(1)} MB — {tiktokVideoFile.type || 'video'}
+                        </p>
+                      </>
+                    ) : (
+                      <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                        Chọn file video TikTok (.mp4, .mov, .webm)
+                      </p>
+                    )}
+                  </div>
+                  {tiktokVideoFile && (
+                    <button
+                      type="button"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: 4, flexShrink: 0 }}
+                      onClick={(e) => { e.stopPropagation(); void handleTiktokVideoFileChange(null) }}
+                      title="Xóa video"
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+                <input
+                  id="tiktok-video-input"
+                  type="file"
+                  accept="video/mp4,video/quicktime,video/webm,video/avi,.mp4,.mov,.webm,.avi"
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null
+                    void handleTiktokVideoFileChange(file)
+                    e.target.value = ''
+                  }}
+                />
+              </div>
+
+              <div className="input-group" style={{ marginBottom: 12 }}>
+                <label className="input-label" htmlFor="tiktok-analysis-notes">Ghi chú thêm (tuỳ chọn)</label>
+                <textarea
+                  id="tiktok-analysis-notes"
+                  className="input-field"
+                  value={tiktokAnalysisNotes}
+                  onChange={(e) => setTiktokAnalysisNotes(e.target.value)}
+                  placeholder="Ví dụ: video bán áo sơ mi, phong cách OOTD, muốn kịch bản theo tone tự nhiên..."
+                  rows={2}
+                />
+              </div>
+
+              <button
+                id="analyze-tiktok-btn"
+                className={`btn-generate btn-generate-secondary ${tiktokAnalysisLoading ? 'loading' : ''}`}
+                onClick={handleAnalyzeTikTok}
+                disabled={tiktokAnalysisLoading || !tiktokVideoBase64 || !apiKey.trim()}
+                style={{ background: 'linear-gradient(135deg, #0ea5e9, #06b6d4)' }}
+              >
+                {tiktokAnalysisLoading ? (
+                  <>
+                    <div className="spinner" />
+                    Đang phân tích video...
+                  </>
+                ) : (
+                  <>
+                    <Film size={18} />
+                    Phân tích & Tạo kịch bản
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+
+              {tiktokAnalysisLoading && (
+                <div className="progress-bar">
+                  <div className="progress-bar-fill" style={{ width: '55%', background: 'linear-gradient(90deg, #0ea5e9, #06b6d4)' }} />
+                </div>
+              )}
+
+              {tiktokAnalysisError && (
+                <div className="error-message">
+                  <AlertCircle size={16} />
+                  {tiktokAnalysisError}
+                </div>
+              )}
+            </div>
+
             {/* Algorithm Info */}
             <div className="card" style={{
               marginBottom: 16,
@@ -4627,6 +4942,15 @@ export default function App() {
                     >
                       <History /> Lich su ({workHistory.length})
                     </button>
+                    {tiktokAnalysisResult && (
+                      <button
+                        className={`tab ${activeTab === 'tiktokanalysis' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('tiktokanalysis')}
+                        style={activeTab === 'tiktokanalysis' ? { borderColor: '#0ea5e9', color: '#0ea5e9' } : {}}
+                      >
+                        <Film /> TikTok Phân tích
+                      </button>
+                    )}
                   </div>
 
                   {/* Content */}
@@ -5023,6 +5347,82 @@ export default function App() {
                         <div className="history-empty">Dang tai lich su tu MongoDB...</div>
                       ) : (
                         <div className="history-empty">Chua co ban ghi nao trong work_history.</div>
+                      )}
+                    </>
+                  )}
+
+                  {/* TikTok Analysis Tab */}
+                  {tiktokAnalysisResult && activeTab === 'tiktokanalysis' && (
+                    <>
+                      {/* Overview */}
+                      <div className="dna-section" style={{ marginBottom: 16 }}>
+                        <div className="dna-title" style={{ color: '#0ea5e9' }}>
+                          <Film size={13} /> Phân tích Video TikTok
+                          <CopyButton text={[
+                            `CONTENT TYPE: ${tiktokAnalysisResult.detectedContentType}`,
+                            `DURATION: ~${tiktokAnalysisResult.detectedDurationSec}s`,
+                            `HOOK: ${tiktokAnalysisResult.hookStyle}`,
+                            `NARRATIVE: ${tiktokAnalysisResult.narrativeStructure}`,
+                            `CTA: ${tiktokAnalysisResult.ctaStyle}`,
+                            `COLOR GRADE: ${tiktokAnalysisResult.colorGrade}`,
+                            `PACING: ${tiktokAnalysisResult.pacing}`,
+                          ].join('\n')} />
+                        </div>
+                        <div className="prompt-text" style={{ lineHeight: 1.85 }}>
+                          <strong>Loại nội dung:</strong> {tiktokAnalysisResult.detectedContentType}
+                          {'\n'}<strong>Thời lượng:</strong> ~{tiktokAnalysisResult.detectedDurationSec}s
+                          {'\n'}<strong>Hook:</strong> {tiktokAnalysisResult.hookStyle}
+                          {'\n'}<strong>Cấu trúc:</strong> {tiktokAnalysisResult.narrativeStructure}
+                          {'\n'}<strong>CTA:</strong> {tiktokAnalysisResult.ctaStyle}
+                          {'\n'}<strong>Màu sắc/Grade:</strong> {tiktokAnalysisResult.colorGrade}
+                          {'\n'}<strong>Nhịp độ:</strong> {tiktokAnalysisResult.pacing}
+                        </div>
+                      </div>
+
+                      {/* Scene Beats */}
+                      <h3 style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0ea5e9', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        🎬 Scene Beats ({tiktokAnalysisResult.sceneBeats.length})
+                      </h3>
+                      {tiktokAnalysisResult.sceneBeats.map((beat) => (
+                        <div key={beat.index} className="prompt-card" style={{ animationDelay: `${beat.index * 60}ms`, borderColor: 'rgba(14,165,233,0.25)' }}>
+                          <div className="prompt-card-header">
+                            <div className="prompt-card-badge" style={{ color: '#0ea5e9', borderColor: 'rgba(14,165,233,0.3)' }}>
+                              <Film size={14} />
+                              {beat.beatName}
+                            </div>
+                            <span className="prompt-card-time">{beat.timestamp}</span>
+                          </div>
+                          <div className="prompt-card-body">
+                            <CopyButton text={[
+                              `[${beat.beatName}] ${beat.timestamp}`,
+                              `Mô tả: ${beat.description}`,
+                              `Camera: ${beat.cameraHint}`,
+                              `Narration: ${beat.narrationHint}`,
+                            ].join('\n')} />
+                            <div className="prompt-text">
+                              {beat.description}
+                              {beat.cameraHint ? <>{'\n'}<strong>Camera:</strong> {beat.cameraHint}</> : null}
+                              {beat.narrationHint ? <>{'\n'}<strong>Narration:</strong> {beat.narrationHint}</> : null}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Generated Script */}
+                      {tiktokAnalysisResult.generatedScript && (
+                        <>
+                          <h3 style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0ea5e9', marginBottom: 10, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                            📝 Kịch bản đề xuất
+                          </h3>
+                          <div className="prompt-card" style={{ borderColor: 'rgba(14,165,233,0.35)' }}>
+                            <div className="prompt-card-body">
+                              <CopyButton text={tiktokAnalysisResult.generatedScript} />
+                              <div className="prompt-text" style={{ whiteSpace: 'pre-wrap', lineHeight: 1.85 }}>
+                                {tiktokAnalysisResult.generatedScript}
+                              </div>
+                            </div>
+                          </div>
+                        </>
                       )}
                     </>
                   )}
