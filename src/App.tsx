@@ -25,10 +25,13 @@ interface KeyframePrompt {
 interface ScenePrompt {
   index: number
   timeRange: string
+  subject: string
   narrative: string
   startPose: string
   endPose: string
+  composition: string
   cameraMovement: string
+  lighting: string
   locationFlow?: string
   fullPrompt: string
 }
@@ -2030,24 +2033,28 @@ ASPECT RATIO: ${aspectRatio}`,
       )
       const timeRange = toSafeString(sc.timeRange, `${startSec}s-${endSec}s`)
 
+      const lighting = keyframes[i]?.lighting || ''
+      const composition = keyframes[i]?.camera || ''
+      const subject = typeof parsed.masterDNA === 'string' ? parsed.masterDNA.trim() : ''
+
       return {
         index: i,
         timeRange,
+        subject,
         narrative,
         startPose,
         endPose,
+        composition,
         cameraMovement,
+        lighting,
         locationFlow,
-        fullPrompt: `${narrative}
-START_POSE [KF${i + 1}]: ${startPose}
-END_POSE [KF${i + 2}]: ${endPose}
-      START_LOCATION [KF${i + 1}]: ${startLocation}
-      END_LOCATION [KF${i + 2}]: ${endLocation}
-      LOCATION_FLOW: ${locationFlow}
-CAMERA: ${cameraMovement}
-ASPECT_RATIO: ${aspectRatio}
-DURATION: 8 seconds
-FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
+        fullPrompt: [
+          subject ? `SUBJECT: ${subject}` : '',
+          `ACTION: ${narrative}`,
+          composition ? `COMPOSITION: ${composition}` : '',
+          `CAMERA: ${cameraMovement}`,
+          lighting ? `LIGHTING: ${lighting}` : '',
+        ].filter(Boolean).join('\n'),
       }
     })
 
@@ -2441,6 +2448,8 @@ function buildPromptResultFromHistoryItem(
   const normalizedKeyframeCount = Math.max(keyframeCount, sceneCount + 1)
   const normalizedSceneCount = Math.max(sceneCount, normalizedKeyframeCount - 1)
 
+  const masterDNA = toHistoryString(promptRecord.masterDNA, buildCharacterDNA(item.notes || '', resolvedType))
+
   const fallbackLocation = (index: number) => {
     if (generatedLocations.length > 0) {
       return generatedLocations[index % generatedLocations.length]
@@ -2502,34 +2511,34 @@ ASPECT RATIO: ${aspectRatio}`,
       `Retention beat ${index + 1}: smooth transition from keyframe ${index + 1} to keyframe ${index + 2}.`,
     )
     const cameraMovement = toHistoryString(raw.cameraMovement, 'Stable cinematic move with clean social-native pacing')
+    const lighting = toHistoryString(raw.lighting, keyframes[index]?.lighting || '')
+    const composition = toHistoryString(raw.composition, keyframes[index]?.camera || '')
+    const subject = toHistoryString(raw.subject, masterDNA)
     const timeRange = toHistoryString(raw.timeRange, `${startSec}s-${endSec}s`)
-    const fullPrompt = toHistoryString(
-      raw.fullPrompt,
-      `${narrative}
-START_POSE [KF${index + 1}]: ${startPose}
-END_POSE [KF${index + 2}]: ${endPose}
-    START_LOCATION [KF${index + 1}]: ${startLocation}
-    END_LOCATION [KF${index + 2}]: ${endLocation}
-    LOCATION_FLOW: ${locationFlow}
-CAMERA: ${cameraMovement}
-ASPECT_RATIO: ${aspectRatio}
-DURATION: 8 seconds
-FORMAT: Veo 3.1 first-frame → last-frame interpolation`,
-    )
+    const builtFullPrompt = [
+      subject ? `SUBJECT: ${subject}` : '',
+      `ACTION: ${narrative}`,
+      composition ? `COMPOSITION: ${composition}` : '',
+      `CAMERA: ${cameraMovement}`,
+      lighting ? `LIGHTING: ${lighting}` : '',
+    ].filter(Boolean).join('\n')
+    const fullPrompt = toHistoryString(raw.fullPrompt, builtFullPrompt)
 
     return {
       index,
       timeRange,
+      subject,
       narrative,
       startPose,
       endPose,
+      composition,
       cameraMovement,
+      lighting,
       locationFlow,
       fullPrompt,
     }
   })
 
-  const masterDNA = toHistoryString(promptRecord.masterDNA, buildCharacterDNA(item.notes || '', resolvedType))
   const createImagePrompt = toHistoryString(
     promptRecord.createImagePrompt,
     buildCreateImagePrompt(resolvedType, item.notes || ''),
@@ -4672,12 +4681,11 @@ export default function App() {
                           <div className="prompt-card-body">
                             <CopyButton text={sc.fullPrompt} />
                             <div className="prompt-text">
-                              <strong>NARRATIVE:</strong> {sc.narrative}
-                              {'\n'}<strong>START_POSE:</strong> {sc.startPose}
-                              {'\n'}<strong>END_POSE:</strong> {sc.endPose}
-                              {'\n'}<strong>LOCATION FLOW:</strong> {sc.locationFlow || '-'}
+                              {sc.subject ? <><strong>SUBJECT:</strong> {sc.subject}{'\n'}</> : null}
+                              <strong>ACTION:</strong> {sc.narrative}
+                              {sc.composition ? <>{'\n'}<strong>COMPOSITION:</strong> {sc.composition}</> : null}
                               {'\n'}<strong>CAMERA:</strong> {sc.cameraMovement}
-                              {'\n'}<strong>FORMAT:</strong> Veo 3.1 first-frame → last-frame (8s)
+                              {sc.lighting ? <>{'\n'}<strong>LIGHTING:</strong> {sc.lighting}</> : null}
                             </div>
                           </div>
                         </div>
