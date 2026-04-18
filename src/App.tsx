@@ -1667,7 +1667,15 @@ ${primaryPlannedLocation.length > 0
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
 
-CRITICAL RULES (NON-NEGOTIABLE):
+${notes ? `⚡ USER NOTES PRIORITY MODE — ACTIVE
+Rule 30 is the PRIMARY creative directive for this run.
+Rules 9, 11, 13, 17–20, 23–29 (style, tone, location, camera, format, narrative, pacing)
+are SUBORDINATE to User Notes wherever user intent conflicts with defaults.
+Apply User Notes first; only fall back to defaults when User Notes are silent on a dimension.
+Truly non-negotiable: Rule 31 (celebrity safety), output schema structure, scene/keyframe counts,
+and VEO interpolation continuity (Rules 1, 2, 12).` : ''}
+
+CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style/format/location conflict; Rules 1, 2, 12, 31 and schema are always enforced]:
 1. Each scene is exactly 8 seconds, using Veo 3.1 first-frame + last-frame interpolation.
 2. Keyframe chain must be SEAMLESS: last frame of scene N = first frame of scene N+1.
 3. Character identity must be perfectly consistent across all keyframes (face, body proportions, hair, skin tone).
@@ -1676,7 +1684,7 @@ CRITICAL RULES (NON-NEGOTIABLE):
 6. Scene 1 must create a strong visual hook in the first 1-3 seconds with immediate product readability.
 7. Infer scene context from garment/product characteristics, content type, and user notes; avoid generic preset randomness.
 8. NEVER use background, location, props, or lighting from the FACE reference image. Face image is identity-only.
-9. Keep one primary location coherent across all keyframes/scenes; do not change location unless user explicitly requests a transition.
+9. Keep one primary location coherent across all keyframes/scenes; do not change location unless user explicitly requests a transition. [SUBORDINATE to Rule 30 — User Notes may specify multi-location or location changes]
 10. Prompt detail quality must follow Veo best practice: each keyframe/scenes should be specific on Subject, Action, Camera, Composition, Style, and Ambiance/Lighting.
 11. Camera grammar must stay coherent: one dominant camera move per 8s scene, no chaotic mixed camera instructions.
 12. First-last-frame interpolation safety is mandatory: adjacent keyframes must use micro-progression (small pose delta, stable framing axis, no sudden body teleport).
@@ -1686,18 +1694,18 @@ CRITICAL RULES (NON-NEGOTIABLE):
 16. AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID + SAME OUTFIT TYPE - Never reuse locations listed in either location-history section above.
 17. ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT - Use the Diversity seed to generate fresh concepts; do not duplicate ACTION, LOCATION, CAMERA, NARRATIVE in one output.
 18. PRODUCT-FIRST COMPOSITION - Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
-19. MOBILE SAFE-FRAME RULE - Keep hero subject in a central safe area and avoid placing critical details at extreme top/bottom edges where TikTok UI/captions can cover them.
-20. RETENTION PACING RULE - Avoid static visuals for too long; every ~1-2 seconds should include meaningful subject or camera progression.
+19. MOBILE SAFE-FRAME RULE - Keep hero subject in a central safe area and avoid placing critical details at extreme top/bottom edges where TikTok UI/captions can cover them. [SUBORDINATE to Rule 30 — User Notes on framing override this]
+20. RETENTION PACING RULE - Avoid static visuals for too long; every ~1-2 seconds should include meaningful subject or camera progression. [SUBORDINATE to Rule 30 — User Notes on pace/mood override this]
 21. NO VOICE REQUIREMENT - The video must work fully without voiceover/dialogue. Do not rely on spoken lines to deliver value or proof.
 22. AUDIO IS OPTIONAL (IF USED) - Prefer silent-first visual storytelling. If adding SFX/ambience, describe it clearly but keep comprehension independent from audio.
 23. AUTHENTICITY + TRUST - Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
 24. NO-CTA ENDING + TEMPLATE CONSISTENCY - Final scene should land a clean visual payoff with product clarity; explicit CTA is optional and never mandatory.
-25. OOTD FAMILY TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTDMIRROR, enforce mirror fitcheck flow only. For OOTD, enforce single-corner studio flow only. For OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow.
-26. MIRROR FITCHECK SPEC - Use full-body mirror framing, vertical social-native phone aesthetic, visible head-to-toe outfit readability, and ensure no camera/tripod/operator reflection appears in the mirror.
-27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes.
-28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition.
+25. OOTD FAMILY TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTDMIRROR, enforce mirror fitcheck flow only. For OOTD, enforce single-corner studio flow only. For OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow. [SUBORDINATE to Rule 30 — User Notes override format/flow]
+26. MIRROR FITCHECK SPEC - Use full-body mirror framing, vertical social-native phone aesthetic, visible head-to-toe outfit readability, and ensure no camera/tripod/operator reflection appears in the mirror. [SUBORDINATE to Rule 30 — User Notes may modify mirror spec]
+27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes. [SUBORDINATE to Rule 30 — User Notes may modify studio spec]
+28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition. [SUBORDINATE to Rule 30 — User Notes may override style lock]
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
-30. USER NOTES PRIORITY LOCK - When USER NOTES are provided, prioritize and preserve those instructions first across narrative/action/camera/style choices; only override if a mandatory non-negotiable rule, schema, or safety/location constraint conflicts.
+30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default style, tone, format, location, camera, and narrative choices in Rules 5–29 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Rule 31 (celebrity safety), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12) are the only truly non-negotiable constraints.
 31. CELEBRITY / PUBLIC-FIGURE SAFETY LOCK - Never depict/imitate/reference real celebrities/public figures/identifiable persons, never generate deepfake-style impersonation or fake endorsement/dialogue; if user asks for real person, convert to fictional archetype while preserving only general mood/style.
 
 Return STRICT COMPACT JSON only in this schema:
@@ -3224,6 +3232,109 @@ async function saveRecentLocalImagesToIndexedDb(bucket: string, images: RecentLo
 // COMPONENTS
 // ═══════════════════════════════════════════════
 
+function ErrorLogModal({ lines, onClose }: { lines: string[]; onClose: () => void }) {
+  const fullText = lines.join('\n')
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(fullText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // silent
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px',
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: 'var(--card-bg, #1a1a2e)', border: '1px solid var(--border)',
+          borderRadius: 12, maxWidth: 680, width: '100%', maxHeight: '80vh',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 16px', borderBottom: '1px solid var(--border)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertCircle size={16} color="#f87171" />
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#f87171', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Pipeline Error Log
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleCopy}
+              style={{
+                background: copied ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.07)',
+                border: `1px solid ${copied ? 'rgba(34,197,94,0.4)' : 'var(--border)'}`,
+                borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                color: copied ? '#4ade80' : 'var(--text-secondary)',
+                fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: 5,
+              }}
+            >
+              {copied ? <Check size={13} /> : <Copy size={13} />}
+              {copied ? 'Đã copy' : 'Copy log'}
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'rgba(255,255,255,0.07)', border: '1px solid var(--border)',
+                borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+
+        {/* Log lines */}
+        <div style={{ overflow: 'auto', padding: '14px 16px', flex: 1 }}>
+          {lines.length === 0 ? (
+            <p style={{ color: 'var(--text-secondary)', fontSize: '0.78rem' }}>Không có log.</p>
+          ) : (
+            <pre style={{
+              fontSize: '0.72rem', lineHeight: 1.75, color: '#e2e8f0',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0, fontFamily: 'monospace',
+            }}>
+              {lines.map((line, i) => (
+                <span
+                  key={i}
+                  style={{
+                    display: 'block',
+                    color: line.startsWith('[ERROR]') || line.startsWith('✖') ? '#f87171'
+                      : line.startsWith('[RETRY]') ? '#fbbf24'
+                      : line.startsWith('[OK]') ? '#4ade80'
+                      : line.startsWith('[WARN]') ? '#fb923c'
+                      : '#cbd5e1',
+                  }}
+                >
+                  {line}
+                </span>
+              ))}
+            </pre>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -3627,6 +3738,10 @@ export default function App() {
   const [tiktokAnalysisError, setTiktokAnalysisError] = useState('')
   const [tiktokAnalysisResult, setTiktokAnalysisResult] = useState<TikTokAnalysisResult | null>(null)
 
+  // Error log modal
+  const [errorLogLines, setErrorLogLines] = useState<string[]>([])
+  const [showErrorLogModal, setShowErrorLogModal] = useState(false)
+
   // Persist settings
   useEffect(() => { localStorage.setItem('aff_api_key', apiKey) }, [apiKey])
   useEffect(() => { localStorage.setItem('aff_model', model) }, [model])
@@ -3867,6 +3982,7 @@ export default function App() {
 
   // Generate handler
   const handleGenerate = async () => {
+    const MAX_ATTEMPTS = 3
     setLoading(true)
     setSelectedHistoryId(null)
     setLoadingStageIndex(0)
@@ -3876,6 +3992,12 @@ export default function App() {
     })
     setError('')
     setResult(null)
+    setErrorLogLines([])
+
+    const logLines: string[] = []
+    const pushLog = (line: string) => { logLines.push(line) }
+
+    pushLog(`[START] ${new Date().toISOString()} — model=${model} duration=${duration}s type=${contentType}`)
 
     try {
       if (!apiKey.trim()) {
@@ -3887,121 +4009,169 @@ export default function App() {
         ? (productLocationHistory[currentProductImageId] || [])
         : []
 
-      const res = await generateWithGemini(
-        apiKey,
-        model,
-        faceImage,
-        productImage,
-        duration,
-        aspectRatio,
-        notes,
-        contentType,
-        usedLocationsForProduct,
-        outfitTypeLocationHistory,
-        FIXED_AFFILIATE_MODE,
-        FIXED_SALES_TEMPLATE,
-      )
+      let lastAttemptError: Error | null = null
 
-      const resolvedType: ResolvedContentType = res.resolvedContentType
-        || (contentType === 'auto'
-          ? (FIXED_AFFILIATE_MODE === 'strict' ? 'tiktokshop' : 'outfitideas')
-          : contentType)
-
-      res.createImagePrompt = buildCreateImagePrompt(resolvedType, notes)
-      setResult(res)
-      setSelectedContentType(resolvedType)
-      setActiveTab('keyframes')
-      setPromptToast({
-        kind: 'success',
-        message: 'Đã tạo xong Prompt Package. Bạn có thể copy hoặc export ngay.',
-      })
-
-      const generatedLocations = Array.from(
-        new Set(
-          res.keyframes
-            .map((keyframe) => keyframe.location.trim())
-            .filter((location) => location.length > 0)
-        )
-      )
-
-      const promptPackageForHistory = {
-        masterDNA: res.masterDNA,
-        createImagePrompt: res.createImagePrompt || '',
-        keyframes: res.keyframes.map((keyframe) => ({
-          index: keyframe.index,
-          timestamp: keyframe.timestamp,
-          subject: keyframe.subject,
-          action: keyframe.action,
-          location: keyframe.location,
-          camera: keyframe.camera,
-          lighting: keyframe.lighting,
-          style: keyframe.style,
-          fullPrompt: keyframe.fullPrompt,
-        })),
-        scenes: res.scenes.map((scene) => ({
-          index: scene.index,
-          timeRange: scene.timeRange,
-          narrative: scene.narrative,
-          startPose: scene.startPose,
-          endPose: scene.endPose,
-          cameraMovement: scene.cameraMovement,
-          locationFlow: scene.locationFlow || '',
-          fullPrompt: scene.fullPrompt,
-        })),
-      }
-
-      const workHistoryGeneratedAt = Date.now()
-
-      if (generatedLocations.length > 0) {
-        if (currentProductImageId) {
-          setProductLocationHistory((prev) => {
-            const existing = prev[currentProductImageId] || []
-            const merged = Array.from(new Set([...generatedLocations, ...existing]))
-            return {
-              ...prev,
-              [currentProductImageId]: merged.slice(0, MAX_LOCATION_HISTORY_PER_PRODUCT),
-            }
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (attempt > 1) {
+          pushLog(`[RETRY] Attempt ${attempt}/${MAX_ATTEMPTS} — retrying after failure...`)
+          setPromptToast({
+            kind: 'loading',
+            message: `Thử lại lần ${attempt}/${MAX_ATTEMPTS}...`,
           })
+          setLoadingStageIndex(0)
+        } else {
+          pushLog(`[START] Attempt ${attempt}/${MAX_ATTEMPTS}`)
         }
 
-        setOutfitTypeLocationHistory((prev) => {
-          const existing = prev[resolvedType] || []
-          const merged = Array.from(new Set([...generatedLocations, ...existing]))
-          return {
-            ...prev,
-            [resolvedType]: merged.slice(0, MAX_LOCATION_HISTORY_PER_OUTFIT_TYPE),
+        try {
+          const res = await generateWithGemini(
+            apiKey,
+            model,
+            faceImage,
+            productImage,
+            duration,
+            aspectRatio,
+            notes,
+            contentType,
+            usedLocationsForProduct,
+            outfitTypeLocationHistory,
+            FIXED_AFFILIATE_MODE,
+            FIXED_SALES_TEMPLATE,
+          )
+
+          pushLog(`[OK] Attempt ${attempt} succeeded — keyframes=${res.keyframes.length} scenes=${res.scenes.length}`)
+          setErrorLogLines([...logLines])
+
+          const resolvedType: ResolvedContentType = res.resolvedContentType
+            || (contentType === 'auto'
+              ? (FIXED_AFFILIATE_MODE === 'strict' ? 'tiktokshop' : 'outfitideas')
+              : contentType)
+
+          res.createImagePrompt = buildCreateImagePrompt(resolvedType, notes)
+          setResult(res)
+          setSelectedContentType(resolvedType)
+          setActiveTab('keyframes')
+          setPromptToast({
+            kind: 'success',
+            message: `Đã tạo xong Prompt Package${attempt > 1 ? ` (sau ${attempt} lần thử)` : ''}. Bạn có thể copy hoặc export ngay.`,
+          })
+
+          const generatedLocations = Array.from(
+            new Set(
+              res.keyframes
+                .map((keyframe) => keyframe.location.trim())
+                .filter((location) => location.length > 0)
+            )
+          )
+
+          const promptPackageForHistory = {
+            masterDNA: res.masterDNA,
+            createImagePrompt: res.createImagePrompt || '',
+            keyframes: res.keyframes.map((keyframe) => ({
+              index: keyframe.index,
+              timestamp: keyframe.timestamp,
+              subject: keyframe.subject,
+              action: keyframe.action,
+              location: keyframe.location,
+              camera: keyframe.camera,
+              lighting: keyframe.lighting,
+              style: keyframe.style,
+              fullPrompt: keyframe.fullPrompt,
+            })),
+            scenes: res.scenes.map((scene) => ({
+              index: scene.index,
+              timeRange: scene.timeRange,
+              narrative: scene.narrative,
+              startPose: scene.startPose,
+              endPose: scene.endPose,
+              cameraMovement: scene.cameraMovement,
+              locationFlow: scene.locationFlow || '',
+              fullPrompt: scene.fullPrompt,
+            })),
           }
-        })
+
+          const workHistoryGeneratedAt = Date.now()
+
+          if (generatedLocations.length > 0) {
+            if (currentProductImageId) {
+              setProductLocationHistory((prev) => {
+                const existing = prev[currentProductImageId] || []
+                const merged = Array.from(new Set([...generatedLocations, ...existing]))
+                return {
+                  ...prev,
+                  [currentProductImageId]: merged.slice(0, MAX_LOCATION_HISTORY_PER_PRODUCT),
+                }
+              })
+            }
+
+            setOutfitTypeLocationHistory((prev) => {
+              const existing = prev[resolvedType] || []
+              const merged = Array.from(new Set([...generatedLocations, ...existing]))
+              return {
+                ...prev,
+                [resolvedType]: merged.slice(0, MAX_LOCATION_HISTORY_PER_OUTFIT_TYPE),
+              }
+            })
+          }
+
+          void persistWorkHistory({
+            action: 'prompt',
+            model,
+            contentType: resolvedType,
+            notes: notes.trim(),
+            generatedAt: workHistoryGeneratedAt,
+            metadata: {
+              inputContentType: contentType,
+              resolvedContentType: resolvedType,
+              duration,
+              aspectRatio,
+              keyframeCount: res.keyframes.length,
+              sceneCount: res.scenes.length,
+              generatedLocations: generatedLocations.slice(0, 10),
+              hasFaceImage: Boolean(faceImage),
+              hasProductImage: Boolean(productImage),
+              promptPackage: promptPackageForHistory,
+            },
+          })
+            .then(() => loadWorkHistory({ silent: true }))
+            .catch((saveError) => {
+              console.warn(
+                'Could not save prompt work history:',
+                saveError instanceof Error ? saveError.message : saveError
+              )
+            })
+
+          return // success — exit retry loop
+        } catch (attemptErr: any) {
+          const msg = attemptErr?.message || 'Unknown error'
+          pushLog(`✖ [ERROR] Attempt ${attempt} failed: ${msg}`)
+          lastAttemptError = attemptErr instanceof Error ? attemptErr : new Error(msg)
+
+          const isRetryable = !msg.toLowerCase().includes('api key')
+            && !msg.toLowerCase().includes('quota')
+            && !msg.toLowerCase().includes('permission')
+            && attempt < MAX_ATTEMPTS
+
+          if (!isRetryable) {
+            pushLog(`[WARN] Error is not retryable or max attempts reached. Stopping.`)
+            break
+          }
+        }
       }
 
-      void persistWorkHistory({
-        action: 'prompt',
-        model,
-        contentType: resolvedType,
-        notes: notes.trim(),
-        generatedAt: workHistoryGeneratedAt,
-        metadata: {
-          inputContentType: contentType,
-          resolvedContentType: resolvedType,
-          duration,
-          aspectRatio,
-          keyframeCount: res.keyframes.length,
-          sceneCount: res.scenes.length,
-          generatedLocations: generatedLocations.slice(0, 10),
-          hasFaceImage: Boolean(faceImage),
-          hasProductImage: Boolean(productImage),
-          promptPackage: promptPackageForHistory,
-        },
+      // All attempts failed
+      const finalMsg = lastAttemptError?.message || 'Failed to generate prompts'
+      pushLog(`[ERROR] All ${MAX_ATTEMPTS} attempts failed. Last error: ${finalMsg}`)
+      setErrorLogLines([...logLines])
+      setError(finalMsg)
+      setPromptToast({
+        kind: 'error',
+        message: finalMsg,
       })
-        .then(() => loadWorkHistory({ silent: true }))
-        .catch((saveError) => {
-          console.warn(
-            'Could not save prompt work history:',
-            saveError instanceof Error ? saveError.message : saveError
-          )
-        })
     } catch (err: any) {
       const message = err?.message || 'Failed to generate prompts'
+      pushLog(`[ERROR] Fatal: ${message}`)
+      setErrorLogLines([...logLines])
       setError(message)
       setPromptToast({
         kind: 'error',
@@ -4314,6 +4484,9 @@ export default function App() {
 
   return (
     <>
+      {showErrorLogModal && (
+        <ErrorLogModal lines={errorLogLines} onClose={() => setShowErrorLogModal(false)} />
+      )}
       <div className="app-bg" />
       <div className="app-container">
         {/* Header */}
@@ -4817,9 +4990,26 @@ export default function App() {
             </div>
 
             {error && (
-              <div className="error-message">
-                <AlertCircle size={16} />
-                {error}
+              <div className="error-message" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%' }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 2 }} />
+                  <span style={{ flex: 1 }}>{error}</span>
+                </div>
+                {errorLogLines.length > 0 && (
+                  <button
+                    onClick={() => setShowErrorLogModal(true)}
+                    style={{
+                      marginLeft: 24, background: 'rgba(248,113,113,0.12)',
+                      border: '1px solid rgba(248,113,113,0.35)',
+                      borderRadius: 6, padding: '4px 12px', cursor: 'pointer',
+                      color: '#f87171', fontSize: '0.72rem', fontWeight: 600,
+                      display: 'flex', alignItems: 'center', gap: 5,
+                    }}
+                  >
+                    <AlertCircle size={12} />
+                    Xem log lỗi ({errorLogLines.length} dòng)
+                  </button>
+                )}
               </div>
             )}
           </div>
