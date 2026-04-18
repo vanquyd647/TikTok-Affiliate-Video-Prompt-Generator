@@ -326,6 +326,12 @@ const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use 
 - Avoid discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - Keep subject, action, camera, composition, and ambiance explicit for each keyframe/scene prompt.`
 
+const CELEBRITY_POLICY_GUARDRAILS = `- Do NOT depict, imitate, or reference any real celebrity, public figure, influencer, or identifiable real person (living or deceased).
+- Do NOT generate deepfake-style likeness, impersonation, fake endorsement, or fabricated quote/dialogue from real people.
+- If user notes request a real person, rewrite to a fictional character archetype with similar vibe only (no name, no direct likeness cues).
+- Do NOT claim or imply that generated content is authentic footage of a real person.
+- Keep all human subjects generic/fictional and policy-safe.`
+
 const MOTION_DISCONTINUITY_KEYWORDS = [
   'teleport',
   'teleports',
@@ -566,6 +572,11 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
 • Product name label at top center (clean sans-serif typography)
 • "FRONT" label under left view, "BACK" label under right view
 • Size/material callouts with thin leader lines pointing to key garment details
+
+[POLICY SAFETY]:
+• Never use any real celebrity/public figure/identifiable real person name or likeness cues.
+• If custom notes request a real person, reinterpret as a fictional model archetype with similar mood only.
+• Do not imply endorsement, impersonation, or authentic real-person footage.
 
 ${notes ? `[CUSTOM NOTES]: ${notes}` : ''}
 
@@ -1290,6 +1301,9 @@ ${TIKTOK_OBSERVED_SIGNAL_BASELINE}
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
+CELEBRITY / REAL-PERSON SAFETY GUARDRAILS (MANDATORY):
+${CELEBRITY_POLICY_GUARDRAILS}
+
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
 
@@ -1305,6 +1319,7 @@ RULES:
 - For OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
 - Build action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
 - Plan for retention arc: Hook -> Value -> Proof -> Close.
+- Enforce celebrity/public-figure safety guardrails strictly.
 
 Output STRICT JSON only:
 {
@@ -1610,6 +1625,9 @@ ${contentTypeNativeSignalRules}
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
+CELEBRITY / REAL-PERSON SAFETY GUARDRAILS (MANDATORY):
+${CELEBRITY_POLICY_GUARDRAILS}
+
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsProductPrompt}
 
@@ -1655,6 +1673,7 @@ CRITICAL RULES (NON-NEGOTIABLE):
 28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition.
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
 30. USER NOTES PRIORITY LOCK - When USER NOTES are provided, prioritize and preserve those instructions first across narrative/action/camera/style choices; only override if a mandatory non-negotiable rule, schema, or safety/location constraint conflicts.
+31. CELEBRITY / PUBLIC-FIGURE SAFETY LOCK - Never depict/imitate/reference real celebrities/public figures/identifiable persons, never generate deepfake-style impersonation or fake endorsement/dialogue; if user asks for real person, convert to fictional archetype while preserving only general mood/style.
 
 Return STRICT COMPACT JSON only in this schema:
 {
@@ -1714,7 +1733,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
       const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
 
   Validate and repair the draft package to satisfy all constraints below:
-  - Enforce CRITICAL RULES 1..30 exactly as defined in package generation stage.
+  - Enforce CRITICAL RULES 1..31 exactly as defined in package generation stage.
   - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
   - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
   - AI must choose fresh locations itself and must avoid all locations listed in location-history constraints.
@@ -1742,6 +1761,9 @@ ${contentTypeNativeSignalRules}
 
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
+
+CELEBRITY / REAL-PERSON SAFETY GUARDRAILS (MANDATORY):
+${CELEBRITY_POLICY_GUARDRAILS}
 
 Return STRICT JSON only, same schema:
 {
@@ -1777,6 +1799,7 @@ TASK:
 - Repair ONLY location-related fields so the package satisfies constraints.
 - Keep masterDNA, actions, camera, lighting, style, and scene pacing unchanged unless absolutely necessary for continuity.
 - Enforce ONE primary location across all keyframes/scenes.
+- Preserve celebrity/public-figure safety guardrails (no real-person likeness or impersonation cues).
 
 LOCATION CONSTRAINTS:
 - Scope strictly Vietnam/China/South Korea.
@@ -1832,6 +1855,7 @@ TASK:
 - Repair ONLY motion/camera continuity fields so interpolation between keyframes is physically plausible.
 - Keep location, character identity, garment fidelity, and style lock unchanged.
 - Maintain existing story arc and product-first composition.
+- Preserve celebrity/public-figure safety guardrails (no real-person likeness or impersonation cues).
 
 INTERPOLATION CONTINUITY REQUIREMENTS:
 - Adjacent keyframes must be micro-progression, not abrupt pose jumps.
@@ -1844,6 +1868,9 @@ ${contentTypeNativeSignalRules}
 
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
+
+CELEBRITY / REAL-PERSON SAFETY GUARDRAILS (MANDATORY):
+${CELEBRITY_POLICY_GUARDRAILS}
 
 FAILED VALIDATION REASON:
 ${strictMotionValidation.reason || 'unknown'}
@@ -2658,6 +2685,7 @@ TASK:
   3) "hook": one short hook sentence.
   4) "cta": one short call-to-action sentence.
 - Title must include product intent and buying motivation, avoid spammy overclaims.
+- Do not reference, imitate, or imply endorsement from any real celebrity/public figure/identifiable person.
 - ${buildSeoToneHint(salesTemplate)}
 
 Return JSON only with this exact schema:
@@ -2810,6 +2838,7 @@ TASK:
   * 15-24s: social proof / usage context
   * 24-30s: CTA
 - Tone must be natural, trust-building, and conversion-friendly.
+- Do not include or imply any real celebrity/public figure/identifiable person, fake endorsement, or impersonation cues.
 - ${buildVoiceoverToneHint(salesTemplate)}
 
 Return JSON only with this exact schema:
