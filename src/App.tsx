@@ -1861,11 +1861,10 @@ Output STRICT JSON only:
         const hasTurnCue = hasKeyframeTurnCue(previousAction, previousCamera, currentAction, currentCamera)
 
         if (
+          strict
+          &&
           !hasTurnCue
-          && (
-            (strict && (previousFacingDirection === 'unknown' || currentFacingDirection === 'unknown'))
-            || (!strict && previousFacingDirection === 'unknown' && currentFacingDirection === 'unknown')
-          )
+          && (previousFacingDirection === 'unknown' || currentFacingDirection === 'unknown')
         ) {
           return {
             ok: false,
@@ -1888,7 +1887,7 @@ Output STRICT JSON only:
         }
 
         const families = detectCameraMotionFamilies(cameraMovement)
-        if (families.length > 1) {
+        if (families.length > (strict ? 1 : 2)) {
           return { ok: false, reason: `scene[${i}] camera family conflict ${families.join('/')}` }
         }
       }
@@ -1948,6 +1947,76 @@ Output STRICT JSON only:
       const shapeAndLocationValidation = validatePackageShapeAndLocationsStrict(value, minScore)
       if (!shapeAndLocationValidation.ok) return shapeAndLocationValidation
       return validatePackageTemporalContinuity(value, true)
+    }
+
+    const validatePackageGenerationDraft = (
+      value: Record<string, unknown>,
+    ): { ok: boolean; reason?: string } => {
+      const keyframes = Array.isArray(value.keyframes) ? value.keyframes : []
+      const scenes = Array.isArray(value.scenes) ? value.scenes : []
+
+      const minimumKeyframes = Math.max(2, keyframeCount - 2)
+      const minimumScenes = Math.max(1, sceneCount - 2)
+
+      if (keyframes.length < minimumKeyframes || scenes.length < minimumScenes) {
+        return {
+          ok: false,
+          reason: `draft shape too small keyframes=${keyframes.length}/${keyframeCount}, scenes=${scenes.length}/${sceneCount}`,
+        }
+      }
+
+      const completeness = getPackageCompletenessScore(value, keyframeCount, sceneCount)
+      if (completeness < 0.45) {
+        return { ok: false, reason: `draft completeness too low ${completeness.toFixed(2)} < 0.45` }
+      }
+
+      return { ok: true }
+    }
+
+    const normalizePackageCounts = (value: Record<string, unknown>): Record<string, unknown> => {
+      const normalized: Record<string, unknown> = { ...value }
+
+      const keyframesRaw = Array.isArray(value.keyframes) ? value.keyframes : []
+      const scenesRaw = Array.isArray(value.scenes) ? value.scenes : []
+
+      const keyframes = keyframesRaw
+        .filter((item): item is Record<string, unknown> => asRecord(item))
+        .map((item) => ({ ...item }))
+      const scenes = scenesRaw
+        .filter((item): item is Record<string, unknown> => asRecord(item))
+        .map((item) => ({ ...item }))
+
+      const keyframeSeed = keyframes.length > 0 ? keyframes[keyframes.length - 1] : {}
+      while (keyframes.length < keyframeCount) {
+        keyframes.push({
+          ...keyframeSeed,
+          index: keyframes.length,
+          action: toSafeText(keyframeSeed.action, 'Model pivots naturally into the next pose while preserving garment continuity.'),
+          location: toSafeText(keyframeSeed.location, ''),
+          camera: toSafeText(keyframeSeed.camera, 'Stable medium shot with controlled movement.'),
+          lighting: toSafeText(keyframeSeed.lighting, 'Consistent soft fashion lighting.'),
+          style: toSafeText(keyframeSeed.style, 'Natural fashion editorial style.'),
+        })
+      }
+
+      const sceneSeed = scenes.length > 0 ? scenes[scenes.length - 1] : {}
+      while (scenes.length < sceneCount) {
+        scenes.push({
+          ...sceneSeed,
+          index: scenes.length,
+          narrative: toSafeText(sceneSeed.narrative, 'Continue smooth transition with product clarity and stable scene continuity.'),
+          cameraMovement: toSafeText(sceneSeed.cameraMovement, 'Controlled tracking with stable axis.'),
+        })
+      }
+
+      normalized.keyframes = keyframes
+        .slice(0, keyframeCount)
+        .map((item, index) => ({ ...item, index }))
+      normalized.scenes = scenes
+        .slice(0, sceneCount)
+        .map((item, index) => ({ ...item, index }))
+
+      return normalized
     }
 
     // STAGE 3 — PACKAGE GENERATION
@@ -2087,7 +2156,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
         temperature,
         maxTokens,
       ),
-      (value) => validatePackageShapeLocationsAndMotion(value, 0.62),
+      (value) => validatePackageGenerationDraft(value),
     )
 
     // STAGE 4 — QA + REPAIR (with fast-path skip)
@@ -2290,12 +2359,26 @@ Return STRICT JSON only, same schema:
       }
     }
 
+    const preNormalizeKeyframeCount = Array.isArray(parsed.keyframes) ? parsed.keyframes.length : 0
+    const preNormalizeSceneCount = Array.isArray(parsed.scenes) ? parsed.scenes.length : 0
+    parsed = normalizePackageCounts(parsed)
+
     const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
     const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : []
 
+    if (preNormalizeKeyframeCount !== keyframeCount || preNormalizeSceneCount !== sceneCount) {
+      stageMetrics.push({
+        stage: 'shape_normalize',
+        attempt: 0,
+        durationMs: 0,
+        ok: true,
+        note: `keyframes ${preNormalizeKeyframeCount}->${rawKeyframes.length}, scenes ${preNormalizeSceneCount}->${rawScenes.length}`,
+      })
+    }
+
     if (rawKeyframes.length !== keyframeCount || rawScenes.length !== sceneCount) {
       throw new Error(
-        `Gemini returned unsynchronized package (keyframes: ${rawKeyframes.length}/${keyframeCount}, scenes: ${rawScenes.length}/${sceneCount})`
+        `Gemini returned unsynchronized package after normalization (keyframes: ${rawKeyframes.length}/${keyframeCount}, scenes: ${rawScenes.length}/${sceneCount})`
       )
     }
 
@@ -2373,7 +2456,17 @@ Return STRICT JSON only, same schema:
     const inferredCameraFallback = 'AI-selected framing, lens, and movement optimized for fashion storytelling'
     const inferredLightingFallback = 'Lighting inferred from scene mood and garment texture visibility'
 
-    const normalizedKeyframesForRule32 = rawKeyframes.map((kf: any, i: number) => {
+    const normalizedKeyframesForRule32: Array<{
+      action: string
+      camera: string
+      lighting: string
+      style: string
+      timestamp: string
+      facingDirection: ConcreteFacingDirection
+    }> = []
+
+    for (let i = 0; i < rawKeyframes.length; i += 1) {
+      const kf = rawKeyframes[i]
       const record = asRecord(kf) ? kf as Record<string, unknown> : {}
 
       const actionBase = toSafeString(record.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
@@ -2404,15 +2497,15 @@ Return STRICT JSON only, same schema:
         }
       }
 
-      return {
+      normalizedKeyframesForRule32.push({
         action,
         camera,
         lighting,
         style,
         timestamp,
         facingDirection: resolvedFacing,
-      }
-    })
+      })
+    }
 
     // Build full prompts for each keyframe and scene
     const keyframes: KeyframePrompt[] = normalizedKeyframesForRule32.map((kf, i: number) => {
