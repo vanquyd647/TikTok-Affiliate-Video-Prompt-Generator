@@ -15,6 +15,7 @@ interface KeyframePrompt {
   timestamp: string
   subject: string
   action: string
+  facingDirection?: 'front' | 'back' | 'left' | 'right' | 'three-quarter-left' | 'three-quarter-right'
   location: string
   camera: string
   lighting: string
@@ -428,6 +429,17 @@ type KeyframeFacingDirection =
   | 'three-quarter-left'
   | 'three-quarter-right'
   | 'unknown'
+
+type ConcreteFacingDirection = Exclude<KeyframeFacingDirection, 'unknown'>
+
+const RULE32_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
+  'front',
+  'three-quarter-left',
+  'back',
+  'three-quarter-right',
+  'left',
+  'right',
+] as const
 
 type ContentStyleLock = 'mirror' | 'studio' | 'flex'
 
@@ -933,6 +945,49 @@ function extractKeyframeFacingDirection(action: unknown, camera?: unknown, facin
   return normalizeFacingDirectionToken(camera)
 }
 
+function toFacingDirectionLabel(direction: ConcreteFacingDirection): string {
+  if (direction === 'three-quarter-left') return 'three-quarter-left'
+  if (direction === 'three-quarter-right') return 'three-quarter-right'
+  return direction
+}
+
+function pickAlternatingFacingDirection(
+  index: number,
+  previous: ConcreteFacingDirection | null,
+  preferred: KeyframeFacingDirection,
+): ConcreteFacingDirection {
+  if (preferred !== 'unknown' && preferred !== previous) {
+    return preferred
+  }
+
+  const start = ((index % RULE32_FACING_SEQUENCE.length) + RULE32_FACING_SEQUENCE.length) % RULE32_FACING_SEQUENCE.length
+  for (let offset = 0; offset < RULE32_FACING_SEQUENCE.length; offset += 1) {
+    const candidate = RULE32_FACING_SEQUENCE[(start + offset) % RULE32_FACING_SEQUENCE.length]
+    if (candidate !== previous) {
+      return candidate
+    }
+  }
+
+  return previous === 'front' ? 'three-quarter-left' : 'front'
+}
+
+function appendSentenceIfMissing(base: string, sentence: string): string {
+  const trimmedBase = base.trim()
+  const trimmedSentence = sentence.trim()
+  if (!trimmedSentence) return trimmedBase
+  if (!trimmedBase) return trimmedSentence
+
+  const normalizedBase = normalizeLocationKey(trimmedBase)
+  const normalizedSentence = normalizeLocationKey(trimmedSentence)
+  if (normalizedSentence.length > 0 && normalizedBase.includes(normalizedSentence)) {
+    return trimmedBase
+  }
+
+  return /[.!?]$/.test(trimmedBase)
+    ? `${trimmedBase} ${trimmedSentence}`
+    : `${trimmedBase}. ${trimmedSentence}`
+}
+
 function hasKeyframeTurnCue(...values: Array<unknown>): boolean {
   const normalized = normalizeLocationKey(values.filter((item): item is string => typeof item === 'string').join(' '))
   if (!normalized) return false
@@ -1304,11 +1359,12 @@ AFFILIATE EXECUTION RULES:
       if (!asRecord(item)) return acc
       let score = 0
       if (toSafeText(item.action).length > 0) score += 1
+      if (normalizeFacingDirectionToken(item.facingDirection) !== 'unknown') score += 1
       if (toSafeText(item.location).length > 0) score += 1
       if (toSafeText(item.camera).length > 0) score += 1
       if (toSafeText(item.lighting).length > 0) score += 1
       if (toSafeText(item.style).length > 0) score += 1
-      return acc + score / 5
+      return acc + score / 6
     }, 0) / Math.max(keyframes.length, 1)
 
     const sceneFieldCoverage = scenes.reduce((acc, item) => {
@@ -1752,6 +1808,11 @@ Output STRICT JSON only:
 
         const action = toSafeText(keyframe.action, '')
         const camera = toSafeText(keyframe.camera, '')
+        const explicitFacingToken = normalizeFacingDirectionToken(keyframe.facingDirection)
+
+        if (strict && explicitFacingToken === 'unknown') {
+          return { ok: false, reason: `keyframe[${i}] missing explicit facingDirection token for Rule 32` }
+        }
 
         if (containsMotionDiscontinuityKeyword(action) || containsMotionDiscontinuityKeyword(camera)) {
           return { ok: false, reason: `keyframe[${i}] contains discontinuity keyword` }
@@ -2312,31 +2373,69 @@ Return STRICT JSON only, same schema:
     const inferredCameraFallback = 'AI-selected framing, lens, and movement optimized for fashion storytelling'
     const inferredLightingFallback = 'Lighting inferred from scene mood and garment texture visibility'
 
-    // Build full prompts for each keyframe and scene
-    const keyframes: KeyframePrompt[] = rawKeyframes.map((kf: any, i: number) => {
-      const subject = `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`
-      const action = toSafeString(kf.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
-      const location = synchronizedKeyframeLocations[i] || primaryResolvedLocation
-      const camera = toSafeString(kf.camera, inferredCameraFallback)
-      const lighting = toSafeString(kf.lighting, inferredLightingFallback)
-      const style = toSafeString(kf.style, fallbackStyleByType[finalContentType as Exclude<ContentType, 'auto'>])
-      const timestamp = toSafeString(kf.timestamp, `${Math.round((i * duration) / (keyframeCount - 1))}s`)
+    const normalizedKeyframesForRule32 = rawKeyframes.map((kf: any, i: number) => {
+      const record = asRecord(kf) ? kf as Record<string, unknown> : {}
+
+      const actionBase = toSafeString(record.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
+      const camera = toSafeString(record.camera, inferredCameraFallback)
+      const lighting = toSafeString(record.lighting, inferredLightingFallback)
+      const style = toSafeString(record.style, fallbackStyleByType[finalContentType as Exclude<ContentType, 'auto'>])
+      const timestamp = toSafeString(record.timestamp, `${Math.round((i * duration) / (keyframeCount - 1))}s`)
+
+      const inferredFacing = extractKeyframeFacingDirection(actionBase, camera, record.facingDirection)
+      const previous = i > 0 ? normalizedKeyframesForRule32[i - 1] : null
+      const previousFacing = previous?.facingDirection || null
+      const resolvedFacing = pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
+
+      const actionHasFacingSignal = normalizeFacingDirectionToken(actionBase) !== 'unknown'
+      const hasTurnSignal = i > 0
+        ? hasKeyframeTurnCue(previous?.action || '', previous?.camera || '', actionBase, camera)
+        : false
+
+      let action = actionBase
+      if (i === 0) {
+        if (!actionHasFacingSignal || inferredFacing !== resolvedFacing) {
+          action = appendSentenceIfMissing(action, `Body facing ${toFacingDirectionLabel(resolvedFacing)}`)
+        }
+      } else {
+        const transitionHint = `Turn/pivot from ${toFacingDirectionLabel(previousFacing || 'front')} to ${toFacingDirectionLabel(resolvedFacing)}, ending ${toFacingDirectionLabel(resolvedFacing)}`
+        if (!actionHasFacingSignal || !hasTurnSignal || inferredFacing !== resolvedFacing) {
+          action = appendSentenceIfMissing(action, transitionHint)
+        }
+      }
 
       return {
-        index: i,
-        timestamp,
-        subject,
         action,
-        location,
         camera,
         lighting,
         style,
+        timestamp,
+        facingDirection: resolvedFacing,
+      }
+    })
+
+    // Build full prompts for each keyframe and scene
+    const keyframes: KeyframePrompt[] = normalizedKeyframesForRule32.map((kf, i: number) => {
+      const subject = `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`
+      const location = synchronizedKeyframeLocations[i] || primaryResolvedLocation
+
+      return {
+        index: i,
+        timestamp: kf.timestamp,
+        subject,
+        action: kf.action,
+        facingDirection: kf.facingDirection,
+        location,
+        camera: kf.camera,
+        lighting: kf.lighting,
+        style: kf.style,
         fullPrompt: `SUBJECT: ${subject}
-ACTION: ${action}
+ACTION: ${kf.action}
+FACING: ${kf.facingDirection}
 LOCATION: ${location}
-CAMERA: ${camera}
-LIGHTING: ${lighting}
-STYLE: ${style}
+CAMERA: ${kf.camera}
+LIGHTING: ${kf.lighting}
+STYLE: ${kf.style}
 ASPECT RATIO: ${aspectRatio}`,
       }
     })
@@ -4376,6 +4475,7 @@ export default function App() {
               timestamp: keyframe.timestamp,
               subject: keyframe.subject,
               action: keyframe.action,
+              facingDirection: keyframe.facingDirection || '',
               location: keyframe.location,
               camera: keyframe.camera,
               lighting: keyframe.lighting,
@@ -5469,6 +5569,7 @@ export default function App() {
                             <div className="prompt-text">
                               <strong>SUBJECT:</strong> {kf.subject}
                               {'\n'}<strong>ACTION:</strong> {kf.action}
+                              {kf.facingDirection ? <>{'\n'}<strong>FACING:</strong> {kf.facingDirection}</> : null}
                               {'\n'}<strong>LOCATION:</strong> {kf.location}
                               {'\n'}<strong>CAMERA:</strong> {kf.camera}
                               {'\n'}<strong>LIGHTING:</strong> {kf.lighting}
