@@ -254,6 +254,7 @@ const CONTENT_TYPES = [
   { value: 'styling', label: 'Styling', icon: Wand2, desc: 'Fashion Styling Tips', color: '#ec4899' },
   { value: 'luxury', label: 'Luxury', icon: Star, desc: 'Old Money / Sophisticated', color: '#8b5cf6' },
   { value: 'streetstyle', label: 'Street Style', icon: TrendingUp, desc: 'Outdoor Urban Candid Walk', color: '#06b6d4' },
+  { value: 'partyoutfit', label: 'Party Outfit', icon: Sparkles, desc: 'Đầm Tiệc / Occasion Dress', color: '#e879f9' },
 ] as const
 
 type ContentType = typeof CONTENT_TYPES[number]['value']
@@ -298,6 +299,7 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'styling',
   'luxury',
   'streetstyle',
+  'partyoutfit',
 ]
 
 const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfitideas', 'review', 'ootd', 'ootdmirror']
@@ -409,6 +411,7 @@ const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
   styling: 'Teach actionable styling transformations that position the product as a high-utility wardrobe solution.',
   luxury: 'Communicate premium quality, silhouette precision, and refined aspirational value that justifies purchase.',
   streetstyle: 'Leverage authentic outdoor urban energy to showcase outfit wearability in real daily-life contexts, driving relatable purchase motivation.',
+  partyoutfit: 'Showcase occasion dress desirability with full silhouette reveal, back-design proof, fabric drape movement, and multi-occasion versatility to drive immediate purchase intent for #damditiec and event-wear buyers.',
 }
 
 function buildSalesTemplateRules(salesTemplate: SalesTemplate): string {
@@ -539,6 +542,14 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'NATURAL MOVEMENT BEAT', emoji: '💫', cameraHint: 'Low-angle tracking shot capturing confident stride, hair movement, and natural body flow' },
     { name: 'STREET STYLE CLOSER', emoji: '🎬', cameraHint: 'Model turning back to camera with casual confidence, wide shot with golden-hour or natural outdoor light' },
   ],
+  partyoutfit: [
+    { name: 'SILHOUETTE REVEAL HOOK', emoji: '✨', cameraHint: 'Slow full-body reveal from hemline up — show dress length, silhouette, and first impression of the occasion look' },
+    { name: 'BACK DESIGN SHOWCASE', emoji: '🔄', cameraHint: 'Model pivots away from camera — slow tilt down back to highlight back cut-out, bow, lace, or corset detail' },
+    { name: 'FABRIC DRAPE MOVEMENT', emoji: '🌸', cameraHint: 'Side-angle medium shot capturing flowing skirt, silk movement, or lace overlay as model takes slow elegant steps' },
+    { name: 'WAIST & FIT PROOF', emoji: '👗', cameraHint: 'Push-in toward waist and hip area to demonstrate tôn dáng (body-flattering fit) and material quality' },
+    { name: 'OCCASION CONTEXT MOMENT', emoji: '🥂', cameraHint: 'Wide shot placing model in aspirational setting (hotel corridor, rooftop, garden venue) to sell the occasion vibe' },
+    { name: 'CONFIDENT OCCASION CLOSER', emoji: '🎬', cameraHint: 'Slow 3/4 turn to face camera with poised composure — full-body visible, soft lighting, elegant final pose' },
+  ],
 }
 
 function buildCharacterDNA(notes: string, contentType: ResolvedContentType): string {
@@ -555,6 +566,7 @@ function buildCharacterDNA(notes: string, contentType: ResolvedContentType): str
     styling: 'Expert fashion advisor aesthetic, polished and informative',
     luxury: 'Old money aesthetic, understated elegance, timeless sophistication',
     streetstyle: 'Outdoor urban candid aesthetic, natural movement, real-world street fashion energy',
+    partyoutfit: 'Occasion-dress editorial aesthetic, elegant soft lighting, back-detail and silhouette storytelling, aspirational event setting',
   }
   return `[FACE PRESERVATION]: The model's face must be rendered with exact, hyper-realistic photographic likeness based on the provided face reference image.
 [GARMENT PRESERVATION]: The garment from the product reference image must be preserved EXACTLY — no redesign, no reinterpretation. Prioritize intricate details.
@@ -578,6 +590,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
     styling: 'Fashion Styling Guide — showcase expert outfit coordination and versatility',
     luxury: 'Luxury / Old Money — timeless sophisticated style with understated elegance',
     streetstyle: 'Street Style — outdoor urban candid walk showcasing outfit in real-world daily-life settings',
+    partyoutfit: 'Party Outfit / Occasion Dress — đầm tiệc, corset, silk dress showcase with back-design reveal, silhouette proof, and aspirational event setting',
   }
 
   return `Create a vertical portrait product promotional image (9:16 aspect ratio) for ${contentDesc[contentType]}.
@@ -605,6 +618,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
   contentType === 'athleisure' ? 'Urban sporty-chic, approachable lifestyle.' :
   contentType === 'haul' ? 'Energetic and approachable showcase.' :
   contentType === 'streetstyle' ? 'Outdoor urban candid fashion — natural golden-hour or daylight, street backdrop, authentic movement.' :
+  contentType === 'partyoutfit' ? 'Occasion dress editorial — soft elegant studio or venue lighting, dress movement and back-detail emphasis, aspirational event atmosphere.' :
   'High-end editorial quality.'
 } Shot on Sony A7R IV, 85mm f/1.4 lens, ISO 100.
 
@@ -699,6 +713,15 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
     return `- Street style social grammar: natural outdoor walk, candid urban backdrop, authentic movement energy.
 - Keep full-body outfit visibility high across the timeline — silhouette must be clearly readable in natural/street light.
 - Align visual rhythm with thoitrangnu/streetstyle cluster behavior: walking entrance → outfit proof → candid detail → urban environment moment.`
+  }
+
+  if (contentType === 'partyoutfit') {
+    return `- Occasion dress grammar (#damditiec / #vayditiec cluster): full silhouette reveal → back design showcase → fabric drape movement → waist/fit proof → occasion context → confident closer.
+- MANDATORY back-facing or pivot beat: every partyoutfit video must include at least one keyframe showing the garment\'s back design (the unique selling point most viewers want to verify before buying).
+- Emphasize material-feel cues: lace, silk, corset gọng, flowing layers — these are Vietnamese buyers\' top purchase signals for occasion wear.
+- Location must sell the occasion: hotel corridor, rooftop bar, garden setting, or elegant indoor venue — not street or casual setting.
+- Keep tone aspirational but accessible: đi tiệc, đi biển, đi cưới, cà phê sang — show the dress\'s occasion versatility across at least 2 implied occasions in captions/context.
+- Align with high-view behavior: minimalist caption, visuals carry the message, fabric movement is the hook.`
   }
 
   return `- Keep social-native pacing, clear outfit readability, and practical value demonstration.
@@ -990,7 +1013,7 @@ AFFILIATE EXECUTION RULES:
 
   const pipelineStartedAt = Date.now()
   const stageMetrics: Array<{ stage: string; attempt: number; durationMs: number; ok: boolean; note?: string }> = []
-  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury', 'streetstyle']
+  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury', 'streetstyle', 'partyoutfit']
   const faceImageId = faceImage ? createProductImageId(faceImage) : 'none'
   const productImageId = productImage ? createProductImageId(productImage) : 'none'
   const notesFingerprint = createTextFingerprint(notes)
@@ -2016,6 +2039,7 @@ Return STRICT JSON only, same schema:
       styling: 'Purposeful modeling pose highlighting outfit coordination and styling impact',
       luxury: 'Composed understated movement exuding timeless elegance and quiet confidence',
       streetstyle: 'Natural outdoor walk movement showcasing outfit silhouette and wearability in authentic urban street setting',
+      partyoutfit: 'Elegant full-body occasion dress reveal with back-design pivot and flowing fabric drape movement',
     }
 
     const fallbackStyleByType: Record<Exclude<ContentType, 'auto'>, string> = {
@@ -2031,6 +2055,7 @@ Return STRICT JSON only, same schema:
       styling: 'Expert fashion editorial style, polished and educational',
       luxury: 'Old money sophisticated aesthetic, understated timeless elegance, neutral palette',
       streetstyle: 'Outdoor urban candid street fashion aesthetic, natural daylight or golden hour, authentic movement energy',
+      partyoutfit: 'Occasion dress editorial aesthetic, soft elegant lighting, silhouette and back-detail emphasis, aspirational event venue atmosphere',
     }
 
     const inferredCameraFallback = 'AI-selected framing, lens, and movement optimized for fashion storytelling'
