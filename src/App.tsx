@@ -253,6 +253,7 @@ const CONTENT_TYPES = [
   { value: 'haul', label: 'Haul', icon: Layers, desc: 'Try-On / Collection Showcase', color: '#f59e0b' },
   { value: 'styling', label: 'Styling', icon: Wand2, desc: 'Fashion Styling Tips', color: '#ec4899' },
   { value: 'luxury', label: 'Luxury', icon: Star, desc: 'Old Money / Sophisticated', color: '#8b5cf6' },
+  { value: 'streetstyle', label: 'Street Style', icon: TrendingUp, desc: 'Outdoor Urban Candid Walk', color: '#06b6d4' },
 ] as const
 
 type ContentType = typeof CONTENT_TYPES[number]['value']
@@ -296,6 +297,7 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'haul',
   'styling',
   'luxury',
+  'streetstyle',
 ]
 
 const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfitideas', 'review', 'ootd', 'ootdmirror']
@@ -405,6 +407,7 @@ const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
   haul: 'Showcase variety and excitement with clear piece-by-piece value, fit proof, and purchasing motivation.',
   styling: 'Teach actionable styling transformations that position the product as a high-utility wardrobe solution.',
   luxury: 'Communicate premium quality, silhouette precision, and refined aspirational value that justifies purchase.',
+  streetstyle: 'Leverage authentic outdoor urban energy to showcase outfit wearability in real daily-life contexts, driving relatable purchase motivation.',
 }
 
 function buildSalesTemplateRules(salesTemplate: SalesTemplate): string {
@@ -527,6 +530,14 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'COMPOSED CONFIDENCE WALK', emoji: '🌟', cameraHint: 'Slow, steady walk with refined poise and grace' },
     { name: 'OLD MONEY AESTHETIC CLOSER', emoji: '🎬', cameraHint: 'Wide shot capturing understated luxury and refinement' },
   ],
+  streetstyle: [
+    { name: 'STREET ENTRANCE HOOK', emoji: '🚶‍♀️', cameraHint: 'Tracking shot following model walking naturally into urban frame from a slight low angle' },
+    { name: 'OUTFIT READABILITY WALK', emoji: '👗', cameraHint: 'Medium-wide tracking shot, model in natural stride showing full outfit silhouette on-street' },
+    { name: 'CANDID DETAIL PAUSE', emoji: '✨', cameraHint: 'Quick push-in on fabric/texture while model pauses naturally at a street corner or doorway' },
+    { name: 'URBAN ENVIRONMENT MOMENT', emoji: '🏙️', cameraHint: 'Lateral pan revealing model against a vibrant street backdrop (cafe wall, alley, market)' },
+    { name: 'NATURAL MOVEMENT BEAT', emoji: '💫', cameraHint: 'Low-angle tracking shot capturing confident stride, hair movement, and natural body flow' },
+    { name: 'STREET STYLE CLOSER', emoji: '🎬', cameraHint: 'Model turning back to camera with casual confidence, wide shot with golden-hour or natural outdoor light' },
+  ],
 }
 
 function buildCharacterDNA(notes: string, contentType: ResolvedContentType): string {
@@ -542,6 +553,7 @@ function buildCharacterDNA(notes: string, contentType: ResolvedContentType): str
     haul: 'Excited energetic unboxing aesthetic, approachable and relatable',
     styling: 'Expert fashion advisor aesthetic, polished and informative',
     luxury: 'Old money aesthetic, understated elegance, timeless sophistication',
+    streetstyle: 'Outdoor urban candid aesthetic, natural movement, real-world street fashion energy',
   }
   return `[FACE PRESERVATION]: The model's face must be rendered with exact, hyper-realistic photographic likeness based on the provided face reference image.
 [GARMENT PRESERVATION]: The garment from the product reference image must be preserved EXACTLY — no redesign, no reinterpretation. Prioritize intricate details.
@@ -564,6 +576,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
     haul: 'Haul Showcase — collection display with multiple outfit combinations',
     styling: 'Fashion Styling Guide — showcase expert outfit coordination and versatility',
     luxury: 'Luxury / Old Money — timeless sophisticated style with understated elegance',
+    streetstyle: 'Street Style — outdoor urban candid walk showcasing outfit in real-world daily-life settings',
   }
 
   return `Create a vertical portrait product promotional image (9:16 aspect ratio) for ${contentDesc[contentType]}.
@@ -590,6 +603,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
   contentType === 'luxury' ? 'Understated elegance, refined luxury presentation.' :
   contentType === 'athleisure' ? 'Urban sporty-chic, approachable lifestyle.' :
   contentType === 'haul' ? 'Energetic and approachable showcase.' :
+  contentType === 'streetstyle' ? 'Outdoor urban candid fashion — natural golden-hour or daylight, street backdrop, authentic movement.' :
   'High-end editorial quality.'
 } Shot on Sony A7R IV, 85mm f/1.4 lens, ISO 100.
 
@@ -678,6 +692,12 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
     return `- TikTok Shop grammar: proof stack (fit + material + usage) then objection handling and conversion intent.
 - Keep product readability dominant and include review or unboxing style trust cues.
 - Maintain conversion-native language and framing consistency across scenes.`
+  }
+
+  if (contentType === 'streetstyle') {
+    return `- Street style social grammar: natural outdoor walk, candid urban backdrop, authentic movement energy.
+- Keep full-body outfit visibility high across the timeline — silhouette must be clearly readable in natural/street light.
+- Align visual rhythm with thoitrangnu/streetstyle cluster behavior: walking entrance → outfit proof → candid detail → urban environment moment.`
   }
 
   return `- Keep social-native pacing, clear outfit readability, and practical value demonstration.
@@ -969,7 +989,7 @@ AFFILIATE EXECUTION RULES:
 
   const pipelineStartedAt = Date.now()
   const stageMetrics: Array<{ stage: string; attempt: number; durationMs: number; ok: boolean; note?: string }> = []
-  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury']
+  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury', 'streetstyle']
   const faceImageId = faceImage ? createProductImageId(faceImage) : 'none'
   const productImageId = productImage ? createProductImageId(productImage) : 'none'
   const notesFingerprint = createTextFingerprint(notes)
@@ -1992,6 +2012,7 @@ Return STRICT JSON only, same schema:
       haul: 'Excited try-on movements showcasing product fit and styling versatility',
       styling: 'Purposeful modeling pose highlighting outfit coordination and styling impact',
       luxury: 'Composed understated movement exuding timeless elegance and quiet confidence',
+      streetstyle: 'Natural outdoor walk movement showcasing outfit silhouette and wearability in authentic urban street setting',
     }
 
     const fallbackStyleByType: Record<Exclude<ContentType, 'auto'>, string> = {
@@ -2006,6 +2027,7 @@ Return STRICT JSON only, same schema:
       haul: 'Energetic colorful unboxing and try-on aesthetic, dynamic lighting',
       styling: 'Expert fashion editorial style, polished and educational',
       luxury: 'Old money sophisticated aesthetic, understated timeless elegance, neutral palette',
+      streetstyle: 'Outdoor urban candid street fashion aesthetic, natural daylight or golden hour, authentic movement energy',
     }
 
     const inferredCameraFallback = 'AI-selected framing, lens, and movement optimized for fashion storytelling'
