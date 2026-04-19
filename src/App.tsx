@@ -351,7 +351,8 @@ const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use 
 - Keep one dominant camera movement per 8s scene; avoid mixed or contradictory camera instructions.
 - Preserve camera axis and movement direction across adjacent scenes unless an explicit turn-around beat is written.
 - Avoid discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
-- Keep subject, action, camera, composition, and ambiance explicit for each keyframe/scene prompt.`
+- Keep subject, action, camera, composition, and ambiance explicit for each keyframe/scene prompt.
+- CONSECUTIVE KEYFRAME FACING LOCK: Two adjacent keyframes MUST NOT show the subject facing the same body direction (e.g., both front-facing, both side-facing). Between any two consecutive keyframes a visible body turn or pivot must occur. This is mandatory because Veo 3.1 has no knowledge of the garment\'s back side; repeating the same facing direction forces the model to hallucinate unknown back-of-garment details, causing severe outfit inconsistency artifacts.`
 
 const CELEBRITY_POLICY_GUARDRAILS = `- Do NOT depict, imitate, or reference any real celebrity, public figure, influencer, or identifiable real person (living or deceased).
 - Do NOT generate deepfake-style likeness, impersonation, fake endorsement, or fabricated quote/dialogue from real people.
@@ -1727,6 +1728,7 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
 30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default style, tone, format, location, camera, and narrative choices in Rules 5–29 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Rule 31 (celebrity safety), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12) are the only truly non-negotiable constraints.
 31. CELEBRITY / PUBLIC-FIGURE SAFETY LOCK - Never depict/imitate/reference real celebrities/public figures/identifiable persons, never generate deepfake-style impersonation or fake endorsement/dialogue; if user asks for real person, convert to fictional archetype while preserving only general mood/style.
+32. CONSECUTIVE KEYFRAME FACING DIRECTION LOCK — Two adjacent keyframes MUST NOT place the subject facing the same body direction (e.g., both fully front-facing, both fully side-facing, both fully rear-facing). Every keyframe transition must include a discernible body turn or pivot. Reason: Veo 3.1 interpolates between frames but has zero reference for the garment back side; repeated same-direction framing forces hallucination of unknown back-of-garment details, causing severe outfit inconsistency. If the narrative requires a held direction, break it with a slight 3/4 pivot before continuing. [ALWAYS ENFORCED — not subordinate to Rule 30]
 
 Return STRICT COMPACT JSON only in this schema:
 {
@@ -1797,6 +1799,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Keep product-first composition and TikTok retention pacing.
   - Use the same primary location lock in all keyframes/scenes.
   - Enforce interpolation safety guardrails: micro-progression between adjacent keyframes, no abrupt opposite camera direction, no discontinuity keywords.
+  - Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.
 
 PRIMARY LOCATION LOCK (MANDATORY):
 ${primaryPlannedLocation.length > 0
