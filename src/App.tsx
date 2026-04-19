@@ -344,10 +344,18 @@ const STUDIO_LOCATION_STYLE_KEYWORDS = [
   'studio mini',
 ] as const
 
-const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster frequently combines #ootd, #outfit, #outfitideas, #xuhuong, #fyp.
-- Fitcheck cluster frequently combines #fitcheck, #ootd, #outfitinspo, #outfitideas.
-- Mirror-fitcheck cluster uses mirror semantics such as mirror fit check, mirror selfie, and reflection-led framing.
-- TikTok Shop fashion cluster often combines #tiktokshop, #review, #unboxing, #xuhuong, and clear value-proof language.`
+const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster is strong and broad (#ootd ~65M, #outfitideas ~23.5M, #fitcheck ~10M).
+- GRWM cluster is mainstream (#grwm ~22.8M) with strong alias behavior (#getreadywithme ~3.4M).
+- Mirror-specific internal labels are weak (#ootdmirror ~1.2K), so natural outputs should anchor to #fitcheck / #mirrorselfie / #ootd language.
+- TikTok Shop + proof content is high-adoption (#tiktokshop ~121M, #review ~16.4M, #unboxing ~17.7M).
+- FYP is too broad (#fyp ~8.7B) and should be secondary only, never the core fashion narrative.
+- Occasion-wear clusters are healthier with Vietnamese tags (#vayditiec ~243K, #damditiec ~119K) than literal #partyoutfit (~105K).`
+
+const NATURALITY_PROMPT_GUARDRAILS = `- Prefer creator-native language and believable social behavior over ad-like perfection.
+- Avoid robotic sequencing terms ("Step 1", "Step 2", "Objective achieved", "conversion beat").
+- Use lived-in micro-actions: outfit adjustment, natural pause, glance, weight shift, fabric touch, candid walkback.
+- Keep transitions motivated by body movement and camera follow, not mechanical choreography.
+- Keep tone conversational, practical, and trust-first; avoid over-scripted cinematic jargon in every line.`
 
 const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use micro-progression between adjacent keyframes (small pose delta, no sudden body jump).
 - Keep one dominant camera movement per 8s scene; avoid mixed or contradictory camera instructions.
@@ -688,7 +696,8 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
   if (contentType === 'ootdmirror') {
     return `- Mirror-first social grammar: mirror fit check, mirror selfie, reflection readability.
 - Keep full-body reflection visible for most of the timeline, with at least one stable fit-check hold.
-- Align visual rhythm with fitcheck cluster behavior: clear silhouette proof before transitions.`
+- Align visual rhythm with fitcheck cluster behavior: clear silhouette proof before transitions.
+- Treat "ootdmirror" as an internal strategy label only; externally mirror the stronger native cluster language (#fitcheck, #mirrorselfie, #ootd, #outfitinspo).`
   }
 
   if (contentType === 'ootd') {
@@ -701,6 +710,12 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
     return `- Outfit ideas grammar: practical mix-and-match sequence, not random cinematic fragments.
 - Include at least one clear before/after styling switch and one save-worthy final composition.
 - Align pacing with fitcheck and outfitinspo behavior seen on TikTok.`
+  }
+
+  if (contentType === 'grwm') {
+    return `- GRWM grammar: natural preparation flow (choose look -> detail check -> ready-to-go payoff), not scripted tutorial voice.
+- Anchor socially recognizable behavior to #grwm and #getreadywithme clusters rather than over-produced cinematic beats.
+- Keep pacing intimate and human: short candid moments, not rigid shot-list execution.`
   }
 
   if (contentType === 'tiktokshop') {
@@ -721,12 +736,80 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
 - Emphasize material-feel cues: lace, silk, corset gọng, flowing layers — these are Vietnamese buyers\' top purchase signals for occasion wear.
 - Location must sell the occasion: hotel corridor, rooftop bar, garden setting, or elegant indoor venue — not street or casual setting.
 - Keep tone aspirational but accessible: đi tiệc, đi biển, đi cưới, cà phê sang — show the dress\'s occasion versatility across at least 2 implied occasions in captions/context.
-- Align with high-view behavior: minimalist caption, visuals carry the message, fabric movement is the hook.`
+- Align with high-view behavior: minimalist caption, visuals carry the message, fabric movement is the hook.
+- Treat "partyoutfit" as internal labeling; prioritize natural Vietnamese occasion-wear semantics (#vayditiec, #damditiec) in scene intent.`
+  }
+
+  if (contentType === 'athleisure') {
+    return `- Athleisure should be styled as everyday wearable movement, not a strict gym ad aesthetic.
+- Blend comfort-proof + street-ready styling with practical scenarios (commute, cafe, quick errand).
+- Because #athleisure is mid-size, pair intent with stronger neighboring clusters like #ootd / #outfitinspo behavior cues.`
+  }
+
+  if (contentType === 'fyp') {
+    return `- FYP is a distribution layer, not a content identity. Build around real fashion story beats first.
+- Keep #fyp behavior as secondary amplification only; primary logic must remain outfit readability + value + proof.
+- Avoid random viral gimmicks that weaken product trust or garment clarity.`
   }
 
   return `- Keep social-native pacing, clear outfit readability, and practical value demonstration.
 - Favor authentic creator-style framing over over-produced ad-like visuals.
 - Maintain hook-to-value-to-proof-to-close structure.`
+}
+
+function buildTikTokTrendAlignmentRules(contentType: ResolvedContentType): string {
+  if (contentType === 'ootdmirror') {
+    return `- Adoption reality: literal #ootdmirror usage is low (~1.2K), so do not force this term in narrative language.
+- Anchor style to strong mirror-fitcheck clusters: #fitcheck (~10M), #ootd (~65M), #outfitinspo (~15M), #mirrorselfie (~431K).
+- Keep mirror framing social-native and candid, not over-directed.`
+  }
+
+  if (contentType === 'partyoutfit') {
+    return `- Adoption reality: #partyoutfit (~105K) is weaker than local occasion tags.
+- Prioritize Vietnamese demand clusters: #vayditiec (~243K) and #damditiec (~119K) for style semantics.
+- Keep desirability cues practical: back detail, drape movement, fit proof, occasion versatility.`
+  }
+
+  if (contentType === 'athleisure') {
+    return `- Adoption reality: #athleisure (~339K) is niche compared to broad women-fashion clusters.
+- Blend athleisure intent with wider wearable behavior from #ootd/#outfitinspo to avoid rigid niche output.
+- Emphasize real-day transitions over performance-only gym choreography.`
+  }
+
+  if (contentType === 'fyp') {
+    return `- Adoption reality: #fyp is extremely broad (~8.7B) and weak as a precise fashion signal.
+- Use #fyp-style pacing as secondary layer only; core narrative must come from concrete fashion clusters and product proof.
+- Never let "viral for viral" override garment readability.`
+  }
+
+  if (contentType === 'grwm') {
+    return `- Mainstream alignment: #grwm (~22.8M) + #getreadywithme (~3.4M) support strong natural routine storytelling.
+- Favor human prep rhythm (micro choices, outfit checks, final confidence moment) over scripted cinematic beats.`
+  }
+
+  if (contentType === 'tiktokshop') {
+    return `- High-adoption commerce alignment: #tiktokshop (~121M) with proof clusters (#review ~16.4M, #unboxing ~17.7M).
+- Keep trust signals visible and practical, avoid over-polished ad scripting.`
+  }
+
+  if (contentType === 'ootd' || contentType === 'outfitideas') {
+    return `- Strong mainstream alignment: #ootd / #outfitideas / #fitcheck clusters are robust and natural for women fashion.
+- Prioritize saveable practical styling and readable silhouette over flashy transitions.`
+  }
+
+  return `- Keep content type execution aligned with high-adoption women-fashion behaviors on TikTok.
+- Prefer native creator realism over rigid template language.`
+}
+
+function formatBeatNameForNarrative(rawName: string): string {
+  const normalized = rawName
+    .trim()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+
+  if (!normalized) return 'Natural fashion beat'
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
 }
 
 function containsMotionDiscontinuityKeyword(value: string): boolean {
@@ -1003,6 +1086,11 @@ AFFILIATE EXECUTION RULES:
         ? formatLocationsForPrompt(locations)
         : `None yet for outfit type ${selectedType.toUpperCase()}`
     })()
+  const requestedTypeTrendAlignmentRules = isAuto
+    ? `- AUTO mode: prefer high-adoption women-fashion clusters (OOTD / OutfitIdeas / Fitcheck / TikTok Shop proof) before niche labels.
+- Do not choose FYP-style generic framing as a primary fashion identity.
+- If a niche internal label is selected, map to natural public-facing hashtag behavior.`
+    : buildTikTokTrendAlignmentRules(contentType as ResolvedContentType)
   const safeJsonStringify = (value: unknown) => {
     try {
       return JSON.stringify(value, null, 2)
@@ -1367,6 +1455,12 @@ ${usedLocationsOutfitTypePrompt}
 OBSERVED TIKTOK FASHION BASELINES:
 ${TIKTOK_OBSERVED_SIGNAL_BASELINE}
 
+REQUESTED TYPE TREND ALIGNMENT:
+${requestedTypeTrendAlignmentRules}
+
+NATURALITY GUARDRAILS (MANDATORY):
+${NATURALITY_PROMPT_GUARDRAILS}
+
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
@@ -1388,6 +1482,7 @@ RULES:
 - For OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
 - Build action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
 - Plan for retention arc: Hook -> Value -> Proof -> Close.
+- If content type label is niche or internal, express the plan using stronger natural TikTok behavior clusters.
 - Enforce celebrity/public-figure safety guardrails strictly.
 
 Output STRICT JSON only:
@@ -1464,6 +1559,7 @@ Output STRICT JSON only:
     const finalResolvedType = finalContentType as ResolvedContentType
     const finalStyleLock = getContentTypeStyleLock(finalResolvedType)
     const contentTypeNativeSignalRules = buildTikTokNativeSignalRules(finalResolvedType)
+    const finalTypeTrendAlignmentRules = buildTikTokTrendAlignmentRules(finalResolvedType)
 
     const affiliateObjectiveForFinal = AFFILIATE_VIDEO_OBJECTIVES[finalResolvedType]
     const usedLocationsForFinalOutfitType = normalizedUsedLocationsByOutfitType[finalResolvedType] || []
@@ -1691,6 +1787,12 @@ ${TIKTOK_OBSERVED_SIGNAL_BASELINE}
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
 
+CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
+${finalTypeTrendAlignmentRules}
+
+NATURALITY GUARDRAILS (MANDATORY):
+${NATURALITY_PROMPT_GUARDRAILS}
+
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
@@ -1838,6 +1940,12 @@ ${safeJsonStringify(draftPackage)}
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
 
+CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
+${finalTypeTrendAlignmentRules}
+
+NATURALITY GUARDRAILS (MANDATORY):
+${NATURALITY_PROMPT_GUARDRAILS}
+
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
@@ -1944,6 +2052,12 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
+
+CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
+${finalTypeTrendAlignmentRules}
+
+NATURALITY GUARDRAILS (MANDATORY):
+${NATURALITY_PROMPT_GUARDRAILS}
 
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
@@ -2101,11 +2215,14 @@ ASPECT RATIO: ${aspectRatio}`,
         ? `Hold location: ${startLocation}`
         : `${startLocation} -> ${endLocation}`
       const beatIndex = i % SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>].length
+      const beatLabel = formatBeatNameForNarrative(
+        SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].name
+      )
       const narrative = toSafeString(
         sc.narrative,
         normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
-          ? `${SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].name}. Keep the scene fully at ${startLocation} while the model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
-          : `${SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].name}. Transition location naturally from ${startLocation} to ${endLocation} while keeping smooth pose continuity over ${endSec - startSec} seconds.`
+          ? `${beatLabel}. Keep the scene fully at ${startLocation} while the model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
+          : `${beatLabel}. Transition location naturally from ${startLocation} to ${endLocation} while keeping smooth pose continuity over ${endSec - startSec} seconds.`
       )
       const cameraMovement = toSafeString(
         sc.cameraMovement,
