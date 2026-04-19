@@ -362,7 +362,9 @@ const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use 
 - Preserve camera axis and movement direction across adjacent scenes unless an explicit turn-around beat is written.
 - Avoid discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - Keep subject, action, camera, composition, and ambiance explicit for each keyframe/scene prompt.
-- CONSECUTIVE KEYFRAME FACING LOCK: Two adjacent keyframes MUST NOT show the subject facing the same body direction (e.g., both front-facing, both side-facing). Between any two consecutive keyframes a visible body turn or pivot must occur. This is mandatory because Veo 3.1 has no knowledge of the garment\'s back side; repeating the same facing direction forces the model to hallucinate unknown back-of-garment details, causing severe outfit inconsistency artifacts.`
+- CONSECUTIVE KEYFRAME FACING LOCK: Two adjacent keyframes MUST NOT show the subject facing the same body direction (e.g., both front-facing, both side-facing). Between any two consecutive keyframes a visible body turn or pivot must occur.
+- FACING TAG CLARITY RULE: Every keyframe action should explicitly encode body facing (front-facing, left-facing, right-facing, back-facing, or 3/4 variants) so adjacent turns are unambiguous.
+- This is mandatory because Veo 3.1 has no knowledge of the garment\'s back side; repeating the same facing direction forces the model to hallucinate unknown back-of-garment details, causing severe outfit inconsistency artifacts.`
 
 const CELEBRITY_POLICY_GUARDRAILS = `- Do NOT depict, imitate, or reference any real celebrity, public figure, influencer, or identifiable real person (living or deceased).
 - Do NOT generate deepfake-style likeness, impersonation, fake endorsement, or fabricated quote/dialogue from real people.
@@ -394,6 +396,38 @@ const CAMERA_MOTION_FAMILY_KEYWORDS: Record<string, readonly string[]> = {
   zoom: ['zoom', 'zoom in', 'zoom out'],
   handheld: ['handheld', 'hand held', 'shaky cam'],
 }
+
+const KEYFRAME_TURN_CUE_KEYWORDS = [
+  'turn',
+  'pivot',
+  'rotate',
+  'rotation',
+  'swivel',
+  'spin',
+  'twirl',
+  'quarter turn',
+  'half turn',
+  '3/4 turn',
+  'three quarter turn',
+  'look back',
+  'over shoulder',
+  'turn away',
+  'turn toward',
+  'xoay',
+  'quay',
+  'nghieng',
+  'quay lung',
+  'doi lung',
+] as const
+
+type KeyframeFacingDirection =
+  | 'front'
+  | 'back'
+  | 'left'
+  | 'right'
+  | 'three-quarter-left'
+  | 'three-quarter-right'
+  | 'unknown'
 
 type ContentStyleLock = 'mirror' | 'studio' | 'flex'
 
@@ -860,6 +894,50 @@ function isOppositeMotionDirection(
     || (previous === 'clockwise' && current === 'counterclockwise')
     || (previous === 'counterclockwise' && current === 'clockwise')
   )
+}
+
+function normalizeFacingDirectionToken(value: unknown): KeyframeFacingDirection {
+  const normalized = normalizeLocationKey(typeof value === 'string' ? value : '')
+  if (!normalized) return 'unknown'
+
+  if (normalized.includes('three quarter left') || normalized.includes('3 4 left') || normalized.includes('3 4 trai') || normalized.includes('goc 3 4 trai')) {
+    return 'three-quarter-left'
+  }
+  if (normalized.includes('three quarter right') || normalized.includes('3 4 right') || normalized.includes('3 4 phai') || normalized.includes('goc 3 4 phai')) {
+    return 'three-quarter-right'
+  }
+  if (normalized.includes('back facing') || normalized.includes('rear view') || normalized.includes('facing away') || normalized.includes('back to camera') || normalized.includes('doi lung') || normalized.includes('quay lung')) {
+    return 'back'
+  }
+  if (normalized.includes('front facing') || normalized.includes('facing camera') || normalized.includes('face camera') || normalized.includes('toward camera') || normalized.includes('chinh dien') || normalized.includes('truc dien')) {
+    return 'front'
+  }
+  if (normalized.includes('left facing') || normalized.includes('left profile') || normalized.includes('profile left') || normalized.includes('facing left') || normalized.includes('huong trai') || normalized.includes('sang trai') || normalized.includes('nghieng trai')) {
+    return 'left'
+  }
+  if (normalized.includes('right facing') || normalized.includes('right profile') || normalized.includes('profile right') || normalized.includes('facing right') || normalized.includes('huong phai') || normalized.includes('sang phai') || normalized.includes('nghieng phai')) {
+    return 'right'
+  }
+
+  return 'unknown'
+}
+
+function extractKeyframeFacingDirection(action: unknown, camera?: unknown, facingDirection?: unknown): KeyframeFacingDirection {
+  const explicit = normalizeFacingDirectionToken(facingDirection)
+  if (explicit !== 'unknown') return explicit
+
+  const fromAction = normalizeFacingDirectionToken(action)
+  if (fromAction !== 'unknown') return fromAction
+
+  // Fallback to camera text only if action has no direction token.
+  return normalizeFacingDirectionToken(camera)
+}
+
+function hasKeyframeTurnCue(...values: Array<unknown>): boolean {
+  const normalized = normalizeLocationKey(values.filter((item): item is string => typeof item === 'string').join(' '))
+  if (!normalized) return false
+
+  return KEYFRAME_TURN_CUE_KEYWORDS.some((keyword) => normalized.includes(normalizeLocationKey(keyword)))
 }
 
 function isAllowedLocationCountry(value: string): boolean {
@@ -1685,6 +1763,56 @@ Output STRICT JSON only:
         }
       }
 
+      for (let i = 1; i < keyframes.length; i += 1) {
+        const previousKeyframe = asRecord(keyframes[i - 1]) ? keyframes[i - 1] as Record<string, unknown> : null
+        const currentKeyframe = asRecord(keyframes[i]) ? keyframes[i] as Record<string, unknown> : null
+        if (!previousKeyframe || !currentKeyframe) {
+          return { ok: false, reason: `continuity keyframe pair[${i - 1},${i}] is not valid` }
+        }
+
+        const previousAction = toSafeText(previousKeyframe.action, '')
+        const previousCamera = toSafeText(previousKeyframe.camera, '')
+        const currentAction = toSafeText(currentKeyframe.action, '')
+        const currentCamera = toSafeText(currentKeyframe.camera, '')
+
+        const previousFacingDirection = extractKeyframeFacingDirection(
+          previousAction,
+          previousCamera,
+          previousKeyframe.facingDirection,
+        )
+        const currentFacingDirection = extractKeyframeFacingDirection(
+          currentAction,
+          currentCamera,
+          currentKeyframe.facingDirection,
+        )
+
+        if (
+          previousFacingDirection !== 'unknown'
+          && currentFacingDirection !== 'unknown'
+          && previousFacingDirection === currentFacingDirection
+        ) {
+          return {
+            ok: false,
+            reason: `keyframe[${i - 1}] and keyframe[${i}] share same facing direction (${currentFacingDirection}); Rule 32 requires a turn/pivot`,
+          }
+        }
+
+        const hasTurnCue = hasKeyframeTurnCue(previousAction, previousCamera, currentAction, currentCamera)
+
+        if (
+          !hasTurnCue
+          && (
+            (strict && (previousFacingDirection === 'unknown' || currentFacingDirection === 'unknown'))
+            || (!strict && previousFacingDirection === 'unknown' && currentFacingDirection === 'unknown')
+          )
+        ) {
+          return {
+            ok: false,
+            reason: `keyframe[${i - 1}] -> keyframe[${i}] lacks explicit turn cue/facing change for Rule 32`,
+          }
+        }
+      }
+
       for (let i = 0; i < scenes.length; i += 1) {
         const scene = asRecord(scenes[i]) ? scenes[i] as Record<string, unknown> : null
         if (!scene) {
@@ -1853,7 +1981,13 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
 30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default style, tone, format, location, camera, and narrative choices in Rules 5–29 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Rule 31 (celebrity safety), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12) are the only truly non-negotiable constraints.
 31. CELEBRITY / PUBLIC-FIGURE SAFETY LOCK - Never depict/imitate/reference real celebrities/public figures/identifiable persons, never generate deepfake-style impersonation or fake endorsement/dialogue; if user asks for real person, convert to fictional archetype while preserving only general mood/style.
-32. CONSECUTIVE KEYFRAME FACING DIRECTION LOCK — Two adjacent keyframes MUST NOT place the subject facing the same body direction (e.g., both fully front-facing, both fully side-facing, both fully rear-facing). Every keyframe transition must include a discernible body turn or pivot. Reason: Veo 3.1 interpolates between frames but has zero reference for the garment back side; repeated same-direction framing forces hallucination of unknown back-of-garment details, causing severe outfit inconsistency. If the narrative requires a held direction, break it with a slight 3/4 pivot before continuing. [ALWAYS ENFORCED — not subordinate to Rule 30]
+32. CONSECUTIVE KEYFRAME FACING DIRECTION LOCK — Two adjacent keyframes MUST NOT place the subject facing the same body direction (e.g., both fully front-facing, both fully side-facing, both fully rear-facing). Every keyframe transition must include a discernible body turn or pivot.
+  - For each keyframe, provide explicit body-facing intent in both action text and facingDirection token.
+  - Allowed facingDirection tokens: "front", "back", "left", "right", "three-quarter-left", "three-quarter-right".
+  - Adjacent keyframes must never repeat the same facingDirection token.
+  - Reason: Veo 3.1 interpolates between frames but has zero reference for the garment back side; repeated same-direction framing forces hallucination of unknown back-of-garment details, causing severe outfit inconsistency.
+  - If the narrative requires a held direction, break it with a slight 3/4 pivot before continuing.
+  [ALWAYS ENFORCED — not subordinate to Rule 30]
 
 Return STRICT COMPACT JSON only in this schema:
 {
@@ -1862,6 +1996,7 @@ Return STRICT COMPACT JSON only in this schema:
     {
       "index": 0,
       "action": "pose/movement description",
+      "facingDirection": "front|back|left|right|three-quarter-left|three-quarter-right",
       "location": "real location (city/area + venue details in Vietnam/China/South Korea)",
       "camera": "lens, shot type, angle",
       "lighting": "lighting setup",
@@ -1913,7 +2048,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
       const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
 
   Validate and repair the draft package to satisfy all constraints below:
-  - Enforce CRITICAL RULES 1..31 exactly as defined in package generation stage.
+  - Enforce CRITICAL RULES 1..32 exactly as defined in package generation stage.
   - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
   - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
   - AI must choose fresh locations itself and must avoid all locations listed in location-history constraints.
@@ -1925,6 +2060,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Use the same primary location lock in all keyframes/scenes.
   - Enforce interpolation safety guardrails: micro-progression between adjacent keyframes, no abrupt opposite camera direction, no discontinuity keywords.
   - Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.
+  - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
 
 PRIMARY LOCATION LOCK (MANDATORY):
 ${primaryPlannedLocation.length > 0
@@ -2049,6 +2185,7 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - Use one dominant camera movement per scene (no mixed camera grammar).
 - Avoid immediate opposite camera direction across adjacent scenes unless explicit turnaround beat is described.
 - Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
+- Enforce facing continuity lock: consecutive keyframes must not repeat the same body-facing direction; include explicit turn/pivot cues and facingDirection token per keyframe.
 
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
