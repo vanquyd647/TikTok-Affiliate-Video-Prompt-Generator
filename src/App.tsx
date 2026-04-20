@@ -364,6 +364,12 @@ const HAND_ANATOMY_GUARDRAILS = `- Hand anatomy consistency is mandatory: exactl
 - Keep hands visible and slightly separated from torso/skirt edges to reduce reflection occlusion artifacts.
 - If one hand interacts with footwear or hemline, keep the other hand relaxed and anatomically clear.`
 
+const OOTDMIRROR_REAR_MIRROR_GUARDRAILS = `- Applies only when resolved content type is OOTDMIRROR.
+- Use an observer camera placed in front of the model (camera-facing model), not a selfie POV.
+- The mirror must be behind the model and used to capture full-body outfit reflection.
+- The model must not hold any phone/camera/recording device; both hands stay free for natural posing.
+- Never show camera, tripod, operator, or recording gear in the mirror reflection.`
+
 const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use micro-progression between adjacent keyframes (small pose delta, no sudden body jump).
 - Keep one dominant camera movement per 8s scene; avoid mixed or contradictory camera instructions.
 - Preserve camera axis and movement direction across adjacent scenes unless an explicit turn-around beat is written.
@@ -746,9 +752,10 @@ function getStyleLockFallbackLocation(styleLock: ContentStyleLock): string {
 
 function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string {
   if (contentType === 'ootdmirror') {
-    return `- Mirror-first social grammar: mirror fit check, mirror selfie, reflection readability.
+    return `- Mirror-first social grammar: mirror fit check and reflection readability with observer-camera coverage.
 - Keep full-body reflection visible for most of the timeline, with at least one stable fit-check hold.
 - Align visual rhythm with fitcheck cluster behavior: clear silhouette proof before transitions.
+- Use observer-camera framing (camera in front of model, mirror behind model), not device-in-hand selfie capture.
 - Keep hand anatomy stable in reflection: two hands only, five fingers per hand, and no mirrored hand overlap/deformation during turns.
 - Treat "ootdmirror" as an internal strategy label only; externally mirror the stronger native cluster language (#fitcheck, #mirrorselfie, #ootd, #outfitinspo).`
   }
@@ -1051,6 +1058,55 @@ function applyMirrorHandSafetyToSceneNarrative(
     narrative,
     'During the turn, keep a continuous arm trajectory and stable hand anatomy: exactly two hands, five fingers each, no flicker, duplication, fusion, or hand-through-fabric artifacts in the mirror.',
   )
+}
+
+function normalizePromptWhitespace(value: string): string {
+  return value
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim()
+}
+
+function removeOotdMirrorHandheldDevicePhrases(value: string): string {
+  let next = value
+
+  const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /\bmirror\s+selfie\b/gi, replacement: 'mirror fitcheck' },
+    { pattern: /\bselfie(?:-style)?\b/gi, replacement: 'fitcheck-style' },
+    { pattern: /\b(?:holding|using|filming with|recording with|gripping|raising|lifting)\s+(?:a|an|the|her)?\s*(?:phone|smartphone|iphone|mobile(?:\s+phone)?|camera|camcorder|gimbal)\b/gi, replacement: 'hands free' },
+    { pattern: /\b(?:phone|smartphone|iphone|mobile(?:\s+phone)?|camera|camcorder|gimbal)\s*(?:in\s+hand|in\s+her\s+hand|on\s+hand)\b/gi, replacement: 'hands free' },
+    { pattern: /\bhandheld\s+phone\b/gi, replacement: 'observer camera' },
+    { pattern: /\bphone\s+pov\b/gi, replacement: 'observer-camera POV' },
+  ]
+
+  for (const { pattern, replacement } of replacements) {
+    next = next.replace(pattern, replacement)
+  }
+
+  return normalizePromptWhitespace(next)
+}
+
+function enforceOotdMirrorHandsFreeAction(action: string): string {
+  const sanitized = removeOotdMirrorHandheldDevicePhrases(action)
+  return appendSentenceIfMissing(
+    sanitized,
+    'Model is not holding any phone or camera and keeps both hands free for natural posing.',
+  )
+}
+
+function enforceOotdMirrorObserverCamera(camera: string): string {
+  let next = removeOotdMirrorHandheldDevicePhrases(camera)
+  next = appendSentenceIfMissing(next, 'Observer camera is front-facing the model at chest-to-eye height')
+  next = appendSentenceIfMissing(next, 'Use the rear mirror behind the model for full-body outfit reflection')
+  next = appendSentenceIfMissing(next, 'No camera, tripod, operator, or recording gear visible in mirror reflection')
+  return next
+}
+
+function enforceOotdMirrorSceneNarrative(narrative: string): string {
+  let next = removeOotdMirrorHandheldDevicePhrases(narrative)
+  next = appendSentenceIfMissing(next, 'Use observer-camera coverage with the mirror behind the model for reflection proof')
+  next = appendSentenceIfMissing(next, 'Model remains hands-free with no handheld recording device')
+  return next
 }
 
 function hasKeyframeTurnCue(...values: Array<unknown>): boolean {
@@ -1663,6 +1719,9 @@ ${NATURALITY_PROMPT_GUARDRAILS}
 HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
 ${HAND_ANATOMY_GUARDRAILS}
 
+OOTDMIRROR REAR-MIRROR CAMERA LOCK (APPLIES WHEN TYPE=OOTDMIRROR):
+${OOTDMIRROR_REAR_MIRROR_GUARDRAILS}
+
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
@@ -2122,6 +2181,9 @@ ${NATURALITY_PROMPT_GUARDRAILS}
 HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
 ${HAND_ANATOMY_GUARDRAILS}
 
+OOTDMIRROR REAR-MIRROR CAMERA LOCK (APPLIES WHEN TYPE=OOTDMIRROR):
+${OOTDMIRROR_REAR_MIRROR_GUARDRAILS}
+
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
@@ -2176,7 +2238,7 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
 23. AUTHENTICITY + TRUST - Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
 24. NO-CTA ENDING + TEMPLATE CONSISTENCY - Final scene should land a clean visual payoff with product clarity; explicit CTA is optional and never mandatory.
 25. OOTD FAMILY TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTDMIRROR, enforce mirror fitcheck flow only. For OOTD, enforce single-corner studio flow only. For OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow. [SUBORDINATE to Rule 30 — User Notes override format/flow]
-26. MIRROR FITCHECK SPEC - Use full-body mirror framing, vertical social-native phone aesthetic, visible head-to-toe outfit readability, and ensure no camera/tripod/operator reflection appears in the mirror. [SUBORDINATE to Rule 30 — User Notes may modify mirror spec]
+26. MIRROR FITCHECK SPEC - Use observer-camera framing (camera in front of model) with the mirror behind the model for reflection proof, keep full-body head-to-toe readability, do not let model hold phone/camera, and ensure no camera/tripod/operator reflection appears in the mirror. [SUBORDINATE to Rule 30 — User Notes may modify mirror spec]
 27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes. [SUBORDINATE to Rule 30 — User Notes may modify studio spec]
 28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition. [SUBORDINATE to Rule 30 — User Notes may override style lock]
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
@@ -2264,6 +2326,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.
   - Enforce hand-anatomy continuity in mirror/reflection beats: exactly two hands, five fingers per hand, no fused/missing/extra fingers, and no hand-through-garment artifacts.
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
+  - For OOTDMIRROR: enforce observer-camera setup (camera in front of model), mirror behind model, and no handheld phone/camera in model hands.
 
 PRIMARY LOCATION LOCK (MANDATORY):
 ${primaryPlannedLocation.length > 0
@@ -2287,6 +2350,9 @@ ${NATURALITY_PROMPT_GUARDRAILS}
 
 HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
 ${HAND_ANATOMY_GUARDRAILS}
+
+OOTDMIRROR REAR-MIRROR CAMERA LOCK (APPLIES WHEN TYPE=OOTDMIRROR):
+${OOTDMIRROR_REAR_MIRROR_GUARDRAILS}
 
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
@@ -2393,6 +2459,7 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - Enforce facing continuity lock: consecutive keyframes must not repeat the same body-facing direction; include explicit turn/pivot cues and facingDirection token per keyframe.
 - Enforce hand-anatomy continuity in mirror/reflection beats: exactly two hands, five fingers per hand, no fused/missing/extra fingers, and no hand-through-garment artifacts.
+- For OOTDMIRROR: keep observer-camera framing (front-facing model), mirror behind model, and remove any handheld recording-device behavior from actions/narrative.
 
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
@@ -2405,6 +2472,9 @@ ${NATURALITY_PROMPT_GUARDRAILS}
 
 HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
 ${HAND_ANATOMY_GUARDRAILS}
+
+OOTDMIRROR REAR-MIRROR CAMERA LOCK (APPLIES WHEN TYPE=OOTDMIRROR):
+${OOTDMIRROR_REAR_MIRROR_GUARDRAILS}
 
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
@@ -2550,7 +2620,7 @@ Return STRICT JSON only, same schema:
       const record = asRecord(kf) ? kf as Record<string, unknown> : {}
 
       const actionBase = toSafeString(record.action, fallbackActionByType[finalContentType as Exclude<ContentType, 'auto'>])
-      const camera = toSafeString(record.camera, inferredCameraFallback)
+      let camera = toSafeString(record.camera, inferredCameraFallback)
       const lighting = toSafeString(record.lighting, inferredLightingFallback)
       const style = toSafeString(record.style, fallbackStyleByType[finalContentType as Exclude<ContentType, 'auto'>])
       const timestamp = toSafeString(record.timestamp, `${Math.round((i * duration) / (keyframeCount - 1))}s`)
@@ -2578,7 +2648,9 @@ Return STRICT JSON only, same schema:
       }
 
       if (finalContentType === 'ootdmirror') {
+        action = enforceOotdMirrorHandsFreeAction(action)
         action = applyMirrorHandSafetyToAction(action, resolvedFacing, i === rawKeyframes.length - 1)
+        camera = enforceOotdMirrorObserverCamera(camera)
       }
 
       normalizedKeyframesForRule32.push({
@@ -2641,13 +2713,19 @@ ASPECT RATIO: ${aspectRatio}`,
       const endFacingValue = keyframes[i + 1]?.facingDirection
       const startFacing = isConcreteFacingDirection(startFacingValue) ? startFacingValue : null
       const endFacing = isConcreteFacingDirection(endFacingValue) ? endFacingValue : null
-      const safeNarrative = finalContentType === 'ootdmirror'
+      let safeNarrative = finalContentType === 'ootdmirror'
         ? applyMirrorHandSafetyToSceneNarrative(narrative, startFacing, endFacing)
         : narrative
-      const cameraMovement = toSafeString(
+      if (finalContentType === 'ootdmirror') {
+        safeNarrative = enforceOotdMirrorSceneNarrative(safeNarrative)
+      }
+      let cameraMovement = toSafeString(
         sc.cameraMovement,
         SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].cameraHint
       )
+      if (finalContentType === 'ootdmirror') {
+        cameraMovement = enforceOotdMirrorObserverCamera(cameraMovement)
+      }
       const timeRange = toSafeString(sc.timeRange, `${startSec}s-${endSec}s`)
 
       const lighting = keyframes[i]?.lighting || ''
