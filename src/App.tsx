@@ -358,6 +358,12 @@ const NATURALITY_PROMPT_GUARDRAILS = `- Prefer creator-native language and belie
 - Keep transitions motivated by body movement and camera follow, not mechanical choreography.
 - Keep tone conversational, practical, and trust-first; avoid over-scripted cinematic jargon in every line.`
 
+const HAND_ANATOMY_GUARDRAILS = `- Hand anatomy consistency is mandatory: exactly two hands, five fingers per hand, natural finger spacing.
+- Avoid hand artifacts: no fused fingers, missing fingers, extra fingers, duplicated palms, broken wrists, or impossible hand orientation.
+- For mirror fitcheck turns (especially back-facing to three-quarter look-back), keep arm trajectories continuous and physically plausible.
+- Keep hands visible and slightly separated from torso/skirt edges to reduce reflection occlusion artifacts.
+- If one hand interacts with footwear or hemline, keep the other hand relaxed and anatomically clear.`
+
 const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use micro-progression between adjacent keyframes (small pose delta, no sudden body jump).
 - Keep one dominant camera movement per 8s scene; avoid mixed or contradictory camera instructions.
 - Preserve camera axis and movement direction across adjacent scenes unless an explicit turn-around beat is written.
@@ -743,6 +749,7 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
     return `- Mirror-first social grammar: mirror fit check, mirror selfie, reflection readability.
 - Keep full-body reflection visible for most of the timeline, with at least one stable fit-check hold.
 - Align visual rhythm with fitcheck cluster behavior: clear silhouette proof before transitions.
+- Keep hand anatomy stable in reflection: two hands only, five fingers per hand, and no mirrored hand overlap/deformation during turns.
 - Treat "ootdmirror" as an internal strategy label only; externally mirror the stronger native cluster language (#fitcheck, #mirrorselfie, #ootd, #outfitinspo).`
   }
 
@@ -951,6 +958,17 @@ function toFacingDirectionLabel(direction: ConcreteFacingDirection): string {
   return direction
 }
 
+function isConcreteFacingDirection(value: unknown): value is ConcreteFacingDirection {
+  return (
+    value === 'front'
+    || value === 'back'
+    || value === 'left'
+    || value === 'right'
+    || value === 'three-quarter-left'
+    || value === 'three-quarter-right'
+  )
+}
+
 function pickAlternatingFacingDirection(
   index: number,
   previous: ConcreteFacingDirection | null,
@@ -986,6 +1004,53 @@ function appendSentenceIfMissing(base: string, sentence: string): string {
   return /[.!?]$/.test(trimmedBase)
     ? `${trimmedBase} ${trimmedSentence}`
     : `${trimmedBase}. ${trimmedSentence}`
+}
+
+function applyMirrorHandSafetyToAction(
+  action: string,
+  facingDirection: ConcreteFacingDirection,
+  isFinalKeyframe: boolean,
+): string {
+  let nextAction = appendSentenceIfMissing(
+    action,
+    'Keep exactly two visible hands with natural five fingers per hand; no extra, missing, fused, or distorted fingers.',
+  )
+
+  if (facingDirection === 'back') {
+    nextAction = appendSentenceIfMissing(
+      nextAction,
+      'Both arms stay relaxed slightly away from the torso and skirt so hand silhouettes remain clean in the mirror reflection.',
+    )
+  }
+
+  if (facingDirection === 'three-quarter-left' || facingDirection === 'three-quarter-right') {
+    nextAction = appendSentenceIfMissing(
+      nextAction,
+      isFinalKeyframe
+        ? 'For the over-shoulder finish, only one hand may lift one heel while the other hand stays relaxed by the thigh with separated fingers.'
+        : 'Use one active hand at a time while the other hand stays relaxed by the thigh to prevent mirrored hand overlap artifacts.',
+    )
+  }
+
+  return nextAction
+}
+
+function applyMirrorHandSafetyToSceneNarrative(
+  narrative: string,
+  startFacing: ConcreteFacingDirection | null,
+  endFacing: ConcreteFacingDirection | null,
+): string {
+  const isBackToQuarterTurn = (
+    startFacing === 'back'
+    && (endFacing === 'three-quarter-left' || endFacing === 'three-quarter-right')
+  )
+
+  if (!isBackToQuarterTurn) return narrative
+
+  return appendSentenceIfMissing(
+    narrative,
+    'During the turn, keep a continuous arm trajectory and stable hand anatomy: exactly two hands, five fingers each, no flicker, duplication, fusion, or hand-through-fabric artifacts in the mirror.',
+  )
 }
 
 function hasKeyframeTurnCue(...values: Array<unknown>): boolean {
@@ -1595,6 +1660,9 @@ ${requestedTypeTrendAlignmentRules}
 NATURALITY GUARDRAILS (MANDATORY):
 ${NATURALITY_PROMPT_GUARDRAILS}
 
+HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
+${HAND_ANATOMY_GUARDRAILS}
+
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
@@ -2051,6 +2119,9 @@ ${finalTypeTrendAlignmentRules}
 NATURALITY GUARDRAILS (MANDATORY):
 ${NATURALITY_PROMPT_GUARDRAILS}
 
+HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
+${HAND_ANATOMY_GUARDRAILS}
+
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
 
@@ -2116,6 +2187,7 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
   - Allowed facingDirection tokens: "front", "back", "left", "right", "three-quarter-left", "three-quarter-right".
   - Adjacent keyframes must never repeat the same facingDirection token.
   - Reason: Veo 3.1 interpolates between frames but has zero reference for the garment back side; repeated same-direction framing forces hallucination of unknown back-of-garment details, causing severe outfit inconsistency.
+  - Hand anatomy lock for mirror turns: preserve exactly two hands and five fingers per hand across adjacent keyframes; no fused/missing/extra fingers, no duplicated palms, and no hand-through-skirt artifacts.
   - If the narrative requires a held direction, break it with a slight 3/4 pivot before continuing.
   [ALWAYS ENFORCED — not subordinate to Rule 30]
 
@@ -2190,6 +2262,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Use the same primary location lock in all keyframes/scenes.
   - Enforce interpolation safety guardrails: micro-progression between adjacent keyframes, no abrupt opposite camera direction, no discontinuity keywords.
   - Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.
+  - Enforce hand-anatomy continuity in mirror/reflection beats: exactly two hands, five fingers per hand, no fused/missing/extra fingers, and no hand-through-garment artifacts.
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
 
 PRIMARY LOCATION LOCK (MANDATORY):
@@ -2211,6 +2284,9 @@ ${finalTypeTrendAlignmentRules}
 
 NATURALITY GUARDRAILS (MANDATORY):
 ${NATURALITY_PROMPT_GUARDRAILS}
+
+HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
+${HAND_ANATOMY_GUARDRAILS}
 
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
@@ -2316,6 +2392,7 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - Avoid immediate opposite camera direction across adjacent scenes unless explicit turnaround beat is described.
 - Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - Enforce facing continuity lock: consecutive keyframes must not repeat the same body-facing direction; include explicit turn/pivot cues and facingDirection token per keyframe.
+- Enforce hand-anatomy continuity in mirror/reflection beats: exactly two hands, five fingers per hand, no fused/missing/extra fingers, and no hand-through-garment artifacts.
 
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
@@ -2325,6 +2402,9 @@ ${finalTypeTrendAlignmentRules}
 
 NATURALITY GUARDRAILS (MANDATORY):
 ${NATURALITY_PROMPT_GUARDRAILS}
+
+HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
+${HAND_ANATOMY_GUARDRAILS}
 
 VEO 3.1 INTERPOLATION SAFETY GUARDRAILS:
 ${VEO_INTERPOLATION_GUARDRAILS}
@@ -2497,6 +2577,10 @@ Return STRICT JSON only, same schema:
         }
       }
 
+      if (finalContentType === 'ootdmirror') {
+        action = applyMirrorHandSafetyToAction(action, resolvedFacing, i === rawKeyframes.length - 1)
+      }
+
       normalizedKeyframesForRule32.push({
         action,
         camera,
@@ -2553,6 +2637,13 @@ ASPECT RATIO: ${aspectRatio}`,
           ? `${beatLabel}. Keep the scene fully at ${startLocation} while the model transitions smoothly between matched keyframes over ${endSec - startSec} seconds.`
           : `${beatLabel}. Transition location naturally from ${startLocation} to ${endLocation} while keeping smooth pose continuity over ${endSec - startSec} seconds.`
       )
+      const startFacingValue = keyframes[i]?.facingDirection
+      const endFacingValue = keyframes[i + 1]?.facingDirection
+      const startFacing = isConcreteFacingDirection(startFacingValue) ? startFacingValue : null
+      const endFacing = isConcreteFacingDirection(endFacingValue) ? endFacingValue : null
+      const safeNarrative = finalContentType === 'ootdmirror'
+        ? applyMirrorHandSafetyToSceneNarrative(narrative, startFacing, endFacing)
+        : narrative
       const cameraMovement = toSafeString(
         sc.cameraMovement,
         SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].cameraHint
@@ -2567,7 +2658,7 @@ ASPECT RATIO: ${aspectRatio}`,
         index: i,
         timeRange,
         subject,
-        narrative,
+        narrative: safeNarrative,
         startPose,
         endPose,
         composition,
@@ -2576,7 +2667,7 @@ ASPECT RATIO: ${aspectRatio}`,
         locationFlow,
         fullPrompt: [
           subject ? `SUBJECT: ${subject}` : '',
-          `ACTION: ${narrative}`,
+          `ACTION: ${safeNarrative}`,
           composition ? `COMPOSITION: ${composition}` : '',
           `CAMERA: ${cameraMovement}`,
           lighting ? `LIGHTING: ${lighting}` : '',
