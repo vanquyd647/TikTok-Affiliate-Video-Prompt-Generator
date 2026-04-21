@@ -262,8 +262,32 @@ type ContentType = typeof CONTENT_TYPES[number]['value']
 type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
+type GenerationMode = 'video_prompt' | 'lookbook_image'
 type ProductLocationHistoryMap = Record<string, string[]>
 type OutfitTypeLocationHistoryMap = Partial<Record<ResolvedContentType, string[]>>
+
+const GENERATION_MODES: Array<{
+  value: GenerationMode
+  label: string
+  desc: string
+  icon: typeof Film
+  color: string
+}> = [
+  {
+    value: 'video_prompt',
+    label: 'Video Prompt',
+    desc: 'Tao keyframe + scene prompt cho Veo',
+    icon: Film,
+    color: 'var(--accent-cyan)',
+  },
+  {
+    value: 'lookbook_image',
+    label: 'Lookbook Image',
+    desc: 'Tao prompt anh lookbook, khong can video',
+    icon: ImageIcon,
+    color: '#22c55e',
+  },
+]
 
 const CONTENT_TYPE_VALUES = CONTENT_TYPES.map((item) => item.value) as ContentType[]
 const ASPECT_RATIO_VALUES = ASPECT_RATIOS.map((item) => item.value) as Array<'9:16' | '16:9'>
@@ -280,6 +304,12 @@ const PROMPT_LOADING_STAGES = [
   'AI đang phân tích ảnh sản phẩm...',
   'AI đang dựng keyframe và scene prompts...',
   'AI đang tối ưu prompt đầu ra...',
+] as const
+
+const LOOKBOOK_LOADING_STAGES = [
+  'AI dang phan tich anh khuon mat...',
+  'AI dang phan tich anh san pham...',
+  'AI dang viet prompt anh lookbook...',
 ] as const
 
 const FIXED_AFFILIATE_MODE: AffiliateMode = 'strict'
@@ -701,6 +731,26 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
 ${notes ? `[CUSTOM NOTES]: ${notes}` : ''}
 
 CRITICAL: This image will be used as a reference for Veo 3.1 video generation. Ensure consistent proportions and realistic rendering suitable for frame-by-frame animation.`
+}
+
+function resolveLookbookImageContentType(contentType: ContentType): ResolvedContentType {
+  if (contentType === 'auto' || contentType === 'fyp') {
+    return 'outfitideas'
+  }
+
+  return contentType as ResolvedContentType
+}
+
+function buildLookbookImageOnlyPrompt(contentType: ResolvedContentType, notes: string, aspectRatio: '9:16' | '16:9'): string {
+  const videoReferenceLine = 'CRITICAL: This image will be used as a reference for Veo 3.1 video generation. Ensure consistent proportions and realistic rendering suitable for frame-by-frame animation.'
+  const lookbookReferenceLine = 'CRITICAL: This is the final standalone lookbook image output. Do not include video timeline, keyframe, scene, or interpolation instructions.'
+
+  const basePrompt = buildCreateImagePrompt(contentType, notes)
+  const normalizedBase = basePrompt.includes(videoReferenceLine)
+    ? basePrompt.replace(videoReferenceLine, lookbookReferenceLine)
+    : `${basePrompt}\n\n${lookbookReferenceLine}`
+
+  return `${normalizedBase}\n[TARGET ASPECT RATIO]: ${aspectRatio}`
 }
 
 function normalizeLocationKey(value: string): string {
@@ -2789,6 +2839,101 @@ ASPECT RATIO: ${aspectRatio}`,
   }
 }
 
+async function generateLookbookImagePromptWithGemini(
+  apiKey: string,
+  model: string,
+  faceImage: string | null,
+  productImage: string | null,
+  aspectRatio: '9:16' | '16:9',
+  notes: string,
+  contentType: ContentType = 'outfitideas',
+): Promise<{
+  masterDNA: string
+  createImagePrompt: string
+  resolvedContentType: ResolvedContentType
+}> {
+  const resolvedContentType = resolveLookbookImageContentType(contentType)
+  const fallbackMasterDNA = buildCharacterDNA(notes, resolvedContentType)
+  const fallbackPrompt = buildLookbookImageOnlyPrompt(resolvedContentType, notes, aspectRatio)
+
+  const parts: GeminiContentPart[] = []
+  if (faceImage) {
+    const base64 = faceImage.split(',')[1] || faceImage
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64,
+      },
+    })
+    parts.push({ text: 'FACE REFERENCE: preserve facial identity only. Ignore background and props.' })
+  }
+
+  if (productImage) {
+    const base64 = productImage.split(',')[1] || productImage
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64,
+      },
+    })
+    parts.push({ text: 'GARMENT REFERENCE: preserve exact product details, colors, material, and silhouette.' })
+  }
+
+  const prompt = `You are an expert fashion creative director for affiliate lookbook imagery.
+
+TASK:
+- Create one standalone lookbook image prompt only (no video prompt).
+- Output must optimize for outfit readability and conversion-oriented styling proof.
+- The output will be used directly in an image model, not Veo video.
+
+INPUT:
+- Target content style: ${resolvedContentType.toUpperCase()}
+- Target aspect ratio: ${aspectRatio}
+${notes ? `- User notes: ${notes}` : '- User notes: none'}
+
+REQUIREMENTS:
+- Keep exact face identity and exact garment fidelity from references.
+- Keep prompt practical and social-native for lookbook usage.
+- Do NOT include timeline language, keyframes, scenes, transitions, interpolation, or motion continuity instructions.
+- Do NOT mention real celebrities/public figures.
+
+Return strict JSON only:
+{
+  "masterDNA": "concise identity lock summary",
+  "lookbookImagePrompt": "final standalone image prompt"
+}`
+
+  try {
+    const parsed = await requestGeminiJsonWithParts(
+      apiKey,
+      model,
+      [...parts, { text: prompt }],
+      0.62,
+      4096,
+    )
+
+    const toSafeString = (value: unknown, fallback: string) => {
+      if (typeof value !== 'string') return fallback
+      const trimmed = value.trim()
+      return trimmed.length > 0 ? trimmed : fallback
+    }
+
+    const masterDNA = toSafeString((parsed as Record<string, unknown>).masterDNA, fallbackMasterDNA)
+    const createImagePrompt = toSafeString(
+      (parsed as Record<string, unknown>).lookbookImagePrompt,
+      fallbackPrompt,
+    )
+
+    return {
+      masterDNA,
+      createImagePrompt,
+      resolvedContentType,
+    }
+  } catch (error: any) {
+    throw new Error(error?.message || 'Gemini lookbook image prompt generation failed')
+  }
+}
+
 function parseGeminiJsonFromText(raw: string): Record<string, unknown> {
   const stripCodeFence = raw
     .replace(/^```(?:json)?\s*/i, '')
@@ -3024,6 +3169,11 @@ function normalizeHistoryAspectRatio(value: unknown, fallback: '9:16' | '16:9' =
     : fallback
 }
 
+function normalizeHistoryGenerationMode(value: unknown, fallback: GenerationMode = 'video_prompt'): GenerationMode {
+  const candidate = toHistoryString(value, fallback).toLowerCase()
+  return candidate === 'lookbook_image' ? 'lookbook_image' : 'video_prompt'
+}
+
 function inferDurationFromPromptCounts(keyframeCount: number, sceneCount: number, fallback = 32): number {
   const matched = DURATIONS.find((entry) => entry.keyframes === keyframeCount && entry.scenes === sceneCount)
   return matched ? matched.value : fallback
@@ -3123,6 +3273,7 @@ function buildPromptResultFromHistoryItem(
   aspectRatio: '9:16' | '16:9',
 ): GenerateResult {
   const metadata = toHistoryRecord(item.metadata) || {}
+  const metadataGenerationMode = normalizeHistoryGenerationMode(metadata.generationMode, 'video_prompt')
   const promptPackage = getPromptPackageFromMetadata(metadata)
   const promptRecord = toHistoryRecord(promptPackage) || {}
 
@@ -3144,6 +3295,24 @@ function buildPromptResultFromHistoryItem(
   const normalizedSceneCount = Math.max(sceneCount, normalizedKeyframeCount - 1)
 
   const masterDNA = toHistoryString(promptRecord.masterDNA, buildCharacterDNA(item.notes || '', resolvedType))
+  const imageOnlyPrompt = toHistoryString(
+    promptRecord.createImagePrompt,
+    buildLookbookImageOnlyPrompt(resolvedType, item.notes || '', aspectRatio),
+  )
+  const looksLikeImageOnly = metadataGenerationMode === 'lookbook_image'
+    || (rawKeyframes.length === 0 && rawScenes.length === 0 && imageOnlyPrompt.length > 0)
+
+  if (looksLikeImageOnly) {
+    return {
+      masterDNA,
+      keyframes: [],
+      scenes: [],
+      createImagePrompt: imageOnlyPrompt,
+      resolvedContentType: resolvedType,
+      affiliateModeUsed: FIXED_AFFILIATE_MODE,
+      salesTemplateUsed: FIXED_SALES_TEMPLATE,
+    }
+  }
 
   const fallbackLocation = (index: number) => {
     if (generatedLocations.length > 0) {
@@ -4360,6 +4529,10 @@ export default function App() {
   const [pasteTarget, setPasteTarget] = useState<'face' | 'product'>('face')
   const [duration, setDuration] = useState(32)
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16')
+  const [generationMode, setGenerationMode] = useState<GenerationMode>(() => {
+    const saved = localStorage.getItem('aff_generation_mode')
+    return saved === 'lookbook_image' ? 'lookbook_image' : 'video_prompt'
+  })
   const [contentType, setContentType] = useState<ContentType>('ootd')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
@@ -4410,6 +4583,7 @@ export default function App() {
   // Persist settings
   useEffect(() => { localStorage.setItem('aff_api_key', apiKey) }, [apiKey])
   useEffect(() => { localStorage.setItem('aff_model', model) }, [model])
+  useEffect(() => { localStorage.setItem('aff_generation_mode', generationMode) }, [generationMode])
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
 
@@ -4419,13 +4593,17 @@ export default function App() {
       return
     }
 
+    const loadingStages = generationMode === 'lookbook_image'
+      ? LOOKBOOK_LOADING_STAGES
+      : PROMPT_LOADING_STAGES
+
     setLoadingStageIndex(0)
     const timer = window.setInterval(() => {
-      setLoadingStageIndex((prev) => Math.min(prev + 1, PROMPT_LOADING_STAGES.length - 1))
+      setLoadingStageIndex((prev) => Math.min(prev + 1, loadingStages.length - 1))
     }, 1700)
 
     return () => window.clearInterval(timer)
-  }, [loading])
+  }, [generationMode, loading])
 
   useEffect(() => {
     if (!promptToast || promptToast.kind === 'loading') return
@@ -4518,12 +4696,27 @@ export default function App() {
 
   const handleOpenHistoryItem = (item: WorkHistoryItem) => {
     const metadata = toHistoryRecord(item.metadata) || {}
+    const promptPackage = getPromptPackageFromMetadata(metadata)
+    const promptPackageRecord = toHistoryRecord(promptPackage) || {}
+    const packageKeyframeCount = Array.isArray(promptPackageRecord.keyframes)
+      ? promptPackageRecord.keyframes.length
+      : 0
+    const packageSceneCount = Array.isArray(promptPackageRecord.scenes)
+      ? promptPackageRecord.scenes.length
+      : 0
     const contentTypeFromItem = normalizeHistoryContentType(item.contentType, 'ootd')
     const resolvedFromItem = normalizeHistoryResolvedContentType(item.contentType, 'outfitideas')
     const restoredInputType = normalizeHistoryContentType(metadata.inputContentType, contentTypeFromItem)
     const restoredResolvedType = normalizeHistoryResolvedContentType(metadata.resolvedContentType, resolvedFromItem)
-    const keyframeCount = toHistoryInteger(metadata.keyframeCount, 0)
-    const sceneCount = toHistoryInteger(metadata.sceneCount, 0)
+    const keyframeCount = toHistoryInteger(metadata.keyframeCount, packageKeyframeCount)
+    const sceneCount = toHistoryInteger(metadata.sceneCount, packageSceneCount)
+    const inferredGenerationModeFallback: GenerationMode = keyframeCount === 0 && sceneCount === 0
+      ? 'lookbook_image'
+      : 'video_prompt'
+    const restoredGenerationMode = normalizeHistoryGenerationMode(
+      metadata.generationMode,
+      inferredGenerationModeFallback,
+    )
     const inferredDuration = inferDurationFromPromptCounts(keyframeCount, sceneCount)
     const restoredDuration = normalizeHistoryDuration(metadata.duration, inferredDuration)
     const restoredAspectRatio = normalizeHistoryAspectRatio(metadata.aspectRatio, '9:16')
@@ -4550,6 +4743,7 @@ export default function App() {
         restoredAspectRatio,
       )
 
+      setGenerationMode(restoredGenerationMode)
       setDuration(restoredDuration)
       setAspectRatio(restoredAspectRatio)
       setNotes(item.notes || '')
@@ -4559,7 +4753,7 @@ export default function App() {
       setSeoResult(null)
       setVoiceoverResult(null)
       setSelectedSeoVariantIndex(0)
-      setActiveTab('keyframes')
+      setActiveTab(restoredPrompt.keyframes.length > 0 && restoredPrompt.scenes.length > 0 ? 'keyframes' : 'image')
       setPromptToast({
         kind: 'success',
         message: 'Da mo lai Prompt Package tu lich su.',
@@ -4614,6 +4808,7 @@ export default function App() {
   const canGenerateSeo = canGenerate && seoProductName.trim().length > 0
   const canGenerateVoiceover = canGenerate && voiceoverProductName.trim().length > 0
   const hasPromptResult = result !== null
+  const hasVideoPromptResult = result !== null && result.keyframes.length > 0 && result.scenes.length > 0
   const hasSeoResult = seoResult !== null
   const hasVoiceoverResult = voiceoverResult !== null
   const hasAnyResult = hasPromptResult || hasSeoResult || hasVoiceoverResult
@@ -4622,25 +4817,33 @@ export default function App() {
   const hasResultsPanelContent = hasAnyResult || hasHistoryPanelData
   const activeWorkHistoryFilters = historyActionFilter !== 'all' || historySearchQuery.length > 0
   const historyShownCount = workHistory.length
+  const promptPrimaryLabel = generationMode === 'lookbook_image' ? 'Anh Lookbook' : 'Prompt Package'
+  const loadingStages = generationMode === 'lookbook_image' ? LOOKBOOK_LOADING_STAGES : PROMPT_LOADING_STAGES
   const promptStatusKind = loading ? 'loading' : error ? 'error' : hasPromptResult ? 'success' : 'idle'
-  const promptLoadingStep = PROMPT_LOADING_STAGES[Math.min(loadingStageIndex, PROMPT_LOADING_STAGES.length - 1)]
+  const promptLoadingStep = loadingStages[Math.min(loadingStageIndex, loadingStages.length - 1)]
   const promptLoadingProgress = loading ? Math.min(90, 24 + loadingStageIndex * 22) : 100
   const promptFloatingStatus = loading
     ? promptLoadingStep
     : error
       ? 'Có lỗi khi tạo prompt. Kiểm tra thông báo để thử lại.'
       : hasPromptResult
-        ? `Prompt package đã sẵn sàng (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL}).`
+        ? hasVideoPromptResult
+          ? `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL}).`
+          : `Prompt anh lookbook da san sang (${selectedContentType.toUpperCase()}).`
         : canGenerate
-          ? `Sẵn sàng tạo Prompt Package (${FIXED_STRATEGY_DESC}).`
-          : 'Nhập Gemini API Key để bật tính năng tạo prompt.'
+          ? generationMode === 'lookbook_image'
+            ? 'San sang tao prompt anh lookbook (khong video).'
+            : `San sang tao Prompt Package (${FIXED_STRATEGY_DESC}).`
+          : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
   const selectedSeoVariant = seoResult
     ? seoResult.seoVariants[Math.min(selectedSeoVariantIndex, seoResult.seoVariants.length - 1)]
     : null
   const resultsHeader = activeTab === 'history'
     ? 'Lich su da luu (MongoDB)'
     : result
-      ? `Prompt Package — ${duration}s / ${aspectRatio}`
+      ? hasVideoPromptResult
+        ? `Prompt Package — ${duration}s / ${aspectRatio}`
+        : `Lookbook Image Prompt — ${aspectRatio}`
       : activeTab === 'voiceover'
         ? 'Nhiệm vụ 2 — Kịch bản lồng tiếng'
         : 'Nhiệm vụ 1 — SEO TikTok'
@@ -4648,12 +4851,15 @@ export default function App() {
   // Generate handler
   const handleGenerate = async () => {
     const MAX_ATTEMPTS = 3
+    const isLookbookImageMode = generationMode === 'lookbook_image'
     setLoading(true)
     setSelectedHistoryId(null)
     setLoadingStageIndex(0)
     setPromptToast({
       kind: 'loading',
-      message: 'Đang tạo Prompt Package, vui lòng chờ trong giây lát...',
+      message: isLookbookImageMode
+        ? 'Dang tao prompt anh lookbook, vui long cho trong giay lat...'
+        : 'Dang tao Prompt Package, vui long cho trong giay lat...',
     })
     setError('')
     setResult(null)
@@ -4662,11 +4868,83 @@ export default function App() {
     const logLines: string[] = []
     const pushLog = (line: string) => { logLines.push(line) }
 
-    pushLog(`[START] ${new Date().toISOString()} — model=${model} duration=${duration}s type=${contentType}`)
+    pushLog(`[START] ${new Date().toISOString()} — mode=${generationMode} model=${model} duration=${duration}s ratio=${aspectRatio} type=${contentType}`)
 
     try {
       if (!apiKey.trim()) {
         throw new Error('Vui long nhap Gemini API Key de AI phan tich anh va tao boi canh')
+      }
+
+      if (isLookbookImageMode) {
+        pushLog('[MODE] lookbook_image')
+        const generated = await generateLookbookImagePromptWithGemini(
+          apiKey,
+          model,
+          faceImage,
+          productImage,
+          aspectRatio,
+          notes,
+          contentType,
+        )
+
+        const lookbookResult: GenerateResult = {
+          masterDNA: generated.masterDNA,
+          keyframes: [],
+          scenes: [],
+          createImagePrompt: generated.createImagePrompt,
+          resolvedContentType: generated.resolvedContentType,
+          affiliateModeUsed: FIXED_AFFILIATE_MODE,
+          salesTemplateUsed: FIXED_SALES_TEMPLATE,
+        }
+
+        setResult(lookbookResult)
+        setSelectedContentType(generated.resolvedContentType)
+        setActiveTab('image')
+        setPromptToast({
+          kind: 'success',
+          message: 'Da tao xong prompt anh lookbook. Ban co the copy hoac export ngay.',
+        })
+
+        const workHistoryGeneratedAt = Date.now()
+        const promptPackageForHistory = {
+          masterDNA: lookbookResult.masterDNA,
+          createImagePrompt: lookbookResult.createImagePrompt || '',
+          keyframes: [],
+          scenes: [],
+        }
+
+        pushLog('[OK] Lookbook image prompt generated successfully')
+        setErrorLogLines([...logLines])
+
+        void persistWorkHistory({
+          action: 'prompt',
+          model,
+          contentType: generated.resolvedContentType,
+          notes: notes.trim(),
+          generatedAt: workHistoryGeneratedAt,
+          metadata: {
+            generationMode,
+            inputContentType: contentType,
+            resolvedContentType: generated.resolvedContentType,
+            duration,
+            aspectRatio,
+            keyframeCount: 0,
+            sceneCount: 0,
+            generatedLocations: [],
+            hasFaceImage: Boolean(faceImage),
+            hasProductImage: Boolean(productImage),
+            promptPackage: promptPackageForHistory,
+          },
+        })
+          .then(() => loadWorkHistory({ silent: true }))
+          .catch((saveError) => {
+            console.warn(
+              'Could not save prompt work history:',
+              saveError instanceof Error ? saveError.message : saveError
+            )
+          })
+
+        return
       }
 
       const currentProductImageId = productImage ? createProductImageId(productImage) : null
@@ -4787,6 +5065,7 @@ export default function App() {
             notes: notes.trim(),
             generatedAt: workHistoryGeneratedAt,
             metadata: {
+              generationMode,
               inputContentType: contentType,
               resolvedContentType: resolvedType,
               duration,
@@ -5041,26 +5320,43 @@ export default function App() {
     ]
 
     if (result) {
-      lines.push(
-        '',
-        '── VIDEO PROMPT PACKAGE ──',
-        `Duration: ${duration}s | Ratio: ${aspectRatio}`,
-        `Resolved Type: ${selectedContentType.toUpperCase()}`,
-        `Affiliate Mode: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
-        `Sales Template: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
-        '',
-        '── CHARACTER DNA ──',
-        result.masterDNA,
-        '',
-        '── KEYFRAME IMAGE PROMPTS ──',
-        ...result.keyframes.map(kf => `\n${kf.fullPrompt}`),
-        '',
-        '── SCENE PROMPTS (Veo 3.1) ──',
-        ...result.scenes.map(sc => `\n${sc.fullPrompt}`),
-        ...(result.createImagePrompt
-          ? ['', '── CREATE IMAGE PROMPT ──', result.createImagePrompt]
-          : []),
-      )
+      const resultHasVideoFlow = result.keyframes.length > 0 && result.scenes.length > 0
+
+      if (resultHasVideoFlow) {
+        lines.push(
+          '',
+          '── VIDEO PROMPT PACKAGE ──',
+          `Duration: ${duration}s | Ratio: ${aspectRatio}`,
+          `Resolved Type: ${selectedContentType.toUpperCase()}`,
+          `Affiliate Mode: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
+          `Sales Template: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
+          '',
+          '── CHARACTER DNA ──',
+          result.masterDNA,
+          '',
+          '── KEYFRAME IMAGE PROMPTS ──',
+          ...result.keyframes.map(kf => `\n${kf.fullPrompt}`),
+          '',
+          '── SCENE PROMPTS (Veo 3.1) ──',
+          ...result.scenes.map(sc => `\n${sc.fullPrompt}`),
+          ...(result.createImagePrompt
+            ? ['', '── CREATE IMAGE PROMPT ──', result.createImagePrompt]
+            : []),
+        )
+      } else {
+        lines.push(
+          '',
+          '── LOOKBOOK IMAGE PROMPT ──',
+          `Aspect Ratio: ${aspectRatio}`,
+          `Resolved Type: ${selectedContentType.toUpperCase()}`,
+          '',
+          '── CHARACTER DNA ──',
+          result.masterDNA,
+          ...(result.createImagePrompt
+            ? ['', '── IMAGE PROMPT ──', result.createImagePrompt]
+            : []),
+        )
+      }
     }
 
     if (seoResult) {
@@ -5111,16 +5407,28 @@ export default function App() {
     const lines: string[] = []
 
     if (result) {
-      lines.push(
-        `RESOLVED TYPE: ${selectedContentType.toUpperCase()}`,
-        `AFFILIATE MODE: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
-        `SALES TEMPLATE: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
-        '',
-        'CHARACTER DNA:', result.masterDNA, '',
-        'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => kf.fullPrompt), '',
-        'SCENE PROMPTS:', ...result.scenes.map(sc => sc.fullPrompt),
-        ...(result.createImagePrompt ? ['', 'CREATE IMAGE PROMPT:', result.createImagePrompt] : []),
-      )
+      const resultHasVideoFlow = result.keyframes.length > 0 && result.scenes.length > 0
+
+      if (resultHasVideoFlow) {
+        lines.push(
+          `RESOLVED TYPE: ${selectedContentType.toUpperCase()}`,
+          `AFFILIATE MODE: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
+          `SALES TEMPLATE: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
+          '',
+          'CHARACTER DNA:', result.masterDNA, '',
+          'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => kf.fullPrompt), '',
+          'SCENE PROMPTS:', ...result.scenes.map(sc => sc.fullPrompt),
+          ...(result.createImagePrompt ? ['', 'CREATE IMAGE PROMPT:', result.createImagePrompt] : []),
+        )
+      } else {
+        lines.push(
+          `RESOLVED TYPE: ${selectedContentType.toUpperCase()}`,
+          'MODE: LOOKBOOK_IMAGE',
+          '',
+          'CHARACTER DNA:', result.masterDNA,
+          ...(result.createImagePrompt ? ['', 'LOOKBOOK IMAGE PROMPT:', result.createImagePrompt] : []),
+        )
+      }
     }
 
     if (seoResult) {
@@ -5242,40 +5550,74 @@ export default function App() {
               />
             </div>
 
-            {/* Video Config */}
+            {/* Generation Mode */}
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title">
-                <Clapperboard /> Cấu hình Video
+                <Wand2 /> Che do tao noi dung
               </div>
-
-              {/* Duration */}
-              <div className="input-group">
-                <label className="input-label">
-                  <Clock size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-                  Thời lượng
-                </label>
+              <div className="input-group" style={{ marginBottom: 0 }}>
                 <div className="chip-group">
-                  {DURATIONS.map(d => (
-                    <button
-                      key={d.value}
-                      className={`chip ${duration === d.value ? 'active' : ''}`}
-                      onClick={() => setDuration(d.value)}
-                      id={`duration-${d.value}`}
-                    >
-                      {d.label}
-                      <span style={{ fontSize: '0.65rem', opacity: 0.7, marginLeft: 4 }}>
-                        {d.scenes}sc/{d.keyframes}kf
-                      </span>
-                    </button>
-                  ))}
+                  {GENERATION_MODES.map((modeOption) => {
+                    const Icon = modeOption.icon
+                    return (
+                      <button
+                        key={modeOption.value}
+                        className={`chip ${generationMode === modeOption.value ? 'active' : ''}`}
+                        onClick={() => setGenerationMode(modeOption.value)}
+                        id={`generation-mode-${modeOption.value}`}
+                        style={generationMode === modeOption.value ? {
+                          background: `color-mix(in srgb, ${modeOption.color} 15%, transparent)`,
+                          borderColor: modeOption.color,
+                          color: modeOption.color,
+                        } : {}}
+                      >
+                        <Icon size={13} style={{ marginRight: 2 }} />
+                        {modeOption.label}
+                        <span style={{ fontSize: '0.6rem', opacity: 0.7, marginLeft: 4 }}>
+                          {modeOption.desc}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
+            </div>
+
+            {/* Video/Image Config */}
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-title">
+                <Clapperboard /> {generationMode === 'lookbook_image' ? 'Cau hinh anh Lookbook' : 'Cau hinh Video'}
+              </div>
+
+              {generationMode === 'video_prompt' && (
+                <div className="input-group">
+                  <label className="input-label">
+                    <Clock size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                    Thoi luong
+                  </label>
+                  <div className="chip-group">
+                    {DURATIONS.map(d => (
+                      <button
+                        key={d.value}
+                        className={`chip ${duration === d.value ? 'active' : ''}`}
+                        onClick={() => setDuration(d.value)}
+                        id={`duration-${d.value}`}
+                      >
+                        {d.label}
+                        <span style={{ fontSize: '0.65rem', opacity: 0.7, marginLeft: 4 }}>
+                          {d.scenes}sc/{d.keyframes}kf
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Aspect Ratio */}
               <div className="input-group">
                 <label className="input-label">
                   <Ratio size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-                  Tỉ lệ khung hình
+                  Ti le khung hinh
                 </label>
                 <div className="chip-group">
                   {ASPECT_RATIOS.map(ar => (
@@ -5293,6 +5635,12 @@ export default function App() {
                   ))}
                 </div>
               </div>
+
+              {generationMode === 'lookbook_image' && (
+                <p className="ai-task-hint" style={{ marginBottom: 0 }}>
+                  Mode nay chi tao prompt anh lookbook (anh tinh), khong tao keyframe/scenes video.
+                </p>
+              )}
             </div>
 
             {/* Content Type */}
@@ -5605,23 +5953,25 @@ export default function App() {
             </div>
 
             {/* Algorithm Info */}
-            <div className="card" style={{
-              marginBottom: 16,
-              background: 'rgba(139, 92, 246, 0.05)',
-              borderColor: 'rgba(139, 92, 246, 0.15)',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <Layers size={14} color="var(--accent-purple)" />
-                <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  Thuật toán N+1
-                </span>
+            {generationMode === 'video_prompt' && (
+              <div className="card" style={{
+                marginBottom: 16,
+                background: 'rgba(139, 92, 246, 0.05)',
+                borderColor: 'rgba(139, 92, 246, 0.15)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Layers size={14} color="var(--accent-purple)" />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-purple)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Thuật toán N+1
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  Video <strong>{duration}s</strong> → <strong>{durationInfo.scenes} scenes</strong> × 8s mỗi scene → cần <strong>{durationInfo.keyframes} ảnh keyframe</strong>.
+                  <br />
+                  Mỗi scene dùng <strong>Veo 3.1</strong>: ảnh đầu + ảnh cuối → interpolate 8s video liền mạch.
+                </p>
               </div>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                Video <strong>{duration}s</strong> → <strong>{durationInfo.scenes} scenes</strong> × 8s mỗi scene → cần <strong>{durationInfo.keyframes} ảnh keyframe</strong>.
-                <br />
-                Mỗi scene dùng <strong>Veo 3.1</strong>: ảnh đầu + ảnh cuối → interpolate 8s video liền mạch.
-              </p>
-            </div>
+            )}
 
             <div className={`prompt-inline-status prompt-inline-status-${promptStatusKind}`}>
               <div className="prompt-inline-status-head">
@@ -5637,12 +5987,12 @@ export default function App() {
                 <div>
                   <p className="prompt-inline-status-title">
                     {loading
-                      ? 'Đang tạo Prompt Package'
+                      ? `Dang tao ${promptPrimaryLabel}`
                       : promptStatusKind === 'error'
-                        ? 'Tạo prompt chưa thành công'
+                        ? 'Tao noi dung chua thanh cong'
                         : promptStatusKind === 'success'
-                          ? 'Prompt package đã sẵn sàng'
-                          : 'Nút tạo prompt đang nổi cố định phía dưới màn hình'}
+                          ? `${promptPrimaryLabel} da san sang`
+                          : 'Nut tao noi dung dang noi co dinh phia duoi man hinh'}
                   </p>
                   <p className="prompt-inline-status-subtitle">{promptFloatingStatus}</p>
                 </div>
@@ -5688,7 +6038,7 @@ export default function App() {
                   <Film className="results-empty-icon" />
                   <p className="results-empty-text">Chưa có prompt nào</p>
                   <p className="results-empty-hint">
-                    Upload ảnh face & sản phẩm, chọn cấu hình, rồi nhấn "Tạo Prompt Package" để bắt đầu.
+                    Upload ảnh face & sản phẩm, chọn cấu hình, rồi nhấn "{generationMode === 'lookbook_image' ? 'Tạo Ảnh Lookbook' : 'Tạo Prompt Package'}" để bắt đầu.
                   </p>
                   <div className="results-empty-steps">
                     <div className="results-empty-step">
@@ -5697,7 +6047,7 @@ export default function App() {
                     </div>
                     <div className="results-empty-step">
                       <span className="results-empty-step-index">2</span>
-                      <p>Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp</p>
+                      <p>{generationMode === 'lookbook_image' ? 'Chọn mode Lookbook Image, tỉ lệ và kiểu nội dung' : 'Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp'}</p>
                     </div>
                     <div className="results-empty-step">
                       <span className="results-empty-step-index">3</span>
@@ -5714,7 +6064,7 @@ export default function App() {
                         (Type: {selectedContentType.toUpperCase()})
                       </span>
                     )}
-                    {result && activeTab !== 'history' && (
+                    {result && activeTab !== 'history' && hasVideoPromptResult && (
                       <span style={{ marginLeft: 8, fontSize: '0.75rem', opacity: 0.7 }}>
                         [{(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()} • {(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}]
                       </span>
@@ -5724,7 +6074,7 @@ export default function App() {
                   <div className="results-scroll">
 
                   {/* Timeline */}
-                  {result && (
+                  {result && hasVideoPromptResult && (
                     <Timeline
                       keyframeCount={durationInfo.keyframes}
                       sceneCount={durationInfo.scenes}
@@ -5744,7 +6094,7 @@ export default function App() {
 
                   {/* Tabs */}
                   <div className="tabs">
-                    {result && (
+                    {result && hasVideoPromptResult && (
                       <button
                         className={`tab ${activeTab === 'keyframes' ? 'active' : ''}`}
                         onClick={() => setActiveTab('keyframes')}
@@ -5752,7 +6102,7 @@ export default function App() {
                         <Camera /> Keyframes ({result.keyframes.length})
                       </button>
                     )}
-                    {result && (
+                    {result && hasVideoPromptResult && (
                       <button
                         className={`tab ${activeTab === 'scenes' ? 'active' : ''}`}
                         onClick={() => setActiveTab('scenes')}
@@ -5781,10 +6131,10 @@ export default function App() {
                         className={`tab ${activeTab === 'image' ? 'active' : ''}`}
                         onClick={() => setActiveTab('image')}
                       >
-                        <ImageIcon /> Create Image
+                        <ImageIcon /> {hasVideoPromptResult ? 'Create Image' : 'Lookbook Image'}
                       </button>
                     )}
-                    {result && (
+                    {result && hasVideoPromptResult && (
                       <button
                         className={`tab ${activeTab === 'all' ? 'active' : ''}`}
                         onClick={() => setActiveTab('all')}
@@ -5810,7 +6160,7 @@ export default function App() {
                   </div>
 
                   {/* Content */}
-                  {result && (activeTab === 'keyframes' || activeTab === 'all') && (
+                  {result && hasVideoPromptResult && (activeTab === 'keyframes' || activeTab === 'all') && (
                     <>
                       {activeTab === 'all' && (
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -5843,7 +6193,7 @@ export default function App() {
                     </>
                   )}
 
-                  {result && (activeTab === 'scenes' || activeTab === 'all') && (
+                  {result && hasVideoPromptResult && (activeTab === 'scenes' || activeTab === 'all') && (
                     <>
                       {activeTab === 'all' && (
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-pink)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
@@ -5991,14 +6341,14 @@ export default function App() {
                     <>
                       {activeTab === 'all' && (
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-amber)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                          🎨 Create Image Prompt (Tạo ảnh sản phẩm)
+                          🎨 {hasVideoPromptResult ? 'Create Image Prompt (Tạo ảnh sản phẩm)' : 'Lookbook Image Prompt'}
                         </h3>
                       )}
                       <div className="prompt-card">
                         <div className="prompt-card-header">
                           <div className="prompt-card-badge" style={{ color: 'var(--accent-amber)' }}>
                             <Palette size={14} />
-                            Create Product Image Prompt
+                            {hasVideoPromptResult ? 'Create Product Image Prompt' : 'Lookbook Image Prompt'}
                           </div>
                           <span className="prompt-card-time">{selectedContentType.toUpperCase()}</span>
                         </div>
@@ -6302,10 +6652,10 @@ export default function App() {
           </div>
         </div>
 
-        <div className="prompt-floating-bar-wrap" role="region" aria-label="Tạo Prompt Package">
+        <div className="prompt-floating-bar-wrap" role="region" aria-label={generationMode === 'lookbook_image' ? 'Tao Anh Lookbook' : 'Tao Prompt Package'}>
           <div className={`prompt-floating-bar ${loading ? 'is-loading' : ''}`}>
             <div className="prompt-floating-meta">
-              <p className="prompt-floating-title">Tạo Prompt Package</p>
+              <p className="prompt-floating-title">{generationMode === 'lookbook_image' ? 'Tao Anh Lookbook' : 'Tao Prompt Package'}</p>
               <p className={`prompt-floating-subtitle ${promptStatusKind}`}>
                 {promptFloatingStatus}
               </p>
@@ -6320,12 +6670,12 @@ export default function App() {
               {loading ? (
                 <>
                   <div className="spinner" />
-                  Đang tạo prompt...
+                  {generationMode === 'lookbook_image' ? 'Dang tao anh lookbook...' : 'Dang tao prompt...'}
                 </>
               ) : (
                 <>
                   <Wand2 size={18} />
-                  Tạo Prompt Package
+                  {generationMode === 'lookbook_image' ? 'Tao Anh Lookbook' : 'Tao Prompt Package'}
                   <ArrowRight size={16} />
                 </>
               )}
@@ -6357,10 +6707,10 @@ export default function App() {
             <div className="prompt-toast-body">
               <p className="prompt-toast-title">
                 {promptToast.kind === 'loading'
-                  ? 'Đang tạo Prompt Package'
+                  ? `Dang tao ${promptPrimaryLabel}`
                   : promptToast.kind === 'success'
-                    ? 'Tạo Prompt thành công'
-                    : 'Có lỗi khi tạo Prompt'}
+                    ? `${promptPrimaryLabel} thanh cong`
+                    : `Co loi khi tao ${promptPrimaryLabel}`}
               </p>
               <p className="prompt-toast-message">{promptToast.message}</p>
             </div>
