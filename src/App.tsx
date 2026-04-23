@@ -921,6 +921,29 @@ function normalizeLookbookFacingDirection(
   return fallback
 }
 
+function buildDefaultFrameSubject(aspectRatio: string): string {
+  return `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`
+}
+
+function stripPromptFieldPrefix(value: string, labels: readonly string[]): string {
+  let next = value.trim()
+  if (!next) return next
+
+  const escapedLabels = labels
+    .map((label) => label.trim())
+    .filter((label) => label.length > 0)
+    .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+
+  if (escapedLabels.length === 0) return next
+
+  const fieldPrefixPattern = new RegExp(`^(?:${escapedLabels.join('|')})\\s*:\\s*`, 'i')
+  while (fieldPrefixPattern.test(next)) {
+    next = next.replace(fieldPrefixPattern, '').trim()
+  }
+
+  return next
+}
+
 function buildNanoBananaProFramePrompt(input: {
   subject: string
   action: string
@@ -931,14 +954,23 @@ function buildNanoBananaProFramePrompt(input: {
   style: string
   aspectRatio: string
 }): string {
-  return `SUBJECT: ${input.subject}
-ACTION: ${input.action}
-FACING: ${input.facingDirection}
-LOCATION: ${input.location}
-CAMERA: ${input.camera}
-LIGHTING: ${input.lighting}
-STYLE: ${input.style}
-ASPECT RATIO: ${input.aspectRatio}`
+  const subject = stripPromptFieldPrefix(input.subject, ['SUBJECT'])
+  const action = stripPromptFieldPrefix(input.action, ['ACTION'])
+  const facing = stripPromptFieldPrefix(input.facingDirection, ['FACING', 'FACING DIRECTION'])
+  const location = stripPromptFieldPrefix(input.location, ['LOCATION'])
+  const camera = stripPromptFieldPrefix(input.camera, ['CAMERA'])
+  const lighting = stripPromptFieldPrefix(input.lighting, ['LIGHTING'])
+  const style = stripPromptFieldPrefix(input.style, ['STYLE'])
+  const aspectRatio = stripPromptFieldPrefix(input.aspectRatio, ['ASPECT RATIO', 'ASPECT-RATIO'])
+
+  return `SUBJECT: ${subject}
+ACTION: ${action}
+FACING: ${facing}
+LOCATION: ${location}
+CAMERA: ${camera}
+LIGHTING: ${lighting}
+STYLE: ${style}
+ASPECT RATIO: ${aspectRatio}`
 }
 
 function buildLookbookPrimaryLocationFallback(contentType: ResolvedContentType): string {
@@ -1009,7 +1041,7 @@ function buildLookbookImagePromptSet(
       ? `[SHOT VARIATION]: Variation ${cycle}. Change pose/camera angle/background mood while preserving exact face and garment identity.`
       : ''
     const facingDirection = LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[i % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length]
-    const subject = `Single-frame lookbook still (${contentType.toUpperCase()}) with strict face identity and exact garment fidelity.`
+    const subject = buildDefaultFrameSubject(aspectRatio)
     const action = variationDirective
       ? `${blueprint.directive} Variation ${cycle}: change pose/camera/background mood while preserving exact identity and garment details.`
       : blueprint.directive
@@ -1070,7 +1102,7 @@ function normalizeLookbookImagePromptList(
     index: 0,
     title: 'Lookbook Hero Frame',
     purpose: 'Primary hero frame for lookbook output',
-    subject: 'Single-frame lookbook still with strict face identity and garment fidelity.',
+    subject: buildDefaultFrameSubject(aspectRatio),
     action: 'Front-facing hero pose with clear outfit readability and realistic posture.',
     facingDirection: 'front',
     location: 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
@@ -3170,7 +3202,7 @@ Return STRICT JSON only, same schema:
 
     // Build full prompts for each keyframe and scene
     const keyframes: KeyframePrompt[] = normalizedKeyframesForRule32.map((kf, i: number) => {
-      const subject = `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`
+        const subject = buildDefaultFrameSubject(aspectRatio)
       const location = synchronizedKeyframeLocations[i] || primaryResolvedLocation
 
       return {
@@ -3814,7 +3846,7 @@ function buildPromptResultFromHistoryItem(
       prompt: ensureLookbookNanoBananaPrompt(
         ensureLookbookAspectRatioTag(imageOnlyPrompt, aspectRatio),
         {
-          subject: lookbookPromptFallback[0].subject || 'Single-frame lookbook still with strict face identity and garment fidelity.',
+          subject: lookbookPromptFallback[0].subject || buildDefaultFrameSubject(aspectRatio),
           action: lookbookPromptFallback[0].action || 'Front-facing hero pose with clear outfit readability and realistic posture.',
           facingDirection: lookbookPromptFallback[0].facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[0],
           location: lookbookPromptFallback[0].location || 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
@@ -3861,7 +3893,7 @@ function buildPromptResultFromHistoryItem(
 
     const subject = toHistoryString(
       raw.subject,
-      `Create image ${aspectRatio} no split-screen. Faithful character face and body outfit likeness image reference.`,
+      buildDefaultFrameSubject(aspectRatio),
     )
     const action = toHistoryString(raw.action, `Fashion showcase movement beat ${index + 1}`)
     const location = toHistoryString(raw.location, fallbackLocation(index))
@@ -5391,7 +5423,7 @@ export default function App() {
           prompt: ensureLookbookNanoBananaPrompt(
             ensureLookbookAspectRatioTag(result.createImagePrompt, aspectRatio),
             {
-              subject: fallbackSet[0].subject || 'Single-frame lookbook still with strict face identity and garment fidelity.',
+              subject: fallbackSet[0].subject || buildDefaultFrameSubject(aspectRatio),
               action: fallbackSet[0].action || 'Front-facing hero pose with clear outfit readability and realistic posture.',
               facingDirection: fallbackSet[0].facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[0],
               location: fallbackSet[0].location || 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
