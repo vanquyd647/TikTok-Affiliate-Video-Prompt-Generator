@@ -434,6 +434,17 @@ const LOOKBOOK_NANO_BANANA_PRO_RULES = `[NANO BANANA PRO IMAGE RULESET]
 9. Never reference or imitate any real celebrity/public figure.
 10. If tone is sexy, keep it tasteful, classy, non-explicit, and policy-safe.`
 
+const LOOKBOOK_NATURAL_LOCATION_FALLBACKS = [
+  'Street fashion corner near Hoan Kiem Lake, Hanoi, Vietnam',
+  'Sidewalk cafe frontage in Thao Dien, Ho Chi Minh City, Vietnam',
+  'Tree-lined avenue near West Lake, Hanoi, Vietnam',
+  'Open plaza near Myeongdong shopping street, Seoul, South Korea',
+  'Riverside walk near Han River park, Seoul, South Korea',
+  'Pedestrian lane near Xintiandi district, Shanghai, China',
+  'Boutique storefront lane in Jing An district, Shanghai, China',
+  'Outdoor market lane in Ben Thanh area, Ho Chi Minh City, Vietnam',
+] as const
+
 const FIXED_AFFILIATE_MODE: AffiliateMode = 'strict'
 const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
 const FIXED_STRATEGY_LABEL = 'TikTok Shop Core (Strict AUTO + Soft Sell)'
@@ -973,9 +984,8 @@ STYLE: ${style}
 ASPECT RATIO: ${aspectRatio}`
 }
 
-function buildLookbookPrimaryLocationFallback(contentType: ResolvedContentType): string {
-  const styleLock = getContentTypeStyleLock(contentType)
-  return getStyleLockFallbackLocation(styleLock)
+function buildLookbookPrimaryLocationFallback(_contentType: ResolvedContentType): string {
+  return LOOKBOOK_NATURAL_LOCATION_FALLBACKS[0]
 }
 
 function ensureLookbookNanoBananaPrompt(
@@ -999,16 +1009,17 @@ function ensureLookbookNanoBananaPrompt(
     return matched?.[1]?.trim() || ''
   }
 
-  const subject = extractLineValue('SUBJECT') || frame.subject
-  const action = extractLineValue('ACTION') || frame.action
+  // Keep lookbook SUBJECT deterministic for downstream image models.
+  const subject = buildDefaultFrameSubject(aspectRatio)
+  const action = frame.action || extractLineValue('ACTION')
   const facingDirection = normalizeLookbookFacingDirection(
-    extractLineValue('FACING') || extractLineValue('FACING DIRECTION') || frame.facingDirection,
+    frame.facingDirection || extractLineValue('FACING') || extractLineValue('FACING DIRECTION'),
     frame.facingDirection,
   )
-  const location = extractLineValue('LOCATION') || frame.location
-  const camera = extractLineValue('CAMERA') || frame.camera
-  const lighting = extractLineValue('LIGHTING') || frame.lighting
-  const style = extractLineValue('STYLE') || frame.style
+  const location = frame.location || extractLineValue('LOCATION')
+  const camera = frame.camera || extractLineValue('CAMERA')
+  const lighting = frame.lighting || extractLineValue('LIGHTING')
+  const style = frame.style || extractLineValue('STYLE')
 
   return buildNanoBananaProFramePrompt({
     subject,
@@ -1030,7 +1041,7 @@ function buildLookbookImagePromptSet(
   styleTone: LookbookStyleTone,
 ): LookbookImagePrompt[] {
   const prompts: LookbookImagePrompt[] = []
-  const location = buildLookbookPrimaryLocationFallback(contentType)
+  const baseLocationFallback = buildLookbookPrimaryLocationFallback(contentType)
   const trimmedNotes = notes.trim()
 
   for (let i = 0; i < imageCount; i += 1) {
@@ -1041,6 +1052,7 @@ function buildLookbookImagePromptSet(
       ? `[SHOT VARIATION]: Variation ${cycle}. Change pose/camera angle/background mood while preserving exact face and garment identity.`
       : ''
     const facingDirection = LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[i % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length]
+    const location = LOOKBOOK_NATURAL_LOCATION_FALLBACKS[i % LOOKBOOK_NATURAL_LOCATION_FALLBACKS.length] || baseLocationFallback
     const subject = buildDefaultFrameSubject(aspectRatio)
     const action = variationDirective
       ? `${blueprint.directive} Variation ${cycle}: change pose/camera/background mood while preserving exact identity and garment details.`
@@ -1114,7 +1126,7 @@ function normalizeLookbookImagePromptList(
   const safeFallback = fallback.length > 0 ? fallback : [defaultFallback]
   const normalizeFromFallback = (item: LookbookImagePrompt, index: number): LookbookImagePrompt => {
     const shotPurpose = item.purpose?.trim() || defaultFallback.purpose
-    const subject = item.subject?.trim() || defaultFallback.subject || ''
+    const subject = buildDefaultFrameSubject(aspectRatio)
     const action = item.action?.trim() || shotPurpose
     const fallbackFacing = LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[index % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length]
     const facingDirection = normalizeLookbookFacingDirection(item.facingDirection, fallbackFacing)
@@ -1175,9 +1187,7 @@ function normalizeLookbookImagePromptList(
       const purpose = typeof record.purpose === 'string' && record.purpose.trim().length > 0
         ? record.purpose.trim()
         : fallbackItem.purpose
-      const subject = typeof record.subject === 'string' && record.subject.trim().length > 0
-        ? record.subject.trim()
-        : (fallbackItem.subject || defaultFallback.subject || '')
+      const subject = buildDefaultFrameSubject(aspectRatio)
       const action = typeof record.action === 'string' && record.action.trim().length > 0
         ? record.action.trim()
         : (fallbackItem.action || purpose)
@@ -5407,7 +5417,53 @@ export default function App() {
   const currentLookbookPrompts: LookbookImagePrompt[] = (() => {
     if (!result) return []
     if (Array.isArray(result.lookbookImagePrompts) && result.lookbookImagePrompts.length > 0) {
-      return result.lookbookImagePrompts.map((item, index) => ({ ...item, index }))
+      const fallbackSet = buildLookbookImagePromptSet(
+        result.resolvedContentType || selectedContentType,
+        notes,
+        aspectRatio,
+        lookbookImageCount,
+        lookbookStyleTone,
+      )
+
+      return result.lookbookImagePrompts.map((item, index) => {
+        const fallback = fallbackSet[index % fallbackSet.length] || fallbackSet[0]
+        const subject = buildDefaultFrameSubject(aspectRatio)
+        const action = item.action?.trim() || fallback?.action || 'Front-facing hero pose with clear outfit readability and realistic posture.'
+        const fallbackFacing = fallback?.facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[0]
+        const facingDirection = normalizeLookbookFacingDirection(
+          item.facingDirection ?? item.action ?? item.prompt,
+          fallbackFacing,
+        )
+        const location = item.location?.trim() || fallback?.location || 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam'
+        const camera = item.camera?.trim() || fallback?.camera || 'Fashion editorial camera framing with stable axis, full outfit readability, and realistic proportions.'
+        const lighting = item.lighting?.trim() || fallback?.lighting || 'Clean editorial soft lighting prioritizing texture clarity and product detail readability.'
+        const style = item.style?.trim() || fallback?.style || 'Classic social-native lookbook editorial with practical styling clarity and trust-first realism.'
+
+        return {
+          ...item,
+          index,
+          subject,
+          action,
+          facingDirection,
+          location,
+          camera,
+          lighting,
+          style,
+          prompt: ensureLookbookNanoBananaPrompt(
+            item.prompt || '',
+            {
+              subject,
+              action,
+              facingDirection,
+              location,
+              camera,
+              lighting,
+              style,
+            },
+            aspectRatio,
+          ),
+        }
+      })
     }
     if (result.createImagePrompt && result.createImagePrompt.trim().length > 0) {
       if (!hasVideoPromptResult) {
