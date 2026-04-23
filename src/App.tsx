@@ -6356,7 +6356,7 @@ export default function App() {
                   </div>
 
                   <p className="ai-task-hint" style={{ marginBottom: 0 }}>
-                    Mode nay tao bo {lookbookImageCount} prompt anh lookbook (anh tinh). Tone sexy la goi cam thoi trang, khong noi dung 18+.
+                    Mode nay tao bo {lookbookImageCount} prompt anh lookbook (anh tinh) theo format Nano Banana Pro: SUBJECT/ACTION/FACING/LOCATION/CAMERA/LIGHTING/STYLE/ASPECT RATIO. Tone sexy la goi cam thoi trang, khong noi dung 18+.
                   </p>
                 </>
               )}
