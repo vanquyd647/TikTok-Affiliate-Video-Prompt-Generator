@@ -508,6 +508,60 @@ const STUDIO_LOCATION_STYLE_KEYWORDS = [
   'studio mini',
 ] as const
 
+const TIKTOK_HARD_BLOCKED_BACKGROUND_KEYWORDS = [
+  'minimalist high end white studio background',
+  'minimalist high-end white studio background',
+  'white studio background',
+  'plain white background',
+  'solid color background',
+  'solid-colour background',
+  'blank background',
+  'plain background',
+  'seamless white backdrop',
+  'seamless background',
+  'cyclorama',
+  'infinity wall',
+  'infinite white background',
+  'empty white set',
+  'background only',
+  'nen trang tron',
+  'nen tron',
+  'phong nen tron',
+  'backdrop tron',
+] as const
+
+const TIKTOK_SOFT_BLOCKED_BACKGROUND_KEYWORDS = [
+  'clean backdrop',
+  'minimalist backdrop',
+  'empty backdrop',
+  'simple backdrop',
+  'blank wall background',
+  'gradient backdrop',
+] as const
+
+const TIKTOK_CONTEXTUAL_LOCATION_CUES = [
+  'studio corner',
+  'textured wall',
+  'wall texture',
+  'set design',
+  'clothing rack',
+  'rack',
+  'stool',
+  'chair',
+  'shelf',
+  'plant',
+  'mirror',
+  'fitting room',
+  'showroom',
+  'cafe',
+  'street',
+  'market',
+  'plaza',
+  'park',
+  'rooftop',
+  'hotel',
+] as const
+
 const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster is strong and broad (#ootd ~65M, #outfitideas ~23.5M, #fitcheck ~10M).
 - GRWM cluster is mainstream (#grwm ~22.8M) with strong alias behavior (#getreadywithme ~3.4M).
 - Mirror-specific internal labels are weak (#ootdmirror ~1.2K), so natural outputs should anchor to #fitcheck / #mirrorselfie / #ootd language.
@@ -1266,6 +1320,27 @@ function hasStyleKeyword(value: string, keywords: readonly string[]): boolean {
   return keywords.some((keyword) => normalized.includes(normalizeLocationKey(keyword)))
 }
 
+function isTikTokRestrictedFlatBackgroundLocation(value: string): boolean {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return false
+
+  const hasHardBlockedSignal = TIKTOK_HARD_BLOCKED_BACKGROUND_KEYWORDS.some((keyword) =>
+    normalized.includes(normalizeLocationKey(keyword))
+  )
+  if (hasHardBlockedSignal) return true
+
+  const hasSoftBlockedSignal = TIKTOK_SOFT_BLOCKED_BACKGROUND_KEYWORDS.some((keyword) =>
+    normalized.includes(normalizeLocationKey(keyword))
+  )
+  if (!hasSoftBlockedSignal) return false
+
+  const hasContextualCue = TIKTOK_CONTEXTUAL_LOCATION_CUES.some((keyword) =>
+    normalized.includes(normalizeLocationKey(keyword))
+  )
+
+  return !hasContextualCue
+}
+
 function getContentTypeStyleLock(contentType: ResolvedContentType): ContentStyleLock {
   if (contentType === 'ootdmirror') return 'mirror'
   if (contentType === 'ootd') return 'studio'
@@ -1291,7 +1366,7 @@ function getStyleLockFallbackLocation(styleLock: ContentStyleLock): string {
   }
 
   if (styleLock === 'studio') {
-    return 'Single-corner fashion studio with clean backdrop, District 7, Ho Chi Minh City, Vietnam'
+    return 'Single-corner fashion studio with textured wall panels and clothing rack props, District 7, Ho Chi Minh City, Vietnam'
   }
 
   return 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam'
@@ -1308,8 +1383,9 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
   }
 
   if (contentType === 'ootd') {
-    return `- Studio-first OOTD grammar: clean single-corner set, full-look reveal, detail proof, confidence closer.
+    return `- Studio-first OOTD grammar: contextual single-corner set (textured/decorated wall cues), full-look reveal, detail proof, confidence closer.
 - Align social-native cues with OOTD cluster behavior (#ootd, #outfit, #outfitideas style readability).
+- Avoid plain seamless white/solid-color background look that feels like a static cutout ad.
 - Prioritize outfit readability over aggressive transitions.`
   }
 
@@ -1328,6 +1404,7 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
   if (contentType === 'tiktokshop') {
     return `- TikTok Shop grammar: proof stack (fit + material + usage) then objection handling and conversion intent.
 - Keep product readability dominant and include review or unboxing style trust cues.
+- Avoid flat/plain seamless backgrounds; keep believable social-native depth in the environment.
 - Maintain conversion-native language and framing consistency across scenes.`
   }
 
@@ -2283,11 +2360,12 @@ RULES:
 - No duplicate locations against history lists above.
 - AI must self-select fresh real-world locations. Do not use fixed/preset location pools.
 - Choose ONE primary location and keep it consistent across all keyframes/scenes.
+- TikTok product-marketing policy: reject flat/plain seamless backgrounds (example: "minimalist high-end white studio background"). If using studio, keep contextual set depth (textured wall, practical props, realistic spacing).
 - USER NOTES PRIORITY: If user notes are provided, treat them as the highest-priority creative direction and follow them first.
 - Only deviate from user notes when mandatory constraints require it (schema, safety guardrails, location scope, interpolation continuity).
 - For OOTDMIRROR, enforce mirror-fitcheck setup across all scenes.
-- For OOTD, enforce single-corner studio setup across all scenes.
-- For OutfitIdeas, choose mirror-fitcheck OR single-corner studio and keep style consistent.
+- For OOTD, enforce single-corner contextual studio setup across all scenes (no plain seamless background).
+- For OutfitIdeas, choose mirror-fitcheck OR single-corner contextual studio and keep style consistent.
 - Build action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
 - Plan for retention arc: Hook -> Value -> Proof -> Close.
 - If content type label is niche or internal, express the plan using stronger natural TikTok behavior clusters.
@@ -2384,6 +2462,7 @@ Output STRICT JSON only:
 
       return (
         isAllowedLocationCountry(candidate)
+        && !isTikTokRestrictedFlatBackgroundLocation(candidate)
         && matchesStyleLockForLocation(candidate, finalStyleLock)
         && !blockedLocationKeys.has(candidateKey)
       )
@@ -2410,6 +2489,10 @@ Output STRICT JSON only:
           return { ok: false, reason: `keyframe[${i}] missing location` }
         }
 
+        if (isTikTokRestrictedFlatBackgroundLocation(location)) {
+          return { ok: false, reason: `keyframe[${i}] location uses restricted flat/plain background` }
+        }
+
       }
 
       return { ok: true }
@@ -2430,6 +2513,10 @@ Output STRICT JSON only:
         const location = toSafeText(keyframe.location, '')
         if (location.length === 0) {
           return { ok: false, reason: `keyframe[${i}] missing location` }
+        }
+
+        if (isTikTokRestrictedFlatBackgroundLocation(location)) {
+          return { ok: false, reason: `keyframe[${i}] location uses restricted flat/plain background` }
         }
 
         if (!isAllowedLocationCountry(location)) {
@@ -2773,7 +2860,7 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
 11. Camera grammar must stay coherent: one dominant camera move per 8s scene, no chaotic mixed camera instructions.
 12. First-last-frame interpolation safety is mandatory: adjacent keyframes must use micro-progression (small pose delta, stable framing axis, no sudden body teleport).
 13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
-14. LOCATION MUST BE REAL-WORLD VENUES ONLY - Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments.
+14. LOCATION MUST BE REAL-WORLD VENUES ONLY - Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments, and avoid flat/plain seamless backgrounds (example: "minimalist high-end white studio background").
 15. LOCATION SCOPE = VIETNAM, CHINA, SOUTH KOREA ONLY - Every location must be in Vietnam, China, or South Korea, and must include concrete city/area + venue details.
 16. AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID + SAME OUTFIT TYPE - Never reuse locations listed in either location-history section above.
 17. ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT - Use the Diversity seed to generate fresh concepts; do not duplicate ACTION, LOCATION, CAMERA, NARRATIVE in one output.
@@ -2786,7 +2873,7 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
 24. NO-CTA ENDING + TEMPLATE CONSISTENCY - Final scene should land a clean visual payoff with product clarity; explicit CTA is optional and never mandatory.
 25. OOTD FAMILY TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTDMIRROR, enforce mirror fitcheck flow only. For OOTD, enforce single-corner studio flow only. For OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow. [SUBORDINATE to Rule 30 — User Notes override format/flow]
 26. MIRROR FITCHECK SPEC - Use observer-camera framing (camera in front of model) with the mirror behind the model for reflection proof, keep full-body head-to-toe readability, do not let model hold phone/camera, and ensure no camera/tripod/operator reflection appears in the mirror. [SUBORDINATE to Rule 30 — User Notes may modify mirror spec]
-27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner/backdrop with clean floor-wall geometry, soft controlled lighting, minimal props, and consistent camera axis for all scenes. [SUBORDINATE to Rule 30 — User Notes may modify studio spec]
+27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner with contextual depth (textured/decorated wall, practical props like rack/stool/shelf), soft controlled lighting, and consistent camera axis for all scenes; avoid plain seamless white/solid-color backdrops. [SUBORDINATE to Rule 30 — User Notes may modify studio spec]
 28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition. [SUBORDINATE to Rule 30 — User Notes may override style lock]
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
 30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default style, tone, format, location, camera, and narrative choices in Rules 5–29 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Rule 31 (celebrity safety), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12) are the only truly non-negotiable constraints.
@@ -2861,6 +2948,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   Validate and repair the draft package to satisfy all constraints below:
   - Enforce CRITICAL RULES 1..32 exactly as defined in package generation stage.
   - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
+  - Reject flat/plain seamless backgrounds (example: "minimalist high-end white studio background"); keep contextual environment depth.
   - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
   - AI must choose fresh locations itself and must avoid all locations listed in location-history constraints.
   - Keep camera grammar coherent and avoid chaotic mixed movement in one scene.
@@ -2947,6 +3035,7 @@ LOCATION CONSTRAINTS:
 - Scope strictly Vietnam/China/South Korea.
 - Avoid all locations in history lists below.
 - Keep real-world venues only.
+- Reject flat/plain seamless backgrounds (example: "minimalist high-end white studio background"). If studio is used, include contextual set cues (textured wall/props/depth).
 
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsProductPrompt}
