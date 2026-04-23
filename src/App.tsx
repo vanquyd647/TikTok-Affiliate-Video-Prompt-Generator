@@ -910,14 +910,6 @@ function coerceLookbookImageCountFromLength(length: number): LookbookImageCount 
   return 5
 }
 
-function buildLookbookToneDirective(styleTone: LookbookStyleTone): string {
-  if (styleTone === 'sexy') {
-    return 'Tasteful sexy tone: confident pose, elegant body lines, fashion-first framing, non-explicit and policy-safe.'
-  }
-
-  return 'Classic lookbook tone: practical outfit readability, clean styling cues, and save-worthy composition.'
-}
-
 function normalizeLookbookFacingDirection(
   value: unknown,
   fallback: PromptFacingDirection,
@@ -966,39 +958,36 @@ function ensureLookbookNanoBananaPrompt(
     style: string
   },
   aspectRatio: '9:16' | '16:9',
-  toneDirective: string,
-  shotPurpose: string,
 ): string {
   const normalizedRaw = (rawPrompt || '').trim()
-  const hasSubject = /(^|\n)\s*SUBJECT\s*:/i.test(normalizedRaw)
-  const hasAction = /(^|\n)\s*ACTION\s*:/i.test(normalizedRaw)
-  const hasCamera = /(^|\n)\s*CAMERA\s*:/i.test(normalizedRaw)
-  const looksStructured = hasSubject && hasAction && hasCamera
-
-  let next = looksStructured
-    ? normalizedRaw
-    : buildNanoBananaProFramePrompt({
-      ...frame,
-      aspectRatio,
-    })
-
-  if (!next.includes('[NANO BANANA PRO IMAGE RULESET]')) {
-    next = `${LOOKBOOK_NANO_BANANA_PRO_RULES}\n${next}`
+  const extractLineValue = (label: string): string => {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const pattern = new RegExp(`(?:^|\\n)\\s*${escaped}\\s*:\\s*([^\\n]+)`, 'i')
+    const matched = normalizedRaw.match(pattern)
+    return matched?.[1]?.trim() || ''
   }
 
-  if (!/(^|\n)\s*\[LOOKBOOK TONE\]\s*:/i.test(next)) {
-    next = `${next}\n[LOOKBOOK TONE]: ${toneDirective}`
-  }
+  const subject = extractLineValue('SUBJECT') || frame.subject
+  const action = extractLineValue('ACTION') || frame.action
+  const facingDirection = normalizeLookbookFacingDirection(
+    extractLineValue('FACING') || extractLineValue('FACING DIRECTION') || frame.facingDirection,
+    frame.facingDirection,
+  )
+  const location = extractLineValue('LOCATION') || frame.location
+  const camera = extractLineValue('CAMERA') || frame.camera
+  const lighting = extractLineValue('LIGHTING') || frame.lighting
+  const style = extractLineValue('STYLE') || frame.style
 
-  if (!/(^|\n)\s*\[SHOT PURPOSE\]\s*:/i.test(next)) {
-    next = `${next}\n[SHOT PURPOSE]: ${shotPurpose}`
-  }
-
-  if (normalizedRaw.length > 0 && !looksStructured && !next.includes('[DETAIL DIRECTIVES]')) {
-    next = `${next}\n[DETAIL DIRECTIVES]\n${normalizedRaw}`
-  }
-
-  return ensureLookbookAspectRatioTag(next, aspectRatio)
+  return buildNanoBananaProFramePrompt({
+    subject,
+    action,
+    facingDirection,
+    location,
+    camera,
+    lighting,
+    style,
+    aspectRatio,
+  })
 }
 
 function buildLookbookImagePromptSet(
@@ -1008,10 +997,9 @@ function buildLookbookImagePromptSet(
   imageCount: LookbookImageCount,
   styleTone: LookbookStyleTone,
 ): LookbookImagePrompt[] {
-  const basePrompt = buildLookbookImageOnlyPrompt(contentType, notes, aspectRatio, styleTone)
-  const toneDirective = buildLookbookToneDirective(styleTone)
   const prompts: LookbookImagePrompt[] = []
   const location = buildLookbookPrimaryLocationFallback(contentType)
+  const trimmedNotes = notes.trim()
 
   for (let i = 0; i < imageCount; i += 1) {
     const blueprint = LOOKBOOK_SHOT_BLUEPRINTS[i % LOOKBOOK_SHOT_BLUEPRINTS.length]
@@ -1025,6 +1013,9 @@ function buildLookbookImagePromptSet(
     const action = variationDirective
       ? `${blueprint.directive} Variation ${cycle}: change pose/camera/background mood while preserving exact identity and garment details.`
       : blueprint.directive
+    const resolvedAction = trimmedNotes.length > 0
+      ? appendSentenceIfMissing(action, `Creative notes: ${trimmedNotes}`)
+      : action
     const camera = cycle > 1
       ? 'Fresh camera angle variation with stable axis, conversion-first garment readability, no split-screen.'
       : 'Fashion editorial camera framing with stable axis, full outfit readability, and realistic proportions.'
@@ -1034,24 +1025,23 @@ function buildLookbookImagePromptSet(
     const style = styleTone === 'sexy'
       ? 'Tasteful sexy fashion editorial, classy confidence, non-explicit social-native lookbook.'
       : 'Classic social-native lookbook editorial with practical styling clarity and trust-first realism.'
-    const rawPrompt = `${basePrompt}\n[LOOKBOOK SHOT]: ${blueprint.directive}${variationDirective ? `\n${variationDirective}` : ''}`
 
     prompts.push({
       index: i,
       title: `${blueprint.title}${variationSuffix}`,
       purpose: blueprint.purpose,
       subject,
-      action,
+      action: resolvedAction,
       facingDirection,
       location,
       camera,
       lighting,
       style,
       prompt: ensureLookbookNanoBananaPrompt(
-        rawPrompt,
+        '',
         {
           subject,
-          action,
+          action: resolvedAction,
           facingDirection,
           location,
           camera,
@@ -1059,8 +1049,6 @@ function buildLookbookImagePromptSet(
           style,
         },
         aspectRatio,
-        toneDirective,
-        blueprint.purpose,
       ),
     })
   }
@@ -1075,7 +1063,9 @@ function normalizeLookbookImagePromptList(
   imageCount: LookbookImageCount,
   styleTone: LookbookStyleTone = 'standard',
 ): LookbookImagePrompt[] {
-  const toneDirective = buildLookbookToneDirective(styleTone)
+  const defaultStyleByTone = styleTone === 'sexy'
+    ? 'Tasteful sexy fashion editorial, classy confidence, non-explicit social-native lookbook.'
+    : 'Classic social-native lookbook editorial with practical styling clarity and trust-first realism.'
   const defaultFallback: LookbookImagePrompt = {
     index: 0,
     title: 'Lookbook Hero Frame',
@@ -1086,7 +1076,7 @@ function normalizeLookbookImagePromptList(
     location: 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
     camera: 'Fashion editorial camera framing, stable axis, realistic proportions.',
     lighting: 'Clean editorial soft lighting with texture clarity.',
-    style: 'Social-native lookbook editorial style, trust-first realism.',
+    style: defaultStyleByTone,
     prompt: '',
   }
   const safeFallback = fallback.length > 0 ? fallback : [defaultFallback]
@@ -1125,8 +1115,6 @@ function normalizeLookbookImagePromptList(
           style,
         },
         aspectRatio,
-        toneDirective,
-        shotPurpose,
       ),
     }
   }
@@ -1204,8 +1192,6 @@ function normalizeLookbookImagePromptList(
             style,
           },
           aspectRatio,
-          toneDirective,
-          purpose,
         ),
       }
     })
@@ -3837,8 +3823,6 @@ function buildPromptResultFromHistoryItem(
           style: lookbookPromptFallback[0].style || 'Social-native lookbook editorial style, trust-first realism.',
         },
         aspectRatio,
-        buildLookbookToneDirective(metadataLookbookStyleTone),
-        lookbookPromptFallback[0].purpose || 'Primary hero frame for lookbook output',
       ),
     }
   }
@@ -5416,8 +5400,6 @@ export default function App() {
               style: fallbackSet[0].style || 'Social-native lookbook editorial style, trust-first realism.',
             },
             aspectRatio,
-            buildLookbookToneDirective(lookbookStyleTone),
-            fallbackSet[0].purpose || 'Primary hero frame for lookbook output',
           ),
         }
         return fallbackSet
@@ -6007,7 +5989,6 @@ export default function App() {
           lines.push(
             '',
             `LOOKBOOK IMAGE ${prompt.index + 1}: ${prompt.title}`,
-            `Purpose: ${prompt.purpose}`,
             prompt.prompt,
           )
         }
@@ -6095,7 +6076,6 @@ export default function App() {
           lines.push(
             '',
             `LOOKBOOK IMAGE ${prompt.index + 1}: ${prompt.title}`,
-            `PURPOSE: ${prompt.purpose}`,
             prompt.prompt,
           )
         }
@@ -7077,12 +7057,6 @@ export default function App() {
                           <div className="prompt-card-body">
                             <CopyButton text={lookbookPrompt.prompt} />
                             <div className="prompt-text" style={{ lineHeight: 1.8 }}>
-                              {!hasVideoPromptResult && (
-                                <>
-                                  <strong>PURPOSE:</strong> {lookbookPrompt.purpose}
-                                  {'\n'}
-                                </>
-                              )}
                               {lookbookPrompt.prompt}
                             </div>
                           </div>
