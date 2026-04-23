@@ -10,12 +10,14 @@ import './index.css'
 // ═══════════════════════════════════════════════
 // TYPES
 // ═══════════════════════════════════════════════
+type PromptFacingDirection = 'front' | 'back' | 'left' | 'right' | 'three-quarter-left' | 'three-quarter-right'
+
 interface KeyframePrompt {
   index: number
   timestamp: string
   subject: string
   action: string
-  facingDirection?: 'front' | 'back' | 'left' | 'right' | 'three-quarter-left' | 'three-quarter-right'
+  facingDirection?: PromptFacingDirection
   location: string
   camera: string
   lighting: string
@@ -52,6 +54,13 @@ interface LookbookImagePrompt {
   index: number
   title: string
   purpose: string
+  subject?: string
+  action?: string
+  facingDirection?: PromptFacingDirection
+  location?: string
+  camera?: string
+  lighting?: string
+  style?: string
   prompt: string
 }
 
@@ -403,6 +412,27 @@ const LOOKBOOK_SHOT_BLUEPRINTS: Array<{
 
 const LOOKBOOK_TIKTOK_SIGNAL_HINT = `TikTok tag snapshots (web): #OOTD ~65.5M posts, #lookbook ~459.5K posts, #sexyoutfit ~37.6K posts.
 Implication: keep OOTD readability first, then lookbook polish; sexy should be tasteful and non-explicit.`
+
+const LOOKBOOK_NANO_BANANA_FACING_SEQUENCE: PromptFacingDirection[] = [
+  'front',
+  'three-quarter-left',
+  'back',
+  'three-quarter-right',
+  'left',
+  'right',
+]
+
+const LOOKBOOK_NANO_BANANA_PRO_RULES = `[NANO BANANA PRO IMAGE RULESET]
+1. Single frame only. No split-screen, no storyboard, no timeline terms.
+2. Keep exact face identity and exact garment fidelity from references.
+3. Product-first framing: outfit details must stay readable and not occluded.
+4. Keep realistic anatomy and natural posing with physically plausible body angles.
+5. Use explicit body-facing direction and vary facing between adjacent prompts in a set.
+6. Keep one coherent camera instruction per image (no conflicting camera grammar).
+7. Keep lighting practical and continuity-safe for social-native lookbook usage.
+8. Respect user notes as primary direction unless safety/schema constraints conflict.
+9. Never reference or imitate any real celebrity/public figure.
+10. If tone is sexy, keep it tasteful, classy, non-explicit, and policy-safe.`
 
 const FIXED_AFFILIATE_MODE: AffiliateMode = 'strict'
 const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
@@ -888,6 +918,89 @@ function buildLookbookToneDirective(styleTone: LookbookStyleTone): string {
   return 'Classic lookbook tone: practical outfit readability, clean styling cues, and save-worthy composition.'
 }
 
+function normalizeLookbookFacingDirection(
+  value: unknown,
+  fallback: PromptFacingDirection,
+): PromptFacingDirection {
+  const parsed = normalizeFacingDirectionToken(value)
+  if (parsed !== 'unknown') {
+    return parsed
+  }
+  return fallback
+}
+
+function buildNanoBananaProFramePrompt(input: {
+  subject: string
+  action: string
+  facingDirection: PromptFacingDirection
+  location: string
+  camera: string
+  lighting: string
+  style: string
+  aspectRatio: string
+}): string {
+  return `SUBJECT: ${input.subject}
+ACTION: ${input.action}
+FACING: ${input.facingDirection}
+LOCATION: ${input.location}
+CAMERA: ${input.camera}
+LIGHTING: ${input.lighting}
+STYLE: ${input.style}
+ASPECT RATIO: ${input.aspectRatio}`
+}
+
+function buildLookbookPrimaryLocationFallback(contentType: ResolvedContentType): string {
+  const styleLock = getContentTypeStyleLock(contentType)
+  return getStyleLockFallbackLocation(styleLock)
+}
+
+function ensureLookbookNanoBananaPrompt(
+  rawPrompt: string,
+  frame: {
+    subject: string
+    action: string
+    facingDirection: PromptFacingDirection
+    location: string
+    camera: string
+    lighting: string
+    style: string
+  },
+  aspectRatio: '9:16' | '16:9',
+  toneDirective: string,
+  shotPurpose: string,
+): string {
+  const normalizedRaw = (rawPrompt || '').trim()
+  const hasSubject = /(^|\n)\s*SUBJECT\s*:/i.test(normalizedRaw)
+  const hasAction = /(^|\n)\s*ACTION\s*:/i.test(normalizedRaw)
+  const hasCamera = /(^|\n)\s*CAMERA\s*:/i.test(normalizedRaw)
+  const looksStructured = hasSubject && hasAction && hasCamera
+
+  let next = looksStructured
+    ? normalizedRaw
+    : buildNanoBananaProFramePrompt({
+      ...frame,
+      aspectRatio,
+    })
+
+  if (!next.includes('[NANO BANANA PRO IMAGE RULESET]')) {
+    next = `${LOOKBOOK_NANO_BANANA_PRO_RULES}\n${next}`
+  }
+
+  if (!/(^|\n)\s*\[LOOKBOOK TONE\]\s*:/i.test(next)) {
+    next = `${next}\n[LOOKBOOK TONE]: ${toneDirective}`
+  }
+
+  if (!/(^|\n)\s*\[SHOT PURPOSE\]\s*:/i.test(next)) {
+    next = `${next}\n[SHOT PURPOSE]: ${shotPurpose}`
+  }
+
+  if (normalizedRaw.length > 0 && !looksStructured && !next.includes('[DETAIL DIRECTIVES]')) {
+    next = `${next}\n[DETAIL DIRECTIVES]\n${normalizedRaw}`
+  }
+
+  return ensureLookbookAspectRatioTag(next, aspectRatio)
+}
+
 function buildLookbookImagePromptSet(
   contentType: ResolvedContentType,
   notes: string,
@@ -898,6 +1011,7 @@ function buildLookbookImagePromptSet(
   const basePrompt = buildLookbookImageOnlyPrompt(contentType, notes, aspectRatio, styleTone)
   const toneDirective = buildLookbookToneDirective(styleTone)
   const prompts: LookbookImagePrompt[] = []
+  const location = buildLookbookPrimaryLocationFallback(contentType)
 
   for (let i = 0; i < imageCount; i += 1) {
     const blueprint = LOOKBOOK_SHOT_BLUEPRINTS[i % LOOKBOOK_SHOT_BLUEPRINTS.length]
@@ -906,14 +1020,47 @@ function buildLookbookImagePromptSet(
     const variationDirective = cycle > 1
       ? `[SHOT VARIATION]: Variation ${cycle}. Change pose/camera angle/background mood while preserving exact face and garment identity.`
       : ''
+    const facingDirection = LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[i % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length]
+    const subject = `Single-frame lookbook still (${contentType.toUpperCase()}) with strict face identity and exact garment fidelity.`
+    const action = variationDirective
+      ? `${blueprint.directive} Variation ${cycle}: change pose/camera/background mood while preserving exact identity and garment details.`
+      : blueprint.directive
+    const camera = cycle > 1
+      ? 'Fresh camera angle variation with stable axis, conversion-first garment readability, no split-screen.'
+      : 'Fashion editorial camera framing with stable axis, full outfit readability, and realistic proportions.'
+    const lighting = styleTone === 'sexy'
+      ? 'Tasteful contour lighting with soft key and clean fill, body lines elegant and non-explicit.'
+      : 'Clean editorial soft lighting prioritizing texture clarity and product detail readability.'
+    const style = styleTone === 'sexy'
+      ? 'Tasteful sexy fashion editorial, classy confidence, non-explicit social-native lookbook.'
+      : 'Classic social-native lookbook editorial with practical styling clarity and trust-first realism.'
+    const rawPrompt = `${basePrompt}\n[LOOKBOOK SHOT]: ${blueprint.directive}${variationDirective ? `\n${variationDirective}` : ''}`
 
     prompts.push({
       index: i,
       title: `${blueprint.title}${variationSuffix}`,
       purpose: blueprint.purpose,
-      prompt: ensureLookbookAspectRatioTag(
-        `${basePrompt}\n[LOOKBOOK TONE]: ${toneDirective}\n[LOOKBOOK SHOT]: ${blueprint.directive}\n[SHOT PURPOSE]: ${blueprint.purpose}${variationDirective ? `\n${variationDirective}` : ''}`,
+      subject,
+      action,
+      facingDirection,
+      location,
+      camera,
+      lighting,
+      style,
+      prompt: ensureLookbookNanoBananaPrompt(
+        rawPrompt,
+        {
+          subject,
+          action,
+          facingDirection,
+          location,
+          camera,
+          lighting,
+          style,
+        },
         aspectRatio,
+        toneDirective,
+        blueprint.purpose,
       ),
     })
   }
@@ -926,16 +1073,76 @@ function normalizeLookbookImagePromptList(
   fallback: LookbookImagePrompt[],
   aspectRatio: '9:16' | '16:9',
   imageCount: LookbookImageCount,
+  styleTone: LookbookStyleTone = 'standard',
 ): LookbookImagePrompt[] {
+  const toneDirective = buildLookbookToneDirective(styleTone)
+  const defaultFallback: LookbookImagePrompt = {
+    index: 0,
+    title: 'Lookbook Hero Frame',
+    purpose: 'Primary hero frame for lookbook output',
+    subject: 'Single-frame lookbook still with strict face identity and garment fidelity.',
+    action: 'Front-facing hero pose with clear outfit readability and realistic posture.',
+    facingDirection: 'front',
+    location: 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
+    camera: 'Fashion editorial camera framing, stable axis, realistic proportions.',
+    lighting: 'Clean editorial soft lighting with texture clarity.',
+    style: 'Social-native lookbook editorial style, trust-first realism.',
+    prompt: '',
+  }
+  const safeFallback = fallback.length > 0 ? fallback : [defaultFallback]
+  const normalizeFromFallback = (item: LookbookImagePrompt, index: number): LookbookImagePrompt => {
+    const shotPurpose = item.purpose?.trim() || defaultFallback.purpose
+    const subject = item.subject?.trim() || defaultFallback.subject || ''
+    const action = item.action?.trim() || shotPurpose
+    const fallbackFacing = LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[index % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length]
+    const facingDirection = normalizeLookbookFacingDirection(item.facingDirection, fallbackFacing)
+    const location = item.location?.trim() || defaultFallback.location || ''
+    const camera = item.camera?.trim() || defaultFallback.camera || ''
+    const lighting = item.lighting?.trim() || defaultFallback.lighting || ''
+    const style = item.style?.trim() || defaultFallback.style || ''
+
+    return {
+      ...item,
+      index,
+      title: item.title?.trim() || defaultFallback.title,
+      purpose: shotPurpose,
+      subject,
+      action,
+      facingDirection,
+      location,
+      camera,
+      lighting,
+      style,
+      prompt: ensureLookbookNanoBananaPrompt(
+        item.prompt || '',
+        {
+          subject,
+          action,
+          facingDirection,
+          location,
+          camera,
+          lighting,
+          style,
+        },
+        aspectRatio,
+        toneDirective,
+        shotPurpose,
+      ),
+    }
+  }
+
   if (!Array.isArray(value)) {
-    return fallback
+    return safeFallback
       .slice(0, imageCount)
-      .map((item, index) => ({ ...item, index }))
+      .map((item, index) => normalizeFromFallback(item, index))
   }
 
   const normalized = value
     .map((item, index): LookbookImagePrompt | null => {
-      const fallbackItem = fallback[index % fallback.length]
+      const fallbackItem = normalizeFromFallback(
+        safeFallback[index % safeFallback.length],
+        index,
+      )
 
       if (!item || typeof item !== 'object' || Array.isArray(item)) {
         return null
@@ -948,6 +1155,28 @@ function normalizeLookbookImagePromptList(
       const purpose = typeof record.purpose === 'string' && record.purpose.trim().length > 0
         ? record.purpose.trim()
         : fallbackItem.purpose
+      const subject = typeof record.subject === 'string' && record.subject.trim().length > 0
+        ? record.subject.trim()
+        : (fallbackItem.subject || defaultFallback.subject || '')
+      const action = typeof record.action === 'string' && record.action.trim().length > 0
+        ? record.action.trim()
+        : (fallbackItem.action || purpose)
+      const facingDirection = normalizeLookbookFacingDirection(
+        record.facingDirection ?? record.action ?? record.prompt,
+        fallbackItem.facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[index % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length],
+      )
+      const location = typeof record.location === 'string' && record.location.trim().length > 0
+        ? record.location.trim()
+        : (fallbackItem.location || defaultFallback.location || '')
+      const camera = typeof record.camera === 'string' && record.camera.trim().length > 0
+        ? record.camera.trim()
+        : (fallbackItem.camera || defaultFallback.camera || '')
+      const lighting = typeof record.lighting === 'string' && record.lighting.trim().length > 0
+        ? record.lighting.trim()
+        : (fallbackItem.lighting || defaultFallback.lighting || '')
+      const style = typeof record.style === 'string' && record.style.trim().length > 0
+        ? record.style.trim()
+        : (fallbackItem.style || defaultFallback.style || '')
       const rawPrompt = typeof record.prompt === 'string' && record.prompt.trim().length > 0
         ? record.prompt.trim()
         : fallbackItem.prompt
@@ -956,15 +1185,36 @@ function normalizeLookbookImagePromptList(
         index,
         title,
         purpose,
-        prompt: ensureLookbookAspectRatioTag(rawPrompt, aspectRatio),
+        subject,
+        action,
+        facingDirection,
+        location,
+        camera,
+        lighting,
+        style,
+        prompt: ensureLookbookNanoBananaPrompt(
+          rawPrompt,
+          {
+            subject,
+            action,
+            facingDirection,
+            location,
+            camera,
+            lighting,
+            style,
+          },
+          aspectRatio,
+          toneDirective,
+          purpose,
+        ),
       }
     })
     .filter((item): item is LookbookImagePrompt => item !== null)
 
   const merged = [...normalized]
-  for (const fallbackItem of fallback) {
+  for (const fallbackItem of safeFallback) {
     if (merged.length >= imageCount) break
-    merged.push({ ...fallbackItem, index: merged.length })
+    merged.push(normalizeFromFallback(fallbackItem, merged.length))
   }
 
   return merged
@@ -2947,14 +3197,16 @@ Return STRICT JSON only, same schema:
         camera: kf.camera,
         lighting: kf.lighting,
         style: kf.style,
-        fullPrompt: `SUBJECT: ${subject}
-ACTION: ${kf.action}
-FACING: ${kf.facingDirection}
-LOCATION: ${location}
-CAMERA: ${kf.camera}
-LIGHTING: ${kf.lighting}
-STYLE: ${kf.style}
-ASPECT RATIO: ${aspectRatio}`,
+        fullPrompt: buildNanoBananaProFramePrompt({
+          subject,
+          action: kf.action,
+          facingDirection: kf.facingDirection,
+          location,
+          camera: kf.camera,
+          lighting: kf.lighting,
+          style: kf.style,
+          aspectRatio,
+        }),
       }
     })
 
@@ -3128,6 +3380,11 @@ REQUIREMENTS:
 - Do NOT include timeline language, keyframes, scenes, transitions, interpolation, or motion continuity instructions.
 - Do NOT mention real celebrities/public figures.
 - If style tone is SEXY: keep it tasteful, classy, fashion-first, and non-explicit.
+- For each image prompt, enforce Nano Banana Pro frame format parity with video keyframe format:
+  SUBJECT -> ACTION -> FACING -> LOCATION -> CAMERA -> LIGHTING -> STYLE -> ASPECT RATIO.
+
+NANO BANANA PRO IMAGE RULES (MANDATORY):
+${LOOKBOOK_NANO_BANANA_PRO_RULES}
 
 SHOT BLUEPRINT (must cover all):
 ${LOOKBOOK_SHOT_BLUEPRINTS.map((item, index) => `${index + 1}. ${item.title} — ${item.purpose}. ${item.directive}`).join('\n')}
@@ -3141,7 +3398,14 @@ Return strict JSON only:
       "index": 0,
       "title": "...",
       "purpose": "...",
-      "prompt": "..."
+      "subject": "...",
+      "action": "...",
+      "facingDirection": "front|back|left|right|three-quarter-left|three-quarter-right",
+      "location": "...",
+      "camera": "...",
+      "lighting": "...",
+      "style": "...",
+      "prompt": "Must follow exact field order: SUBJECT/ACTION/FACING/LOCATION/CAMERA/LIGHTING/STYLE/ASPECT RATIO"
     }
   ]
 }`
@@ -3167,6 +3431,7 @@ Return strict JSON only:
       fallbackPromptSet,
       aspectRatio,
       imageCount,
+      styleTone,
     )
 
     return {
@@ -3560,7 +3825,21 @@ function buildPromptResultFromHistoryItem(
   if (imageOnlyPrompt.length > 0) {
     lookbookPromptFallback[0] = {
       ...lookbookPromptFallback[0],
-      prompt: ensureLookbookAspectRatioTag(imageOnlyPrompt, aspectRatio),
+      prompt: ensureLookbookNanoBananaPrompt(
+        ensureLookbookAspectRatioTag(imageOnlyPrompt, aspectRatio),
+        {
+          subject: lookbookPromptFallback[0].subject || 'Single-frame lookbook still with strict face identity and garment fidelity.',
+          action: lookbookPromptFallback[0].action || 'Front-facing hero pose with clear outfit readability and realistic posture.',
+          facingDirection: lookbookPromptFallback[0].facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[0],
+          location: lookbookPromptFallback[0].location || 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
+          camera: lookbookPromptFallback[0].camera || 'Fashion editorial camera framing, stable axis, realistic proportions.',
+          lighting: lookbookPromptFallback[0].lighting || 'Clean editorial soft lighting with texture clarity.',
+          style: lookbookPromptFallback[0].style || 'Social-native lookbook editorial style, trust-first realism.',
+        },
+        aspectRatio,
+        buildLookbookToneDirective(metadataLookbookStyleTone),
+        lookbookPromptFallback[0].purpose || 'Primary hero frame for lookbook output',
+      ),
     }
   }
   const lookbookImagePrompts = normalizeLookbookImagePromptList(
@@ -3568,6 +3847,7 @@ function buildPromptResultFromHistoryItem(
     lookbookPromptFallback,
     aspectRatio,
     metadataLookbookImageCount,
+    metadataLookbookStyleTone,
   )
   const looksLikeImageOnly = metadataGenerationMode === 'lookbook_image'
     || (rawKeyframes.length === 0 && rawScenes.length === 0 && imageOnlyPrompt.length > 0)
@@ -3605,15 +3885,22 @@ function buildPromptResultFromHistoryItem(
     const lighting = toHistoryString(raw.lighting, 'Soft cinematic lighting prioritizing product readability')
     const style = toHistoryString(raw.style, 'TikTok fashion editorial aesthetic with social-native realism')
     const timestamp = toHistoryString(raw.timestamp, `${Math.round((index * duration) / Math.max(normalizedKeyframeCount - 1, 1))}s`)
+    const facingDirection = normalizeLookbookFacingDirection(
+      raw.facingDirection ?? action ?? camera,
+      RULE32_FACING_SEQUENCE[index % RULE32_FACING_SEQUENCE.length],
+    )
     const fullPrompt = toHistoryString(
       raw.fullPrompt,
-      `SUBJECT: ${subject}
-ACTION: ${action}
-LOCATION: ${location}
-CAMERA: ${camera}
-LIGHTING: ${lighting}
-STYLE: ${style}
-ASPECT RATIO: ${aspectRatio}`,
+      buildNanoBananaProFramePrompt({
+        subject,
+        action,
+        facingDirection,
+        location,
+        camera,
+        lighting,
+        style,
+        aspectRatio,
+      }),
     )
 
     return {
@@ -3621,6 +3908,7 @@ ASPECT RATIO: ${aspectRatio}`,
       timestamp,
       subject,
       action,
+      facingDirection,
       location,
       camera,
       lighting,
@@ -5116,7 +5404,21 @@ export default function App() {
         )
         fallbackSet[0] = {
           ...fallbackSet[0],
-          prompt: ensureLookbookAspectRatioTag(result.createImagePrompt, aspectRatio),
+          prompt: ensureLookbookNanoBananaPrompt(
+            ensureLookbookAspectRatioTag(result.createImagePrompt, aspectRatio),
+            {
+              subject: fallbackSet[0].subject || 'Single-frame lookbook still with strict face identity and garment fidelity.',
+              action: fallbackSet[0].action || 'Front-facing hero pose with clear outfit readability and realistic posture.',
+              facingDirection: fallbackSet[0].facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[0],
+              location: fallbackSet[0].location || 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
+              camera: fallbackSet[0].camera || 'Fashion editorial camera framing, stable axis, realistic proportions.',
+              lighting: fallbackSet[0].lighting || 'Clean editorial soft lighting with texture clarity.',
+              style: fallbackSet[0].style || 'Social-native lookbook editorial style, trust-first realism.',
+            },
+            aspectRatio,
+            buildLookbookToneDirective(lookbookStyleTone),
+            fallbackSet[0].purpose || 'Primary hero frame for lookbook output',
+          ),
         }
         return fallbackSet
       }
@@ -5238,6 +5540,13 @@ export default function App() {
             index: item.index,
             title: item.title,
             purpose: item.purpose,
+            subject: item.subject,
+            action: item.action,
+            facingDirection: item.facingDirection,
+            location: item.location,
+            camera: item.camera,
+            lighting: item.lighting,
+            style: item.style,
             prompt: item.prompt,
           })),
           keyframes: [],
