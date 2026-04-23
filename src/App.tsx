@@ -42,9 +42,17 @@ interface GenerateResult {
   keyframes: KeyframePrompt[]
   scenes: ScenePrompt[]
   createImagePrompt?: string
+  lookbookImagePrompts?: LookbookImagePrompt[]
   resolvedContentType?: ResolvedContentType
   affiliateModeUsed?: AffiliateMode
   salesTemplateUsed?: SalesTemplate
+}
+
+interface LookbookImagePrompt {
+  index: number
+  title: string
+  purpose: string
+  prompt: string
 }
 
 interface SeoVariant {
@@ -263,6 +271,8 @@ type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image'
+type LookbookImageCount = 5 | 10 | 20
+type LookbookStyleTone = 'standard' | 'sexy'
 type ProductLocationHistoryMap = Record<string, string[]>
 type OutfitTypeLocationHistoryMap = Partial<Record<ResolvedContentType, string[]>>
 
@@ -311,6 +321,88 @@ const LOOKBOOK_LOADING_STAGES = [
   'AI dang phan tich anh san pham...',
   'AI dang viet prompt anh lookbook...',
 ] as const
+
+const LOOKBOOK_IMAGE_COUNT_OPTIONS: LookbookImageCount[] = [5, 10, 20]
+const DEFAULT_LOOKBOOK_IMAGE_COUNT: LookbookImageCount = 5
+const LOOKBOOK_STYLE_TONE_OPTIONS: Array<{
+  value: LookbookStyleTone
+  label: string
+  desc: string
+  color: string
+}> = [
+  {
+    value: 'standard',
+    label: 'Classic',
+    desc: 'Lookbook clean va de ung dung',
+    color: 'var(--accent-cyan)',
+  },
+  {
+    value: 'sexy',
+    label: 'Goi cam Sexy',
+    desc: 'Goi cam tinh te, khong phan cam',
+    color: '#fb7185',
+  },
+]
+
+const LOOKBOOK_SHOT_BLUEPRINTS: Array<{
+  title: string
+  purpose: string
+  directive: string
+}> = [
+  {
+    title: 'Hero Full Body',
+    purpose: 'Primary look reveal for catalog thumbnail and cover',
+    directive: 'Single-frame full-body hero composition, head-to-toe visibility, clean posture, clear garment silhouette, no split-screen.',
+  },
+  {
+    title: 'Front Fit Proof',
+    purpose: 'Show front fit, waistline, and overall shape clarity',
+    directive: 'Front-facing or three-quarter-front still frame, emphasize fit lines and proportion, maintain product details, no split-screen.',
+  },
+  {
+    title: 'Back Detail Proof',
+    purpose: 'Show back structure and rear garment design details',
+    directive: 'Back-facing or over-shoulder still frame emphasizing rear garment design, fabric drape, and stitching clarity, no split-screen.',
+  },
+  {
+    title: 'Texture Close Detail',
+    purpose: 'Verify material texture and craftsmanship for purchase trust',
+    directive: 'Detail-oriented still frame on texture/material/stitching while preserving overall garment identity and realism, no split-screen.',
+  },
+  {
+    title: 'Side Silhouette',
+    purpose: 'Show side profile silhouette and drape balance',
+    directive: 'Side-angle still frame emphasizing silhouette contour, garment drape, and fit transitions, no split-screen.',
+  },
+  {
+    title: 'Waistline Focus',
+    purpose: 'Highlight waist shaping and proportion cues',
+    directive: 'Three-quarter still frame with strong waistline visibility and flattering body proportion cues, no split-screen.',
+  },
+  {
+    title: 'Fabric Motion Freeze',
+    purpose: 'Capture dynamic fabric behavior in a still frame',
+    directive: 'Freeze-frame look with slight garment movement cue to show fabric behavior while keeping details sharp, no split-screen.',
+  },
+  {
+    title: 'Mirror Confidence',
+    purpose: 'Social-native confidence framing with full outfit readability',
+    directive: 'Mirror-style fashion still frame with full outfit readability and clean reflection composition, no split-screen.',
+  },
+  {
+    title: 'Accessory Match',
+    purpose: 'Show compatible accessories and styling coherence',
+    directive: 'Still frame emphasizing accessory pairing and full look cohesion without hiding core garment details, no split-screen.',
+  },
+  {
+    title: 'Occasion Context',
+    purpose: 'Place look in a real-world context suitable for daily/lifestyle use',
+    directive: 'Lifestyle still frame in believable context (studio corner, street, cafe, or fitting room) keeping outfit as hero, no split-screen.',
+  },
+]
+
+const LOOKBOOK_TIKTOK_SIGNAL_HINT = `TikTok tag snapshots (web): #OOTD ~65.5M posts, #lookbook ~459.5K posts, #sexyoutfit ~37.6K posts.
+Implication: keep OOTD readability first, then lookbook polish; sexy should be tasteful and non-explicit.`
 
 const FIXED_AFFILIATE_MODE: AffiliateMode = 'strict'
 const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
@@ -741,16 +833,143 @@ function resolveLookbookImageContentType(contentType: ContentType): ResolvedCont
   return contentType as ResolvedContentType
 }
 
-function buildLookbookImageOnlyPrompt(contentType: ResolvedContentType, notes: string, aspectRatio: '9:16' | '16:9'): string {
+function buildLookbookImageOnlyPrompt(
+  contentType: ResolvedContentType,
+  notes: string,
+  aspectRatio: '9:16' | '16:9',
+  styleTone: LookbookStyleTone = 'standard',
+): string {
   const videoReferenceLine = 'CRITICAL: This image will be used as a reference for Veo 3.1 video generation. Ensure consistent proportions and realistic rendering suitable for frame-by-frame animation.'
   const lookbookReferenceLine = 'CRITICAL: This is the final standalone lookbook image output. Do not include video timeline, keyframe, scene, or interpolation instructions.'
+  const styleToneLine = styleTone === 'sexy'
+    ? '[STYLE TONE]: Tasteful sexy fashion vibe only (confident, body-flattering, elegant). No nudity, no explicit sexual content, no fetish framing, and no provocative camera focus on private body areas.'
+    : '[STYLE TONE]: Clean lookbook vibe with practical outfit readability and polished styling.'
 
   const basePrompt = buildCreateImagePrompt(contentType, notes)
   const normalizedBase = basePrompt.includes(videoReferenceLine)
     ? basePrompt.replace(videoReferenceLine, lookbookReferenceLine)
     : `${basePrompt}\n\n${lookbookReferenceLine}`
 
-  return `${normalizedBase}\n[TARGET ASPECT RATIO]: ${aspectRatio}`
+  return `${normalizedBase}\n[LAYOUT OVERRIDE]: Use a single-frame composition only. Never use split-screen.`
+    + `\n${styleToneLine}`
+    + `\n[TARGET ASPECT RATIO]: ${aspectRatio}`
+}
+
+function ensureLookbookAspectRatioTag(prompt: string, aspectRatio: '9:16' | '16:9'): string {
+  return prompt.toLowerCase().includes(aspectRatio.toLowerCase())
+    ? prompt
+    : `${prompt}\n[TARGET ASPECT RATIO]: ${aspectRatio}`
+}
+
+function normalizeLookbookImageCount(value: unknown, fallback: LookbookImageCount = DEFAULT_LOOKBOOK_IMAGE_COUNT): LookbookImageCount {
+  const numeric = Number(value)
+  if (numeric === 5 || numeric === 10 || numeric === 20) {
+    return numeric as LookbookImageCount
+  }
+  return fallback
+}
+
+function normalizeLookbookStyleTone(value: unknown, fallback: LookbookStyleTone = 'standard'): LookbookStyleTone {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return normalized === 'sexy' ? 'sexy' : fallback
+}
+
+function coerceLookbookImageCountFromLength(length: number): LookbookImageCount {
+  if (length >= 20) return 20
+  if (length >= 10) return 10
+  return 5
+}
+
+function buildLookbookToneDirective(styleTone: LookbookStyleTone): string {
+  if (styleTone === 'sexy') {
+    return 'Tasteful sexy tone: confident pose, elegant body lines, fashion-first framing, non-explicit and policy-safe.'
+  }
+
+  return 'Classic lookbook tone: practical outfit readability, clean styling cues, and save-worthy composition.'
+}
+
+function buildLookbookImagePromptSet(
+  contentType: ResolvedContentType,
+  notes: string,
+  aspectRatio: '9:16' | '16:9',
+  imageCount: LookbookImageCount,
+  styleTone: LookbookStyleTone,
+): LookbookImagePrompt[] {
+  const basePrompt = buildLookbookImageOnlyPrompt(contentType, notes, aspectRatio, styleTone)
+  const toneDirective = buildLookbookToneDirective(styleTone)
+  const prompts: LookbookImagePrompt[] = []
+
+  for (let i = 0; i < imageCount; i += 1) {
+    const blueprint = LOOKBOOK_SHOT_BLUEPRINTS[i % LOOKBOOK_SHOT_BLUEPRINTS.length]
+    const cycle = Math.floor(i / LOOKBOOK_SHOT_BLUEPRINTS.length) + 1
+    const variationSuffix = cycle > 1 ? ` v${cycle}` : ''
+    const variationDirective = cycle > 1
+      ? `[SHOT VARIATION]: Variation ${cycle}. Change pose/camera angle/background mood while preserving exact face and garment identity.`
+      : ''
+
+    prompts.push({
+      index: i,
+      title: `${blueprint.title}${variationSuffix}`,
+      purpose: blueprint.purpose,
+      prompt: ensureLookbookAspectRatioTag(
+        `${basePrompt}\n[LOOKBOOK TONE]: ${toneDirective}\n[LOOKBOOK SHOT]: ${blueprint.directive}\n[SHOT PURPOSE]: ${blueprint.purpose}${variationDirective ? `\n${variationDirective}` : ''}`,
+        aspectRatio,
+      ),
+    })
+  }
+
+  return prompts
+}
+
+function normalizeLookbookImagePromptList(
+  value: unknown,
+  fallback: LookbookImagePrompt[],
+  aspectRatio: '9:16' | '16:9',
+  imageCount: LookbookImageCount,
+): LookbookImagePrompt[] {
+  if (!Array.isArray(value)) {
+    return fallback
+      .slice(0, imageCount)
+      .map((item, index) => ({ ...item, index }))
+  }
+
+  const normalized = value
+    .map((item, index): LookbookImagePrompt | null => {
+      const fallbackItem = fallback[index % fallback.length]
+
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return null
+      }
+
+      const record = item as Record<string, unknown>
+      const title = typeof record.title === 'string' && record.title.trim().length > 0
+        ? record.title.trim()
+        : fallbackItem.title
+      const purpose = typeof record.purpose === 'string' && record.purpose.trim().length > 0
+        ? record.purpose.trim()
+        : fallbackItem.purpose
+      const rawPrompt = typeof record.prompt === 'string' && record.prompt.trim().length > 0
+        ? record.prompt.trim()
+        : fallbackItem.prompt
+
+      return {
+        index,
+        title,
+        purpose,
+        prompt: ensureLookbookAspectRatioTag(rawPrompt, aspectRatio),
+      }
+    })
+    .filter((item): item is LookbookImagePrompt => item !== null)
+
+  const merged = [...normalized]
+  for (const fallbackItem of fallback) {
+    if (merged.length >= imageCount) break
+    merged.push({ ...fallbackItem, index: merged.length })
+  }
+
+  return merged
+    .slice(0, Math.max(imageCount, 1))
+    .map((item, index) => ({ ...item, index }))
 }
 
 function normalizeLocationKey(value: string): string {
@@ -2846,15 +3065,23 @@ async function generateLookbookImagePromptWithGemini(
   productImage: string | null,
   aspectRatio: '9:16' | '16:9',
   notes: string,
+  imageCount: LookbookImageCount,
+  styleTone: LookbookStyleTone,
   contentType: ContentType = 'outfitideas',
 ): Promise<{
   masterDNA: string
-  createImagePrompt: string
+  lookbookImagePrompts: LookbookImagePrompt[]
   resolvedContentType: ResolvedContentType
 }> {
   const resolvedContentType = resolveLookbookImageContentType(contentType)
   const fallbackMasterDNA = buildCharacterDNA(notes, resolvedContentType)
-  const fallbackPrompt = buildLookbookImageOnlyPrompt(resolvedContentType, notes, aspectRatio)
+  const fallbackPromptSet = buildLookbookImagePromptSet(
+    resolvedContentType,
+    notes,
+    aspectRatio,
+    imageCount,
+    styleTone,
+  )
 
   const parts: GeminiContentPart[] = []
   if (faceImage) {
@@ -2882,25 +3109,41 @@ async function generateLookbookImagePromptWithGemini(
   const prompt = `You are an expert fashion creative director for affiliate lookbook imagery.
 
 TASK:
-- Create one standalone lookbook image prompt only (no video prompt).
+- Create exactly ${imageCount} standalone lookbook image prompts (no video prompt).
 - Output must optimize for outfit readability and conversion-oriented styling proof.
 - The output will be used directly in an image model, not Veo video.
 
 INPUT:
 - Target content style: ${resolvedContentType.toUpperCase()}
 - Target aspect ratio: ${aspectRatio}
+- Lookbook style tone: ${styleTone.toUpperCase()}
 ${notes ? `- User notes: ${notes}` : '- User notes: none'}
+
+TIKTOK SIGNAL REFERENCE:
+${LOOKBOOK_TIKTOK_SIGNAL_HINT}
 
 REQUIREMENTS:
 - Keep exact face identity and exact garment fidelity from references.
 - Keep prompt practical and social-native for lookbook usage.
 - Do NOT include timeline language, keyframes, scenes, transitions, interpolation, or motion continuity instructions.
 - Do NOT mention real celebrities/public figures.
+- If style tone is SEXY: keep it tasteful, classy, fashion-first, and non-explicit.
+
+SHOT BLUEPRINT (must cover all):
+${LOOKBOOK_SHOT_BLUEPRINTS.map((item, index) => `${index + 1}. ${item.title} — ${item.purpose}. ${item.directive}`).join('\n')}
+- If requested image count exceeds blueprint length, continue with unique variations (different pose, camera angle, or lighting) while preserving identity and garment fidelity.
 
 Return strict JSON only:
 {
   "masterDNA": "concise identity lock summary",
-  "lookbookImagePrompt": "final standalone image prompt"
+  "lookbookImagePrompts": [
+    {
+      "index": 0,
+      "title": "...",
+      "purpose": "...",
+      "prompt": "..."
+    }
+  ]
 }`
 
   try {
@@ -2919,14 +3162,16 @@ Return strict JSON only:
     }
 
     const masterDNA = toSafeString((parsed as Record<string, unknown>).masterDNA, fallbackMasterDNA)
-    const createImagePrompt = toSafeString(
-      (parsed as Record<string, unknown>).lookbookImagePrompt,
-      fallbackPrompt,
+    const lookbookImagePrompts = normalizeLookbookImagePromptList(
+      (parsed as Record<string, unknown>).lookbookImagePrompts,
+      fallbackPromptSet,
+      aspectRatio,
+      imageCount,
     )
 
     return {
       masterDNA,
-      createImagePrompt,
+      lookbookImagePrompts,
       resolvedContentType,
     }
   } catch (error: any) {
@@ -3279,7 +3524,13 @@ function buildPromptResultFromHistoryItem(
 
   const rawKeyframes = Array.isArray(promptRecord.keyframes) ? promptRecord.keyframes : []
   const rawScenes = Array.isArray(promptRecord.scenes) ? promptRecord.scenes : []
+  const rawLookbookPrompts = Array.isArray(promptRecord.lookbookImagePrompts) ? promptRecord.lookbookImagePrompts : []
   const generatedLocations = toHistoryStringList(metadata.generatedLocations, 12)
+  const metadataLookbookImageCount = normalizeLookbookImageCount(
+    metadata.lookbookImageCount,
+    coerceLookbookImageCountFromLength(rawLookbookPrompts.length),
+  )
+  const metadataLookbookStyleTone = normalizeLookbookStyleTone(metadata.lookbookStyleTone, 'standard')
 
   const fallbackDurationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
   const keyframeCount = Math.max(
@@ -3297,7 +3548,26 @@ function buildPromptResultFromHistoryItem(
   const masterDNA = toHistoryString(promptRecord.masterDNA, buildCharacterDNA(item.notes || '', resolvedType))
   const imageOnlyPrompt = toHistoryString(
     promptRecord.createImagePrompt,
-    buildLookbookImageOnlyPrompt(resolvedType, item.notes || '', aspectRatio),
+    buildLookbookImageOnlyPrompt(resolvedType, item.notes || '', aspectRatio, metadataLookbookStyleTone),
+  )
+  const lookbookPromptFallback = buildLookbookImagePromptSet(
+    resolvedType,
+    item.notes || '',
+    aspectRatio,
+    metadataLookbookImageCount,
+    metadataLookbookStyleTone,
+  )
+  if (imageOnlyPrompt.length > 0) {
+    lookbookPromptFallback[0] = {
+      ...lookbookPromptFallback[0],
+      prompt: ensureLookbookAspectRatioTag(imageOnlyPrompt, aspectRatio),
+    }
+  }
+  const lookbookImagePrompts = normalizeLookbookImagePromptList(
+    promptRecord.lookbookImagePrompts,
+    lookbookPromptFallback,
+    aspectRatio,
+    metadataLookbookImageCount,
   )
   const looksLikeImageOnly = metadataGenerationMode === 'lookbook_image'
     || (rawKeyframes.length === 0 && rawScenes.length === 0 && imageOnlyPrompt.length > 0)
@@ -3307,7 +3577,8 @@ function buildPromptResultFromHistoryItem(
       masterDNA,
       keyframes: [],
       scenes: [],
-      createImagePrompt: imageOnlyPrompt,
+      createImagePrompt: lookbookImagePrompts[0]?.prompt || imageOnlyPrompt,
+      lookbookImagePrompts,
       resolvedContentType: resolvedType,
       affiliateModeUsed: FIXED_AFFILIATE_MODE,
       salesTemplateUsed: FIXED_SALES_TEMPLATE,
@@ -4533,6 +4804,14 @@ export default function App() {
     const saved = localStorage.getItem('aff_generation_mode')
     return saved === 'lookbook_image' ? 'lookbook_image' : 'video_prompt'
   })
+  const [lookbookImageCount, setLookbookImageCount] = useState<LookbookImageCount>(() => {
+    const saved = localStorage.getItem('aff_lookbook_image_count')
+    return normalizeLookbookImageCount(saved, DEFAULT_LOOKBOOK_IMAGE_COUNT)
+  })
+  const [lookbookStyleTone, setLookbookStyleTone] = useState<LookbookStyleTone>(() => {
+    const saved = localStorage.getItem('aff_lookbook_style_tone')
+    return normalizeLookbookStyleTone(saved, 'standard')
+  })
   const [contentType, setContentType] = useState<ContentType>('ootd')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
@@ -4584,6 +4863,8 @@ export default function App() {
   useEffect(() => { localStorage.setItem('aff_api_key', apiKey) }, [apiKey])
   useEffect(() => { localStorage.setItem('aff_model', model) }, [model])
   useEffect(() => { localStorage.setItem('aff_generation_mode', generationMode) }, [generationMode])
+  useEffect(() => { localStorage.setItem('aff_lookbook_image_count', String(lookbookImageCount)) }, [lookbookImageCount])
+  useEffect(() => { localStorage.setItem('aff_lookbook_style_tone', lookbookStyleTone) }, [lookbookStyleTone])
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
 
@@ -4704,6 +4985,9 @@ export default function App() {
     const packageSceneCount = Array.isArray(promptPackageRecord.scenes)
       ? promptPackageRecord.scenes.length
       : 0
+    const packageLookbookPromptCount = Array.isArray(promptPackageRecord.lookbookImagePrompts)
+      ? promptPackageRecord.lookbookImagePrompts.length
+      : 0
     const contentTypeFromItem = normalizeHistoryContentType(item.contentType, 'ootd')
     const resolvedFromItem = normalizeHistoryResolvedContentType(item.contentType, 'outfitideas')
     const restoredInputType = normalizeHistoryContentType(metadata.inputContentType, contentTypeFromItem)
@@ -4720,6 +5004,11 @@ export default function App() {
     const inferredDuration = inferDurationFromPromptCounts(keyframeCount, sceneCount)
     const restoredDuration = normalizeHistoryDuration(metadata.duration, inferredDuration)
     const restoredAspectRatio = normalizeHistoryAspectRatio(metadata.aspectRatio, '9:16')
+    const restoredLookbookImageCount = normalizeLookbookImageCount(
+      metadata.lookbookImageCount,
+      coerceLookbookImageCountFromLength(packageLookbookPromptCount),
+    )
+    const restoredLookbookStyleTone = normalizeLookbookStyleTone(metadata.lookbookStyleTone, 'standard')
 
     if (item.model.trim().length > 0) {
       setModel(item.model.trim())
@@ -4744,6 +5033,8 @@ export default function App() {
       )
 
       setGenerationMode(restoredGenerationMode)
+      setLookbookImageCount(restoredLookbookImageCount)
+      setLookbookStyleTone(restoredLookbookStyleTone)
       setDuration(restoredDuration)
       setAspectRatio(restoredAspectRatio)
       setNotes(item.notes || '')
@@ -4809,6 +5100,36 @@ export default function App() {
   const canGenerateVoiceover = canGenerate && voiceoverProductName.trim().length > 0
   const hasPromptResult = result !== null
   const hasVideoPromptResult = result !== null && result.keyframes.length > 0 && result.scenes.length > 0
+  const currentLookbookPrompts: LookbookImagePrompt[] = (() => {
+    if (!result) return []
+    if (Array.isArray(result.lookbookImagePrompts) && result.lookbookImagePrompts.length > 0) {
+      return result.lookbookImagePrompts.map((item, index) => ({ ...item, index }))
+    }
+    if (result.createImagePrompt && result.createImagePrompt.trim().length > 0) {
+      if (!hasVideoPromptResult) {
+        const fallbackSet = buildLookbookImagePromptSet(
+          result.resolvedContentType || selectedContentType,
+          notes,
+          aspectRatio,
+          lookbookImageCount,
+          lookbookStyleTone,
+        )
+        fallbackSet[0] = {
+          ...fallbackSet[0],
+          prompt: ensureLookbookAspectRatioTag(result.createImagePrompt, aspectRatio),
+        }
+        return fallbackSet
+      }
+
+      return [{
+        index: 0,
+        title: hasVideoPromptResult ? 'Create Product Image Prompt' : 'Lookbook Hero Frame',
+        purpose: hasVideoPromptResult ? 'Reference still image for video pipeline' : 'Primary hero frame for the lookbook set',
+        prompt: result.createImagePrompt,
+      }]
+    }
+    return []
+  })()
   const hasSeoResult = seoResult !== null
   const hasVoiceoverResult = voiceoverResult !== null
   const hasAnyResult = hasPromptResult || hasSeoResult || hasVoiceoverResult
@@ -4817,6 +5138,7 @@ export default function App() {
   const hasResultsPanelContent = hasAnyResult || hasHistoryPanelData
   const activeWorkHistoryFilters = historyActionFilter !== 'all' || historySearchQuery.length > 0
   const historyShownCount = workHistory.length
+  const lookbookStyleToneLabel = lookbookStyleTone === 'sexy' ? 'Sexy' : 'Classic'
   const promptPrimaryLabel = generationMode === 'lookbook_image' ? 'Anh Lookbook' : 'Prompt Package'
   const loadingStages = generationMode === 'lookbook_image' ? LOOKBOOK_LOADING_STAGES : PROMPT_LOADING_STAGES
   const promptStatusKind = loading ? 'loading' : error ? 'error' : hasPromptResult ? 'success' : 'idle'
@@ -4829,10 +5151,10 @@ export default function App() {
       : hasPromptResult
         ? hasVideoPromptResult
           ? `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL}).`
-          : `Prompt anh lookbook da san sang (${selectedContentType.toUpperCase()}).`
+            : `Prompt anh lookbook da san sang (${currentLookbookPrompts.length} pics • ${lookbookStyleToneLabel}).`
         : canGenerate
           ? generationMode === 'lookbook_image'
-            ? 'San sang tao prompt anh lookbook (khong video).'
+              ? `San sang tao ${lookbookImageCount} prompt anh lookbook (${lookbookStyleToneLabel}, khong video).`
             : `San sang tao Prompt Package (${FIXED_STRATEGY_DESC}).`
           : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
   const selectedSeoVariant = seoResult
@@ -4843,7 +5165,7 @@ export default function App() {
     : result
       ? hasVideoPromptResult
         ? `Prompt Package — ${duration}s / ${aspectRatio}`
-        : `Lookbook Image Prompt — ${aspectRatio}`
+        : `Lookbook Image Prompts — ${currentLookbookPrompts.length} pics / ${aspectRatio}`
       : activeTab === 'voiceover'
         ? 'Nhiệm vụ 2 — Kịch bản lồng tiếng'
         : 'Nhiệm vụ 1 — SEO TikTok'
@@ -4884,6 +5206,8 @@ export default function App() {
           productImage,
           aspectRatio,
           notes,
+          lookbookImageCount,
+          lookbookStyleTone,
           contentType,
         )
 
@@ -4891,7 +5215,8 @@ export default function App() {
           masterDNA: generated.masterDNA,
           keyframes: [],
           scenes: [],
-          createImagePrompt: generated.createImagePrompt,
+          createImagePrompt: generated.lookbookImagePrompts[0]?.prompt || '',
+          lookbookImagePrompts: generated.lookbookImagePrompts,
           resolvedContentType: generated.resolvedContentType,
           affiliateModeUsed: FIXED_AFFILIATE_MODE,
           salesTemplateUsed: FIXED_SALES_TEMPLATE,
@@ -4902,13 +5227,19 @@ export default function App() {
         setActiveTab('image')
         setPromptToast({
           kind: 'success',
-          message: 'Da tao xong prompt anh lookbook. Ban co the copy hoac export ngay.',
+          message: `Da tao xong ${lookbookResult.lookbookImagePrompts?.length || 0} prompt anh lookbook. Ban co the copy hoac export ngay.`,
         })
 
         const workHistoryGeneratedAt = Date.now()
         const promptPackageForHistory = {
           masterDNA: lookbookResult.masterDNA,
           createImagePrompt: lookbookResult.createImagePrompt || '',
+          lookbookImagePrompts: (lookbookResult.lookbookImagePrompts || []).map((item) => ({
+            index: item.index,
+            title: item.title,
+            purpose: item.purpose,
+            prompt: item.prompt,
+          })),
           keyframes: [],
           scenes: [],
         }
@@ -4930,6 +5261,8 @@ export default function App() {
             aspectRatio,
             keyframeCount: 0,
             sceneCount: 0,
+            lookbookImageCount: lookbookResult.lookbookImagePrompts?.length || 0,
+            lookbookStyleTone,
             generatedLocations: [],
             hasFaceImage: Boolean(faceImage),
             hasProductImage: Boolean(productImage),
@@ -5349,13 +5682,26 @@ export default function App() {
           '── LOOKBOOK IMAGE PROMPT ──',
           `Aspect Ratio: ${aspectRatio}`,
           `Resolved Type: ${selectedContentType.toUpperCase()}`,
+          `Lookbook Tone: ${lookbookStyleToneLabel}`,
           '',
           '── CHARACTER DNA ──',
           result.masterDNA,
-          ...(result.createImagePrompt
-            ? ['', '── IMAGE PROMPT ──', result.createImagePrompt]
-            : []),
         )
+
+        const lookbookPrompts = result.lookbookImagePrompts && result.lookbookImagePrompts.length > 0
+          ? result.lookbookImagePrompts
+          : (result.createImagePrompt
+            ? [{ index: 0, title: 'Lookbook Hero Frame', purpose: 'Primary hero frame', prompt: result.createImagePrompt }]
+            : [])
+
+        for (const prompt of lookbookPrompts) {
+          lines.push(
+            '',
+            `LOOKBOOK IMAGE ${prompt.index + 1}: ${prompt.title}`,
+            `Purpose: ${prompt.purpose}`,
+            prompt.prompt,
+          )
+        }
       }
     }
 
@@ -5421,13 +5767,29 @@ export default function App() {
           ...(result.createImagePrompt ? ['', 'CREATE IMAGE PROMPT:', result.createImagePrompt] : []),
         )
       } else {
+        const lookbookPrompts = result.lookbookImagePrompts && result.lookbookImagePrompts.length > 0
+          ? result.lookbookImagePrompts
+          : (result.createImagePrompt
+            ? [{ index: 0, title: 'Lookbook Hero Frame', purpose: 'Primary hero frame', prompt: result.createImagePrompt }]
+            : [])
+
         lines.push(
           `RESOLVED TYPE: ${selectedContentType.toUpperCase()}`,
           'MODE: LOOKBOOK_IMAGE',
+          `LOOKBOOK TONE: ${lookbookStyleToneLabel}`,
+          `LOOKBOOK COUNT: ${lookbookPrompts.length}`,
           '',
           'CHARACTER DNA:', result.masterDNA,
-          ...(result.createImagePrompt ? ['', 'LOOKBOOK IMAGE PROMPT:', result.createImagePrompt] : []),
         )
+
+        for (const prompt of lookbookPrompts) {
+          lines.push(
+            '',
+            `LOOKBOOK IMAGE ${prompt.index + 1}: ${prompt.title}`,
+            `PURPOSE: ${prompt.purpose}`,
+            prompt.prompt,
+          )
+        }
       }
     }
 
@@ -5637,9 +5999,57 @@ export default function App() {
               </div>
 
               {generationMode === 'lookbook_image' && (
-                <p className="ai-task-hint" style={{ marginBottom: 0 }}>
-                  Mode nay chi tao prompt anh lookbook (anh tinh), khong tao keyframe/scenes video.
-                </p>
+                <>
+                  <div className="input-group">
+                    <label className="input-label">
+                      <ImageIcon size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      So luong anh lookbook
+                    </label>
+                    <div className="chip-group">
+                      {LOOKBOOK_IMAGE_COUNT_OPTIONS.map((count) => (
+                        <button
+                          key={`lookbook-count-${count}`}
+                          className={`chip ${lookbookImageCount === count ? 'active' : ''}`}
+                          onClick={() => setLookbookImageCount(count)}
+                          id={`lookbook-count-${count}`}
+                        >
+                          {count} pics
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: 10 }}>
+                    <label className="input-label">
+                      <Sparkles size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Tone lookbook
+                    </label>
+                    <div className="chip-group">
+                      {LOOKBOOK_STYLE_TONE_OPTIONS.map((tone) => (
+                        <button
+                          key={`lookbook-tone-${tone.value}`}
+                          className={`chip ${lookbookStyleTone === tone.value ? 'active' : ''}`}
+                          onClick={() => setLookbookStyleTone(tone.value)}
+                          id={`lookbook-tone-${tone.value}`}
+                          style={lookbookStyleTone === tone.value ? {
+                            background: `color-mix(in srgb, ${tone.color} 15%, transparent)`,
+                            borderColor: tone.color,
+                            color: tone.color,
+                          } : {}}
+                        >
+                          {tone.label}
+                          <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                            {tone.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <p className="ai-task-hint" style={{ marginBottom: 0 }}>
+                    Mode nay tao bo {lookbookImageCount} prompt anh lookbook (anh tinh). Tone sexy la goi cam thoi trang, khong noi dung 18+.
+                  </p>
+                </>
               )}
             </div>
 
@@ -6047,7 +6457,7 @@ export default function App() {
                     </div>
                     <div className="results-empty-step">
                       <span className="results-empty-step-index">2</span>
-                      <p>{generationMode === 'lookbook_image' ? 'Chọn mode Lookbook Image, tỉ lệ và kiểu nội dung' : 'Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp'}</p>
+                      <p>{generationMode === 'lookbook_image' ? 'Chon mode Lookbook Image, so luong 5/10/20, tone classic/sexy va kieu noi dung' : 'Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp'}</p>
                     </div>
                     <div className="results-empty-step">
                       <span className="results-empty-step-index">3</span>
@@ -6131,7 +6541,7 @@ export default function App() {
                         className={`tab ${activeTab === 'image' ? 'active' : ''}`}
                         onClick={() => setActiveTab('image')}
                       >
-                        <ImageIcon /> {hasVideoPromptResult ? 'Create Image' : 'Lookbook Image'}
+                        <ImageIcon /> {hasVideoPromptResult ? 'Create Image' : `Lookbook Images (${currentLookbookPrompts.length})`}
                       </button>
                     )}
                     {result && hasVideoPromptResult && (
@@ -6337,28 +6747,38 @@ export default function App() {
                   )}
 
                   {/* Create Image Prompt Tab */}
-                  {result && (activeTab === 'image' || activeTab === 'all') && result.createImagePrompt && (
+                  {result && (activeTab === 'image' || activeTab === 'all') && currentLookbookPrompts.length > 0 && (
                     <>
                       {activeTab === 'all' && (
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-amber)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                          🎨 {hasVideoPromptResult ? 'Create Image Prompt (Tạo ảnh sản phẩm)' : 'Lookbook Image Prompt'}
+                          🎨 {hasVideoPromptResult ? 'Create Image Prompt (Tạo ảnh sản phẩm)' : `Lookbook Image Prompts (${currentLookbookPrompts.length})`}
                         </h3>
                       )}
-                      <div className="prompt-card">
-                        <div className="prompt-card-header">
-                          <div className="prompt-card-badge" style={{ color: 'var(--accent-amber)' }}>
-                            <Palette size={14} />
-                            {hasVideoPromptResult ? 'Create Product Image Prompt' : 'Lookbook Image Prompt'}
+                      {currentLookbookPrompts.map((lookbookPrompt) => (
+                        <div key={`lookbook-${lookbookPrompt.index}`} className="prompt-card" style={{ animationDelay: `${lookbookPrompt.index * 60}ms` }}>
+                          <div className="prompt-card-header">
+                            <div className="prompt-card-badge" style={{ color: 'var(--accent-amber)' }}>
+                              <Palette size={14} />
+                              {hasVideoPromptResult
+                                ? 'Create Product Image Prompt'
+                                : `Lookbook Image ${lookbookPrompt.index + 1}: ${lookbookPrompt.title}`}
+                            </div>
+                            <span className="prompt-card-time">{selectedContentType.toUpperCase()}</span>
                           </div>
-                          <span className="prompt-card-time">{selectedContentType.toUpperCase()}</span>
-                        </div>
-                        <div className="prompt-card-body">
-                          <CopyButton text={result.createImagePrompt} />
-                          <div className="prompt-text" style={{ lineHeight: 1.8 }}>
-                            {result.createImagePrompt}
+                          <div className="prompt-card-body">
+                            <CopyButton text={lookbookPrompt.prompt} />
+                            <div className="prompt-text" style={{ lineHeight: 1.8 }}>
+                              {!hasVideoPromptResult && (
+                                <>
+                                  <strong>PURPOSE:</strong> {lookbookPrompt.purpose}
+                                  {'\n'}
+                                </>
+                              )}
+                              {lookbookPrompt.prompt}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      ))}
                     </>
                   )}
 
