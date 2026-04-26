@@ -267,6 +267,30 @@ const CONTENT_TYPES = [
   { value: 'fyp', label: 'FYP', icon: TrendingUp, desc: 'Viral Discovery', color: 'var(--accent-cyan)' },
   { value: 'review', label: 'Review', icon: MessageSquare, desc: 'Product Review', color: 'var(--accent-emerald)' },
   { value: 'tiktokshop', label: 'TikTok Shop', icon: Sparkles, desc: 'Affiliate Conversion', color: '#f97316' },
+  {
+    value: 'boutiquefeed',
+    label: 'Boutique Feed',
+    icon: MessageSquare,
+    desc: 'Real Experience Boutique',
+    color: '#14b8a6',
+    locationStyleKeywords: [
+      'boutique',
+      'fashion boutique',
+      'showroom',
+      'fashion showroom',
+      'fitting room',
+      'wardrobe mirror',
+      'mirror fitcheck',
+      'storefront',
+      'clothing rack',
+      'rack',
+      'shop corner',
+      'goc shop',
+      'cua hang thoi trang',
+      'guong thu do',
+      'phong thu do',
+    ],
+  },
   { value: 'athleisure', label: 'Athleisure', icon: TrendingUp, desc: 'Gym-to-Café Styling', color: '#10b981' },
   { value: 'haul', label: 'Haul', icon: Layers, desc: 'Try-On / Collection Showcase', color: '#f59e0b' },
   { value: 'styling', label: 'Styling', icon: Wand2, desc: 'Fashion Styling Tips', color: '#ec4899' },
@@ -458,6 +482,7 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'fyp',
   'review',
   'tiktokshop',
+  'boutiquefeed',
   'athleisure',
   'haul',
   'styling',
@@ -466,7 +491,7 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'partyoutfit',
 ]
 
-const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'outfitideas', 'review', 'ootd', 'ootdmirror']
+const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'boutiquefeed', 'outfitideas', 'review', 'ootd', 'ootdmirror']
 
 const ALLOWED_LOCATION_KEYWORDS = [
   'vietnam',
@@ -568,6 +593,12 @@ const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster is strong and broad (#oo
 - TikTok Shop + proof content is high-adoption (#tiktokshop ~121M, #review ~16.4M, #unboxing ~17.7M).
 - FYP is too broad (#fyp ~8.7B) and should be secondary only, never the core fashion narrative.
 - Occasion-wear clusters are healthier with Vietnamese tags (#vayditiec ~243K, #damditiec ~119K) than literal #partyoutfit (~105K).`
+
+const BOUTIQUE_FEED_CHANNEL_BENCHMARK = `- Channel snapshot (@anvy.boutique): 186.4K followers, 2.6M likes, and multiple pinned videos in the 2.6M-3.2M view range.
+- Recurring caption behavior: short emotional hook + emoji stack, then concentrated hashtag bundle.
+- Strong hashtag bundle examples: #damxinh #damtiec #damlua #damthietke #setxinh #thoitranghottrend #goclamdep #xuhuong #anvyboutique.
+- High-performing narrative: immediate silhouette reveal, fit/tone-up proof (hack eo/ton dang), material cue, then concise verdict.
+- Trust pattern: practical first-person review framing (real experience, no hard-sell wall of CTA) while maintaining clear purchase intent.`
 
 const NATURALITY_PROMPT_GUARDRAILS = `- Prefer creator-native language and believable social behavior over ad-like perfection.
 - Avoid robotic sequencing terms ("Step 1", "Step 2", "Objective achieved", "conversion beat").
@@ -689,6 +720,7 @@ const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
   fyp: 'Create high-retention viral pacing but still preserve product clarity and affiliate conversion direction.',
   review: 'Lead with honest product proof, fit/material verification, and credible recommendation cues.',
   tiktokshop: 'Maximize conversion for TikTok Shop: strong hook, product proof, objection handling, and clear purchase-intent visuals.',
+  boutiquefeed: 'Blend boutique-style social proof with trust-first real-experience review language, concise hook captions, and fit/material verification for conversion.',
   athleisure: 'Show movement comfort and styling versatility from active to casual settings, tied to practical purchase value.',
   haul: 'Showcase variety and excitement with clear piece-by-piece value, fit proof, and purchasing motivation.',
   styling: 'Teach actionable styling transformations that position the product as a high-utility wardrobe solution.',
@@ -785,6 +817,14 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'BUYING OBJECTION HANDLER', emoji: '✅', cameraHint: 'Detail-focused shot answering size/quality concerns' },
     { name: 'CONVERSION CLOSER', emoji: '🎬', cameraHint: 'Clean end frame optimized for product clarity and conversion intent' },
   ],
+  boutiquefeed: [
+    { name: 'BOUTIQUE HOOK REVEAL', emoji: '✨', cameraHint: 'Fast full-body reveal in mirror or showroom framing with immediate silhouette readability' },
+    { name: 'HACK-DANG FIT PROOF', emoji: '👗', cameraHint: 'Mid-to-close framing proving waistline shaping and body-flattering fit cues' },
+    { name: 'MATERIAL DETAIL CHECK', emoji: '🧵', cameraHint: 'Texture close-up on fabric, stitching, and drape while preserving full-look continuity' },
+    { name: 'REAL EXPERIENCE VERDICT', emoji: '✅', cameraHint: 'Natural creator-style reaction beat with practical wearability cues' },
+    { name: 'HASHTAG-READY POSE', emoji: '💫', cameraHint: 'Short confidence pose transition optimized for social feed retention' },
+    { name: 'TRUST-FIRST CLOSER', emoji: '🎬', cameraHint: 'Clean final boutique frame with product readability and recommendation-ready mood' },
+  ],
   athleisure: [
     { name: 'GYM-TO-CAFÉ TRANSITION HOOK', emoji: '🏃‍♀️', cameraHint: 'Dynamic entrance from gym, effortless swagger' },
     { name: 'ACTIVEWEAR DETAIL MOMENT', emoji: '💪', cameraHint: 'Close-up on sports bra/leggings fabric and fit' },
@@ -844,6 +884,7 @@ function buildCharacterDNA(notes: string, contentType: ResolvedContentType): str
     fyp: 'Trending viral aesthetic, high-fashion editorial with cinematic flair',
     review: 'Authentic product review style, natural lighting, trustworthy feel',
     tiktokshop: 'Conversion-focused TikTok Shop style, product clarity, social proof, and CTA-driven framing',
+    boutiquefeed: 'Vietnamese boutique feed aesthetic, trust-first real-experience review tone, concise emotional hook, and product-proof-first framing',
     athleisure: 'Urban sporty-chic lifestyle, gym-to-café casual confidence',
     haul: 'Excited energetic unboxing aesthetic, approachable and relatable',
     styling: 'Expert fashion advisor aesthetic, polished and informative',
@@ -868,6 +909,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
     fyp: 'FYP (For You Page) — viral trending aesthetic with dramatic fashion presentation',
     review: 'Product Review — authentic product showcase highlighting garment quality and details',
     tiktokshop: 'TikTok Shop Affiliate — conversion-focused showcase with clear purchase motivation',
+    boutiquefeed: 'Boutique Feed — social-native boutique review style with fit proof, material check, and trust-first recommendation cadence',
     athleisure: 'Athleisure — gym-to-café styling combining sportswear with casual sophistication',
     haul: 'Haul Showcase — collection display with multiple outfit combinations',
     styling: 'Fashion Styling Guide — showcase expert outfit coordination and versatility',
@@ -894,6 +936,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
 
 [STYLE]: Professional fashion e-commerce photography. ${
   contentType === 'tiktokshop' ? 'Conversion-focused showcase with clear value proposition and buy-now momentum.' :
+  contentType === 'boutiquefeed' ? 'Vietnamese boutique feed vibe: trust-first review framing, practical fit/material proof, and concise social-native persuasion.' :
   contentType === 'ootdmirror' ? 'Mirror fitcheck social-native framing with strong head-to-toe outfit readability and trust cues.' :
   contentType === 'outfitideas' ? 'Lookbook inspiration style with practical daily styling guidance.' :
   contentType === 'review' ? 'Authentic and trustworthy feel.' :
@@ -1408,6 +1451,13 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
 - Maintain conversion-native language and framing consistency across scenes.`
   }
 
+  if (contentType === 'boutiquefeed') {
+    return `- Boutique-feed grammar: short emotional hook, immediate outfit readability, then fit/material proof before final verdict.
+- Keep language and motion creator-native; mimic practical boutique review cadence instead of scripted ads.
+- Preserve trust signals: real-experience framing, practical wearability cues, and concise recommendation tone.
+- Keep hashtag-ready intent aligned with Vietnamese boutique clusters (#damxinh, #damtiec, #thoitranghottrend, #goclamdep, #xuhuong).`
+  }
+
   if (contentType === 'streetstyle') {
     return `- Street style social grammar: natural outdoor walk, candid urban backdrop, authentic movement energy.
 - Keep full-body outfit visibility high across the timeline — silhouette must be clearly readable in natural/street light.
@@ -1474,6 +1524,12 @@ function buildTikTokTrendAlignmentRules(contentType: ResolvedContentType): strin
   if (contentType === 'tiktokshop') {
     return `- High-adoption commerce alignment: #tiktokshop (~121M) with proof clusters (#review ~16.4M, #unboxing ~17.7M).
 - Keep trust signals visible and practical, avoid over-polished ad scripting.`
+  }
+
+  if (contentType === 'boutiquefeed') {
+    return `- Boutique benchmark alignment: combine #damxinh/#damtiec demand with broad discovery tags (#thoitranghottrend, #xuhuong, #goclamdep).
+- Captions should stay concise and emotive (hook first), then let visual fit/material proof carry conversion.
+- Keep trust-first recommendation framing (real experience) over hard-sell CTA blocks.`
   }
 
   if (contentType === 'ootd' || contentType === 'outfitideas') {
@@ -1901,10 +1957,10 @@ async function generateWithGemini(
   const affiliateModeLabel = affiliateMode === 'strict' ? 'STRICT' : 'BALANCED'
   const salesTemplateLabel = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
   const affiliateObjective = isAuto
-    ? 'In AUTO mode, prioritize types that improve affiliate conversion for women fashion (tiktokshop, outfitideas, ootd, ootdmirror, review) before generic viral framing.'
+    ? 'In AUTO mode, prioritize types that improve affiliate conversion for women fashion (tiktokshop, boutiquefeed, outfitideas, ootd, ootdmirror, review) before generic viral framing.'
     : AFFILIATE_VIDEO_OBJECTIVES[contentType as ResolvedContentType]
   const autoModeRule = affiliateMode === 'strict'
-    ? 'STRICT AUTO MODE: only allow conversion-oriented types (tiktokshop, outfitideas, review, ootd, ootdmirror). If uncertain, default to tiktokshop.'
+    ? 'STRICT AUTO MODE: only allow conversion-oriented types (tiktokshop, boutiquefeed, outfitideas, review, ootd, ootdmirror). If uncertain, default to tiktokshop.'
     : 'BALANCED AUTO MODE: allow broader creative variety but still prioritize conversion-friendly fashion formats.'
   const salesTemplateRules = buildSalesTemplateRules(salesTemplate)
   const affiliateExecutionRules = `
@@ -1969,6 +2025,9 @@ AFFILIATE EXECUTION RULES:
 - Do not choose FYP-style generic framing as a primary fashion identity.
 - If a niche internal label is selected, map to natural public-facing hashtag behavior.`
     : buildTikTokTrendAlignmentRules(contentType as ResolvedContentType)
+  const boutiqueFeedChannelBenchmark = (isAuto || contentType === 'boutiquefeed')
+    ? BOUTIQUE_FEED_CHANNEL_BENCHMARK
+    : ''
   const safeJsonStringify = (value: unknown) => {
     try {
       return JSON.stringify(value, null, 2)
@@ -1979,7 +2038,7 @@ AFFILIATE EXECUTION RULES:
 
   const pipelineStartedAt = Date.now()
   const stageMetrics: Array<{ stage: string; attempt: number; durationMs: number; ok: boolean; note?: string }> = []
-  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'athleisure', 'haul', 'styling', 'luxury', 'streetstyle', 'partyoutfit']
+  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'boutiquefeed', 'athleisure', 'haul', 'styling', 'luxury', 'streetstyle', 'partyoutfit']
   const faceImageId = faceImage ? createProductImageId(faceImage) : 'none'
   const productImageId = productImage ? createProductImageId(productImage) : 'none'
   const notesFingerprint = createTextFingerprint(notes)
@@ -2334,6 +2393,10 @@ ${usedLocationsOutfitTypePrompt}
 OBSERVED TIKTOK FASHION BASELINES:
 ${TIKTOK_OBSERVED_SIGNAL_BASELINE}
 
+${boutiqueFeedChannelBenchmark ? `BOUTIQUE FEED CHANNEL SNAPSHOT (REFERENCE):
+${boutiqueFeedChannelBenchmark}
+` : ''}
+
 REQUESTED TYPE TREND ALIGNMENT:
 ${requestedTypeTrendAlignmentRules}
 
@@ -2366,6 +2429,7 @@ RULES:
 - For OOTDMIRROR, enforce mirror-fitcheck setup across all scenes.
 - For OOTD, enforce single-corner contextual studio setup across all scenes (no plain seamless background).
 - For OutfitIdeas, choose mirror-fitcheck OR single-corner contextual studio and keep style consistent.
+- For BOUTIQUEFEED, enforce boutique review cadence: short hook caption energy, fit/material proof, trust-first verdict, concise hashtag-ready framing.
 - Build action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
 - Plan for retention arc: Hook -> Value -> Proof -> Close.
 - If content type label is niche or internal, express the plan using stronger natural TikTok behavior clusters.
@@ -2373,7 +2437,7 @@ RULES:
 
 Output STRICT JSON only:
 {
-  ${isAuto ? '"recommendedContentType": "ootd|ootdmirror|grwm|outfitideas|fyp|review|tiktokshop|athleisure|haul|styling|luxury",' : '"recommendedContentType": "same-as-requested",'}
+  ${isAuto ? '"recommendedContentType": "ootd|ootdmirror|grwm|outfitideas|fyp|review|tiktokshop|boutiquefeed|athleisure|haul|styling|luxury|streetstyle|partyoutfit",' : '"recommendedContentType": "same-as-requested",'}
   "creativeDirection": "...",
   "storyArc": ["hook", "value", "proof", "close"],
   "locationCandidates": ["..."],
@@ -2446,6 +2510,9 @@ Output STRICT JSON only:
     const finalStyleLock = getContentTypeStyleLock(finalResolvedType)
     const contentTypeNativeSignalRules = buildTikTokNativeSignalRules(finalResolvedType)
     const finalTypeTrendAlignmentRules = buildTikTokTrendAlignmentRules(finalResolvedType)
+    const boutiqueFeedChannelBenchmarkForFinal = finalResolvedType === 'boutiquefeed'
+      ? BOUTIQUE_FEED_CHANNEL_BENCHMARK
+      : ''
 
     const affiliateObjectiveForFinal = AFFILIATE_VIDEO_OBJECTIVES[finalResolvedType]
     const usedLocationsForFinalOutfitType = normalizedUsedLocationsByOutfitType[finalResolvedType] || []
@@ -2802,6 +2869,10 @@ ${safeJsonStringify(planningResult)}
 
 OBSERVED TIKTOK FASHION BASELINES:
 ${TIKTOK_OBSERVED_SIGNAL_BASELINE}
+
+${boutiqueFeedChannelBenchmarkForFinal ? `BOUTIQUE FEED CHANNEL SNAPSHOT (REFERENCE):
+${boutiqueFeedChannelBenchmarkForFinal}
+` : ''}
 
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
@@ -3215,6 +3286,7 @@ Return STRICT JSON only, same schema:
       fyp: 'Scroll-stopping fashion movement with dynamic pose transition',
       review: 'Authentic product demonstration pose emphasizing fit and material quality',
       tiktokshop: 'Conversion-focused product showcase movement optimized for TikTok Shop clarity and intent',
+      boutiquefeed: 'Boutique-style fitcheck movement with concise hook energy, material proof, and trust-first recommendation cadence',
       athleisure: 'Energetic gym-to-café transition movement with sporty-chic confidence',
       haul: 'Excited try-on movements showcasing product fit and styling versatility',
       styling: 'Purposeful modeling pose highlighting outfit coordination and styling impact',
@@ -3231,6 +3303,7 @@ Return STRICT JSON only, same schema:
       fyp: 'Viral cinematic fashion style with bold visual energy',
       review: 'Trustworthy product review style with high material clarity',
       tiktokshop: 'TikTok Shop conversion style with product clarity, social proof, and urgency cues',
+      boutiquefeed: 'Vietnamese boutique review aesthetic, concise emotional hook language, and trust-first product proof framing',
       athleisure: 'Urban sporty-chic lifestyle photography, natural daylight',
       haul: 'Energetic colorful unboxing and try-on aesthetic, dynamic lighting',
       styling: 'Expert fashion editorial style, polished and educational',
@@ -4481,7 +4554,7 @@ Analyze the provided TikTok video carefully and return STRICT JSON only.
 ${trimmedNotes ? `Additional context from user: ${trimmedNotes}` : ''}
 
 ANALYSIS TASKS:
-1. Identify the content type (ootd, grwm, review, haul, tiktokshop, fyp, styling, athleisure, outfitideas, luxury, or describe a custom type).
+1. Identify the content type (ootd, grwm, review, haul, tiktokshop, boutiquefeed, fyp, styling, athleisure, outfitideas, luxury, partyoutfit, streetstyle, or describe a custom type).
 2. Estimate the total video duration in seconds.
 3. Describe the hook style (how the video grabs attention in the first 2 seconds).
 4. Describe the narrative structure (how the video flows from hook to close).
