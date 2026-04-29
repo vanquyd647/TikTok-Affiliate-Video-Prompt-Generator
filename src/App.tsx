@@ -1134,7 +1134,8 @@ const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use 
 - Preserve camera axis and movement direction across adjacent scenes unless an explicit turn-around beat is written.
 - Avoid discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - Keep subject, action, camera, composition, and ambiance explicit for each keyframe/scene prompt.
-- CONSECUTIVE KEYFRAME FACING LOCK: Two adjacent keyframes MUST NOT show the subject facing the same body direction (e.g., both front-facing, both side-facing). Between any two consecutive keyframes a visible body turn or pivot must occur.
+- CONSECUTIVE KEYFRAME FACING LOCK (DEFAULT): Adjacent keyframes should not repeat the same body direction; include visible turn/pivot intent.
+- DETAIL-SENSITIVE GARMENT EXCEPTION: for complex garments (backless/strappy/multi-strap/lace-up details), allow stable facing hold for 2-3 adjacent keyframes and avoid forced 360-degree direction cycling.
 - FACING TAG CLARITY RULE: Every keyframe action should explicitly encode body facing (front-facing, left-facing, right-facing, back-facing, or 3/4 variants) so adjacent turns are unambiguous.
 - This is mandatory because Veo 3.1 has no knowledge of the garment\'s back side; repeating the same facing direction forces the model to hallucinate unknown back-of-garment details, causing severe outfit inconsistency artifacts.`
 
@@ -1210,6 +1211,55 @@ const RULE32_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
   'three-quarter-right',
   'left',
   'right',
+] as const
+
+const DETAIL_SENSITIVE_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
+  'front',
+  'three-quarter-left',
+  'front',
+  'three-quarter-right',
+] as const
+
+const DETAIL_SENSITIVE_PRODUCT_CATEGORY_PREFIXES = [
+  'dresses_',
+  'skirts_',
+  'lingerie_',
+  'swimwear_',
+] as const
+
+const DETAIL_SENSITIVE_PRODUCT_CATEGORY_VALUES = [
+  'tops_cami_tank_halter',
+  'dresses_by_silhouette',
+  'dresses_by_occasion',
+  'dresses_by_material',
+  'skirts_by_length',
+  'skirts_by_shape',
+  'skirts_by_material',
+  'lingerie_core',
+  'swimwear_core',
+] as const
+
+const DETAIL_SENSITIVE_GARMENT_KEYWORDS = [
+  'backless',
+  'open back',
+  'deep back',
+  'low back',
+  'strappy',
+  'multi strap',
+  'thin strap',
+  'spaghetti strap',
+  'halter',
+  'lace up back',
+  'tie back',
+  'cross back',
+  'cut out back',
+  'cutout back',
+  'corset lace',
+  'bow back',
+  'ho lung',
+  'nhieu day',
+  'day mong',
+  'day cheo',
 ] as const
 
 type ContentStyleLock = 'mirror' | 'studio' | 'flex'
@@ -2300,6 +2350,82 @@ function pickAlternatingFacingDirection(
   return previous === 'front' ? 'three-quarter-left' : 'front'
 }
 
+function isOppositeFacingDirection(
+  previous: ConcreteFacingDirection,
+  current: ConcreteFacingDirection,
+): boolean {
+  return (
+    (previous === 'front' && current === 'back')
+    || (previous === 'back' && current === 'front')
+    || (previous === 'left' && current === 'right')
+    || (previous === 'right' && current === 'left')
+    || (previous === 'three-quarter-left' && current === 'three-quarter-right')
+    || (previous === 'three-quarter-right' && current === 'three-quarter-left')
+  )
+}
+
+function isDetailSensitiveProductCategory(productCategory: ProductCategory): boolean {
+  if (!productCategory || productCategory === 'auto') return false
+
+  if (DETAIL_SENSITIVE_PRODUCT_CATEGORY_VALUES.includes(productCategory as typeof DETAIL_SENSITIVE_PRODUCT_CATEGORY_VALUES[number])) {
+    return true
+  }
+
+  return DETAIL_SENSITIVE_PRODUCT_CATEGORY_PREFIXES.some((prefix) => productCategory.startsWith(prefix))
+}
+
+function hasDetailSensitiveGarmentSignal(values: Array<unknown>): boolean {
+  const signalText = values
+    .filter((value): value is string => typeof value === 'string')
+    .join(' ')
+
+  const normalized = normalizeLocationKey(signalText)
+  if (!normalized) return false
+
+  return DETAIL_SENSITIVE_GARMENT_KEYWORDS.some((keyword) =>
+    normalized.includes(normalizeLocationKey(keyword))
+  )
+}
+
+function softenFacingTransitionForDetailSensitive(
+  previous: ConcreteFacingDirection | null,
+  candidate: ConcreteFacingDirection,
+  index: number,
+): ConcreteFacingDirection {
+  if (!previous) return candidate
+
+  if (isOppositeFacingDirection(previous, candidate)) {
+    return index % 2 === 0 ? 'three-quarter-left' : 'three-quarter-right'
+  }
+
+  return candidate
+}
+
+function pickDetailSensitiveFacingDirection(
+  index: number,
+  previous: ConcreteFacingDirection | null,
+  preferred: KeyframeFacingDirection,
+): ConcreteFacingDirection {
+  if (preferred !== 'unknown') {
+    return softenFacingTransitionForDetailSensitive(
+      previous,
+      preferred as ConcreteFacingDirection,
+      index,
+    )
+  }
+
+  if (!previous) {
+    return DETAIL_SENSITIVE_FACING_SEQUENCE[index % DETAIL_SENSITIVE_FACING_SEQUENCE.length]
+  }
+
+  if (index % 2 === 1) {
+    return previous
+  }
+
+  const candidate = DETAIL_SENSITIVE_FACING_SEQUENCE[index % DETAIL_SENSITIVE_FACING_SEQUENCE.length]
+  return softenFacingTransitionForDetailSensitive(previous, candidate, index)
+}
+
 function appendSentenceIfMissing(base: string, sentence: string): string {
   const trimmedBase = base.trim()
   const trimmedSentence = sentence.trim()
@@ -2315,6 +2441,46 @@ function appendSentenceIfMissing(base: string, sentence: string): string {
   return /[.!?]$/.test(trimmedBase)
     ? `${trimmedBase} ${trimmedSentence}`
     : `${trimmedBase}. ${trimmedSentence}`
+}
+
+function enforceActionFacingDirection(
+  action: string,
+  facingDirection: ConcreteFacingDirection,
+): string {
+  const facingPatterns: RegExp[] = [
+    /\b(?:front|back|left|right)(?:-|\s)?facing\b/gi,
+    /\bthree(?:-|\s)?quarter(?:-|\s)?(?:left|right)(?:-|\s)?facing\b/gi,
+    /\bfacing\s+(?:front|back|left|right)\b/gi,
+    /\bfacing\s+three(?:-|\s)?quarter(?:-|\s)?(?:left|right)\b/gi,
+    /\brear\s+view\b/gi,
+    /\bfacing\s+away\b/gi,
+    /\bback\s+to\s+camera\b/gi,
+    /\bfacing\s+camera\b/gi,
+    /\bface\s+camera\b/gi,
+    /\btoward\s+camera\b/gi,
+    /\bdoi\s+lung\b/gi,
+    /\bquay\s+lung\b/gi,
+    /\bchinh\s+dien\b/gi,
+    /\btruc\s+dien\b/gi,
+    /\bhuong\s+trai\b/gi,
+    /\bhuong\s+phai\b/gi,
+    /\bsang\s+trai\b/gi,
+    /\bsang\s+phai\b/gi,
+    /\bnghieng\s+trai\b/gi,
+    /\bnghieng\s+phai\b/gi,
+  ]
+
+  let sanitized = action
+  for (const pattern of facingPatterns) {
+    sanitized = sanitized.replace(pattern, ' ')
+  }
+
+  sanitized = normalizePromptWhitespace(sanitized).replace(/^[,.;:\-\s]+/, '').trim()
+
+  return appendSentenceIfMissing(
+    sanitized,
+    `Body facing ${toFacingDirectionLabel(facingDirection)}`,
+  )
 }
 
 function applyMirrorHandSafetyToAction(
@@ -2572,6 +2738,7 @@ async function generateWithGemini(
   affiliateMode: AffiliateMode = 'balanced',
   salesTemplate: SalesTemplate = 'hard',
   poseDirectionLock: LookbookPoseDirectionLock = 'auto',
+  productCategory: ProductCategory = 'auto',
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const { scenes: sceneCount, keyframes: keyframeCount } = durationInfo
@@ -2587,6 +2754,9 @@ async function generateWithGemini(
   const autoModeRule = affiliateMode === 'strict'
     ? 'STRICT AUTO MODE: only allow conversion-oriented types (tiktokshop, boutiquefeed, outfitideas, review, ootd, ootdmirror). If uncertain, default to tiktokshop.'
     : 'BALANCED AUTO MODE: allow broader creative variety but still prioritize conversion-friendly fashion formats.'
+  const normalizedProductCategory = normalizeProductCategory(productCategory, 'auto')
+  const selectedProductCategoryOption = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === normalizedProductCategory)
+  const productCategoryLabel = selectedProductCategoryOption?.label || 'Auto Boutique'
   const hasVideoPoseDirectionLock = poseDirectionLock !== 'auto'
   const videoPoseDirectionLockText = hasVideoPoseDirectionLock
     ? poseDirectionLock.toUpperCase()
@@ -3008,6 +3178,7 @@ INPUT CONTEXT:
 - Requested content type: ${contentTypeForPrompt}
 - Affiliate mode: ${affiliateModeLabel}
 - Sales template: ${salesTemplateLabel}
+- Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
 - Diversity seed: ${diversitySeed}
 
 VISUAL ANALYSIS JSON:
@@ -3060,6 +3231,7 @@ RULES:
 - For OutfitIdeas, choose mirror-fitcheck OR single-corner contextual studio and keep style consistent.
 - For BOUTIQUEFEED, enforce boutique review cadence: short hook caption energy, fit/material proof, trust-first verdict, concise hashtag-ready framing.
 - Build action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
+- For detail-sensitive garments (for example backless/strappy/multi-strap), avoid forced full-direction pose cycling; prefer stable facing continuity and controlled pivots.
 - Plan for retention arc: Hook -> Value -> Proof -> Close.
 - If content type label is niche or internal, express the plan using stronger natural TikTok behavior clusters.
 - Enforce celebrity/public-figure safety guardrails strictly.
@@ -3142,6 +3314,64 @@ Output STRICT JSON only:
     const boutiqueFeedChannelBenchmarkForFinal = finalResolvedType === 'boutiquefeed'
       ? BOUTIQUE_FEED_CHANNEL_BENCHMARK
       : ''
+    const detailSensitiveSignalValues: string[] = [
+      visualAnalysis.garmentFacts.category,
+      visualAnalysis.garmentFacts.material,
+      visualAnalysis.garmentFacts.silhouette,
+      ...visualAnalysis.garmentFacts.keyDetails,
+      ...visualAnalysis.garmentFacts.doNotAlter,
+      ...visualAnalysis.riskFlags,
+      notes,
+    ]
+    const isDetailSensitiveByCategory = isDetailSensitiveProductCategory(normalizedProductCategory)
+    const isDetailSensitiveBySignals = hasDetailSensitiveGarmentSignal(detailSensitiveSignalValues)
+    const hasDetailSensitiveGarment = isDetailSensitiveByCategory || isDetailSensitiveBySignals
+    const usesDetailSensitiveFacingMode = !hasVideoPoseDirectionLock && hasDetailSensitiveGarment
+    const detailSensitiveFacingReason = isDetailSensitiveByCategory && isDetailSensitiveBySignals
+      ? 'category + visual signals'
+      : isDetailSensitiveByCategory
+        ? 'category'
+        : isDetailSensitiveBySignals
+          ? 'visual signals'
+          : 'none'
+    const detailSensitiveFacingModeLabel = usesDetailSensitiveFacingMode
+      ? `ACTIVE (${detailSensitiveFacingReason})`
+      : 'INACTIVE'
+
+    const facingRuleForGenerationPrompt = hasVideoPoseDirectionLock
+      ? `32. VIDEO POSE-DIRECTION USER LOCK (OVERRIDE) — Apply the user lock across the full video.
+  - Every keyframe MUST set facingDirection to "${poseDirectionLock}".
+  - ACTION text must be consistent with facingDirection and must not contain conflicting direction phrases (for example: "back-facing" while FACING is "front").
+  - Adjacent keyframes are allowed to keep the same facingDirection while this lock is active.
+  - This user lock overrides the default alternation behavior of Rule 32.
+  [ALWAYS ENFORCED WHEN USER LOCK IS ACTIVE]`
+      : usesDetailSensitiveFacingMode
+        ? `32. DETAIL-SENSITIVE GARMENT FACING LOCK — Activated for complex garments (backless/strappy/multi-strap/lace-up details) to reduce Veo 3.1 detail drift.
+  - Do NOT force full 360-degree body-direction cycling across keyframes.
+  - Keep a stable facing anchor for 2-3 adjacent keyframes whenever needed to preserve product detail fidelity.
+  - Preferred facing set: "front", "three-quarter-left", "three-quarter-right".
+  - Use full "back" or hard side views only when product-proof intent explicitly requires it.
+  - Direction changes must be small controlled pivots; avoid abrupt opposite flips in consecutive keyframes.
+  - ACTION text and facingDirection token must stay consistent on every keyframe.
+  [AUTO ENFORCED FOR DETAIL-SENSITIVE GARMENTS]`
+      : `32. CONSECUTIVE KEYFRAME FACING DIRECTION LOCK — Two adjacent keyframes MUST NOT place the subject facing the same body direction (e.g., both fully front-facing, both fully side-facing, both fully rear-facing). Every keyframe transition must include a discernible body turn or pivot.
+  - For each keyframe, provide explicit body-facing intent in both action text and facingDirection token.
+  - Allowed facingDirection tokens: "front", "back", "left", "right", "three-quarter-left", "three-quarter-right".
+  - Adjacent keyframes must never repeat the same facingDirection token.
+  - Reason: Veo 3.1 interpolates between frames but has zero reference for the garment back side; repeated same-direction framing forces hallucination of unknown back-of-garment details, causing severe outfit inconsistency.
+  - Hand anatomy lock for mirror turns: preserve exactly two hands and five fingers per hand across adjacent keyframes; no fused/missing/extra fingers, no duplicated palms, and no hand-through-skirt artifacts.
+  - If the narrative requires a held direction, break it with a slight 3/4 pivot before continuing.
+  [ALWAYS ENFORCED — not subordinate to Rule 30]`
+    const facingRuleForQaRepair = hasVideoPoseDirectionLock
+      ? `Enforce video pose-direction lock: all keyframes must keep facingDirection "${poseDirectionLock}" and ACTION text must stay direction-consistent with that lock.`
+      : usesDetailSensitiveFacingMode
+        ? 'Enforce detail-sensitive facing mode: keep a stable facing anchor for complex-garment fidelity, avoid forced full-direction cycling, and use only controlled micro-pivots when direction changes are required.'
+        : 'Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.'
+    const facingRuleForMotionRepair = hasVideoPoseDirectionLock
+      ? `Enforce video pose-direction lock: keep all keyframes facing "${poseDirectionLock}" and remove any conflicting direction phrases from ACTION text.`
+      : usesDetailSensitiveFacingMode
+        ? 'Enforce detail-sensitive continuity: allow stable same-facing holds for fidelity, avoid abrupt opposite direction jumps, and keep direction changes as small controlled pivots with explicit facingDirection tags.'
+        : 'Enforce facing continuity lock: consecutive keyframes must not repeat the same body-facing direction; include explicit turn/pivot cues and facingDirection token per keyframe.'
 
     const affiliateObjectiveForFinal = AFFILIATE_VIDEO_OBJECTIVES[finalResolvedType]
     const usedLocationsForFinalOutfitType = normalizedUsedLocationsByOutfitType[finalResolvedType] || []
@@ -3266,9 +3496,22 @@ Output STRICT JSON only:
         const action = toSafeText(keyframe.action, '')
         const camera = toSafeText(keyframe.camera, '')
         const explicitFacingToken = normalizeFacingDirectionToken(keyframe.facingDirection)
+        const actionFacingToken = normalizeFacingDirectionToken(action)
 
         if (strict && explicitFacingToken === 'unknown') {
           return { ok: false, reason: `keyframe[${i}] missing explicit facingDirection token for Rule 32` }
+        }
+
+        if (
+          strict
+          && explicitFacingToken !== 'unknown'
+          && actionFacingToken !== 'unknown'
+          && explicitFacingToken !== actionFacingToken
+        ) {
+          return {
+            ok: false,
+            reason: `keyframe[${i}] has ACTION/FACING conflict (${actionFacingToken} vs ${explicitFacingToken})`,
+          }
         }
 
         if (containsMotionDiscontinuityKeyword(action) || containsMotionDiscontinuityKeyword(camera)) {
@@ -3304,11 +3547,19 @@ Output STRICT JSON only:
           currentKeyframe.facingDirection,
         )
 
+        const previousConcreteFacing = isConcreteFacingDirection(previousFacingDirection)
+          ? previousFacingDirection
+          : null
+        const currentConcreteFacing = isConcreteFacingDirection(currentFacingDirection)
+          ? currentFacingDirection
+          : null
+        const enforceAlternatingFacing = !hasVideoPoseDirectionLock && !usesDetailSensitiveFacingMode
+
         if (
-          !hasVideoPoseDirectionLock
-          && previousFacingDirection !== 'unknown'
-          && currentFacingDirection !== 'unknown'
-          && previousFacingDirection === currentFacingDirection
+          enforceAlternatingFacing
+          && previousConcreteFacing
+          && currentConcreteFacing
+          && previousConcreteFacing === currentConcreteFacing
         ) {
           return {
             ok: false,
@@ -3321,7 +3572,7 @@ Output STRICT JSON only:
         if (
           strict
           &&
-          !hasVideoPoseDirectionLock
+          enforceAlternatingFacing
           &&
           !hasTurnCue
           && (previousFacingDirection === 'unknown' || currentFacingDirection === 'unknown')
@@ -3329,6 +3580,19 @@ Output STRICT JSON only:
           return {
             ok: false,
             reason: `keyframe[${i - 1}] -> keyframe[${i}] lacks explicit turn cue/facing change for Rule 32`,
+          }
+        }
+
+        if (
+          strict
+          && usesDetailSensitiveFacingMode
+          && previousConcreteFacing
+          && currentConcreteFacing
+          && isOppositeFacingDirection(previousConcreteFacing, currentConcreteFacing)
+        ) {
+          return {
+            ok: false,
+            reason: `keyframe[${i - 1}] -> keyframe[${i}] uses abrupt opposite facing (${previousConcreteFacing} -> ${currentConcreteFacing}) in detail-sensitive mode`,
           }
         }
       }
@@ -3488,6 +3752,8 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - Aspect ratio: ${aspectRatio}
 - LOCKED content type: ${finalContentType.toUpperCase()}
 - Video pose-direction lock: ${videoPoseDirectionLockText}
+- Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
+- Detail-sensitive facing mode: ${detailSensitiveFacingModeLabel}
 
 AFFILIATE OBJECTIVE:
 ${affiliateObjectiveForFinal}
@@ -3582,14 +3848,7 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
 30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default style, tone, format, location, camera, and narrative choices in Rules 5–29 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Rule 31 (celebrity safety), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12) are the only truly non-negotiable constraints.
 31. CELEBRITY / PUBLIC-FIGURE SAFETY LOCK - Never depict/imitate/reference real celebrities/public figures/identifiable persons, never generate deepfake-style impersonation or fake endorsement/dialogue; if user asks for real person, convert to fictional archetype while preserving only general mood/style.
-32. CONSECUTIVE KEYFRAME FACING DIRECTION LOCK — Two adjacent keyframes MUST NOT place the subject facing the same body direction (e.g., both fully front-facing, both fully side-facing, both fully rear-facing). Every keyframe transition must include a discernible body turn or pivot.
-  - For each keyframe, provide explicit body-facing intent in both action text and facingDirection token.
-  - Allowed facingDirection tokens: "front", "back", "left", "right", "three-quarter-left", "three-quarter-right".
-  - Adjacent keyframes must never repeat the same facingDirection token.
-  - Reason: Veo 3.1 interpolates between frames but has zero reference for the garment back side; repeated same-direction framing forces hallucination of unknown back-of-garment details, causing severe outfit inconsistency.
-  - Hand anatomy lock for mirror turns: preserve exactly two hands and five fingers per hand across adjacent keyframes; no fused/missing/extra fingers, no duplicated palms, and no hand-through-skirt artifacts.
-  - If the narrative requires a held direction, break it with a slight 3/4 pivot before continuing.
-  [ALWAYS ENFORCED — not subordinate to Rule 30]
+${facingRuleForGenerationPrompt}
 
 Return STRICT COMPACT JSON only in this schema:
 {
@@ -3662,7 +3921,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Keep product-first composition and TikTok retention pacing.
   - Use the same primary location lock in all keyframes/scenes.
   - Enforce interpolation safety guardrails: micro-progression between adjacent keyframes, no abrupt opposite camera direction, no discontinuity keywords.
-  - Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.
+  - ${facingRuleForQaRepair}
   - Enforce hand-anatomy continuity in mirror/reflection beats: exactly two hands, five fingers per hand, no fused/missing/extra fingers, and no hand-through-garment artifacts.
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
   - For OOTDMIRROR: enforce observer-camera setup (camera in front of model), mirror behind model, and no handheld phone/camera in model hands.
@@ -3797,7 +4056,7 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - Use one dominant camera movement per scene (no mixed camera grammar).
 - Avoid immediate opposite camera direction across adjacent scenes unless explicit turnaround beat is described.
 - Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
-- Enforce facing continuity lock: consecutive keyframes must not repeat the same body-facing direction; include explicit turn/pivot cues and facingDirection token per keyframe.
+- ${facingRuleForMotionRepair}
 - Enforce hand-anatomy continuity in mirror/reflection beats: exactly two hands, five fingers per hand, no fused/missing/extra fingers, and no hand-through-garment artifacts.
 - For OOTDMIRROR: keep observer-camera framing (front-facing model), mirror behind model, and remove any handheld recording-device behavior from actions/narrative.
 
@@ -3972,7 +4231,9 @@ Return STRICT JSON only, same schema:
       const previousFacing = previous?.facingDirection || null
       const resolvedFacing: ConcreteFacingDirection = hasVideoPoseDirectionLock
         ? poseDirectionLock as ConcreteFacingDirection
-        : pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
+        : usesDetailSensitiveFacingMode
+          ? pickDetailSensitiveFacingDirection(i, previousFacing, inferredFacing)
+          : pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
 
       const actionHasFacingSignal = normalizeFacingDirectionToken(actionBase) !== 'unknown'
       const hasTurnSignal = i > 0
@@ -3982,7 +4243,25 @@ Return STRICT JSON only, same schema:
       let action = actionBase
       if (hasVideoPoseDirectionLock) {
         if (!actionHasFacingSignal || inferredFacing !== resolvedFacing) {
-          action = appendSentenceIfMissing(action, `Body facing ${toFacingDirectionLabel(resolvedFacing)} throughout this keyframe`)
+          action = enforceActionFacingDirection(action, resolvedFacing)
+        }
+      } else if (usesDetailSensitiveFacingMode) {
+        if (!actionHasFacingSignal || inferredFacing !== resolvedFacing) {
+          action = enforceActionFacingDirection(action, resolvedFacing)
+        }
+
+        if (i > 0) {
+          if (resolvedFacing === previousFacing) {
+            action = appendSentenceIfMissing(
+              action,
+              `Keep ${toFacingDirectionLabel(resolvedFacing)} orientation stable to preserve complex garment details`,
+            )
+          } else {
+            action = appendSentenceIfMissing(
+              action,
+              `Use a small controlled pivot from ${toFacingDirectionLabel(previousFacing || resolvedFacing)} to ${toFacingDirectionLabel(resolvedFacing)}; avoid fast turn`,
+            )
+          }
         }
       } else {
         if (i === 0) {
@@ -6606,6 +6885,7 @@ export default function App() {
             FIXED_AFFILIATE_MODE,
             FIXED_SALES_TEMPLATE,
             videoPoseDirectionLock,
+            productCategory,
           )
 
           pushLog(`[OK] Attempt ${attempt} succeeded — keyframes=${res.keyframes.length} scenes=${res.scenes.length}`)
