@@ -306,6 +306,8 @@ type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
+type LookbookTheme = 'auto' | 'minimal_studio' | 'street_casual' | 'office_chic' | 'party_night' | 'vacation_resort'
+type LookbookPoseDirectionLock = 'auto' | PromptFacingDirection
 type ProductCategoryGroup =
   | 'all'
   | 'tops'
@@ -389,6 +391,137 @@ const LOOKBOOK_STYLE_TONE_OPTIONS: Array<{
     color: '#fb7185',
   },
 ]
+
+const LOOKBOOK_THEME_OPTIONS: Array<{
+  value: LookbookTheme
+  label: string
+  desc: string
+  promptHint: string
+  styleHint: string
+  color: string
+}> = [
+  {
+    value: 'auto',
+    label: 'Auto Theme',
+    desc: 'AI tu can bang boi canh lookbook',
+    promptHint: 'Use the most natural social-native fashion context for each shot while keeping outfit readability first.',
+    styleHint: 'Balanced social-native fashion editorial with adaptable mood.',
+    color: 'var(--text-secondary)',
+  },
+  {
+    value: 'minimal_studio',
+    label: 'Minimal Studio',
+    desc: 'Studio clean co chieu sau va prop nhe',
+    promptHint: 'Keep every frame in a minimal contextual studio corner with clean styling and controlled depth.',
+    styleHint: 'Minimal studio fashion lookbook with neutral styling and clean lines.',
+    color: '#38bdf8',
+  },
+  {
+    value: 'street_casual',
+    label: 'Street Casual',
+    desc: 'Phoi canh dao pho urban tu nhien',
+    promptHint: 'Keep all frames in casual urban street or cafe frontage context with candid confidence.',
+    styleHint: 'Urban candid streetwear mood with practical daily styling energy.',
+    color: '#22c55e',
+  },
+  {
+    value: 'office_chic',
+    label: 'Office Chic',
+    desc: 'Cong so hien dai, thanh lich',
+    promptHint: 'Anchor every frame to modern office and business-lobby inspired context with polished posture.',
+    styleHint: 'Refined office-chic editorial tone, professional yet fashionable.',
+    color: '#6366f1',
+  },
+  {
+    value: 'party_night',
+    label: 'Party Night',
+    desc: 'Dem su kien, sang trong',
+    promptHint: 'Keep all frames in evening event or lounge-like context with elegant nightlife atmosphere.',
+    styleHint: 'Evening occasion fashion mood with glamorous but tasteful energy.',
+    color: '#e879f9',
+  },
+  {
+    value: 'vacation_resort',
+    label: 'Vacation Resort',
+    desc: 'Nghi duong bien/ho boi, nang sang',
+    promptHint: 'Keep all frames in resort, poolside, or vacation walkway context with relaxed luxury mood.',
+    styleHint: 'Resort-ready lifestyle lookbook with airy daylight atmosphere.',
+    color: '#f59e0b',
+  },
+]
+
+const LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS: Array<{
+  value: LookbookPoseDirectionLock
+  label: string
+  desc: string
+}> = [
+  {
+    value: 'auto',
+    label: 'Auto',
+    desc: 'Doi goc nhin tung anh de bo bo cuc da dang',
+  },
+  {
+    value: 'front',
+    label: 'Front',
+    desc: 'Khoa huong chinh dien',
+  },
+  {
+    value: 'back',
+    label: 'Back',
+    desc: 'Khoa huong quay lung',
+  },
+  {
+    value: 'left',
+    label: 'Left',
+    desc: 'Khoa huong nghieng trai',
+  },
+  {
+    value: 'right',
+    label: 'Right',
+    desc: 'Khoa huong nghieng phai',
+  },
+  {
+    value: 'three-quarter-left',
+    label: '3/4 Left',
+    desc: 'Khoa huong 3/4 trai',
+  },
+  {
+    value: 'three-quarter-right',
+    label: '3/4 Right',
+    desc: 'Khoa huong 3/4 phai',
+  },
+]
+
+const LOOKBOOK_THEME_VALUES = LOOKBOOK_THEME_OPTIONS.map((item) => item.value) as LookbookTheme[]
+const LOOKBOOK_POSE_DIRECTION_LOCK_VALUES = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.map((item) => item.value) as LookbookPoseDirectionLock[]
+
+const LOOKBOOK_THEME_LOCATION_FALLBACKS: Record<Exclude<LookbookTheme, 'auto'>, readonly string[]> = {
+  minimal_studio: [
+    'Textured fashion studio corner with clothing rack props, District 7, Ho Chi Minh City, Vietnam',
+    'Minimal editorial studio bay near Jing An, Shanghai, China',
+    'Soft daylight lookbook studio corner near Gangnam, Seoul, South Korea',
+  ],
+  street_casual: [
+    'Sidewalk cafe frontage in Thao Dien, Ho Chi Minh City, Vietnam',
+    'Pedestrian lane near Xintiandi district, Shanghai, China',
+    'Open plaza near Myeongdong shopping street, Seoul, South Korea',
+  ],
+  office_chic: [
+    'Modern office lobby in Thu Thiem business district, Ho Chi Minh City, Vietnam',
+    'Glass corridor in Lujiazui business area, Shanghai, China',
+    'Corporate atrium near Yeouido finance district, Seoul, South Korea',
+  ],
+  party_night: [
+    'Elegant hotel corridor in District 1, Ho Chi Minh City, Vietnam',
+    'Rooftop lounge entrance near The Bund, Shanghai, China',
+    'Evening cocktail venue corridor near Itaewon, Seoul, South Korea',
+  ],
+  vacation_resort: [
+    'Poolside resort walkway in Da Nang, Vietnam',
+    'Coastal resort terrace in Sanya, China',
+    'Ocean-view hotel promenade near Busan, South Korea',
+  ],
+}
 
 const LOOKBOOK_SHOT_BLUEPRINTS: Array<{
   title: string
@@ -1354,12 +1487,21 @@ function buildLookbookImageOnlyPrompt(
   notes: string,
   aspectRatio: '9:16' | '16:9',
   styleTone: LookbookStyleTone = 'standard',
+  theme: LookbookTheme = 'auto',
+  poseDirectionLock: LookbookPoseDirectionLock = 'auto',
 ): string {
   const videoReferenceLine = 'CRITICAL: This image will be used as a reference for Veo 3.1 video generation. Ensure consistent proportions and realistic rendering suitable for frame-by-frame animation.'
   const lookbookReferenceLine = 'CRITICAL: This is the final standalone lookbook image output. Do not include video timeline, keyframe, scene, or interpolation instructions.'
   const styleToneLine = styleTone === 'sexy'
     ? '[STYLE TONE]: Tasteful sexy fashion vibe only (confident, body-flattering, elegant). No nudity, no explicit sexual content, no fetish framing, and no provocative camera focus on private body areas.'
     : '[STYLE TONE]: Clean lookbook vibe with practical outfit readability and polished styling.'
+  const themeOption = getLookbookThemeOption(theme)
+  const themeLine = theme === 'auto'
+    ? '[LOOKBOOK THEME]: Auto balanced social-native lookbook context.'
+    : `[LOOKBOOK THEME]: ${themeOption.label}. ${themeOption.promptHint}`
+  const poseDirectionLine = poseDirectionLock === 'auto'
+    ? '[POSE DIRECTION LOCK]: Auto rotation by frame to keep visual variety.'
+    : `[POSE DIRECTION LOCK]: ${poseDirectionLock}. Keep the same body-facing direction for all generated lookbook frames.`
 
   const basePrompt = buildCreateImagePrompt(contentType, notes)
   const normalizedBase = basePrompt.includes(videoReferenceLine)
@@ -1368,6 +1510,8 @@ function buildLookbookImageOnlyPrompt(
 
   return `${normalizedBase}\n[LAYOUT OVERRIDE]: Use a single-frame composition only. Never use split-screen.`
     + `\n${styleToneLine}`
+    + `\n${themeLine}`
+    + `\n${poseDirectionLine}`
     + `\n[TARGET ASPECT RATIO]: ${aspectRatio}`
 }
 
@@ -1388,6 +1532,65 @@ function normalizeLookbookImageCount(value: unknown, fallback: LookbookImageCoun
 function normalizeLookbookStyleTone(value: unknown, fallback: LookbookStyleTone = 'standard'): LookbookStyleTone {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
   return normalized === 'sexy' ? 'sexy' : fallback
+}
+
+function normalizeLookbookTheme(value: unknown, fallback: LookbookTheme = 'auto'): LookbookTheme {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return LOOKBOOK_THEME_VALUES.includes(normalized as LookbookTheme)
+    ? normalized as LookbookTheme
+    : fallback
+}
+
+function normalizeLookbookPoseDirectionLock(
+  value: unknown,
+  fallback: LookbookPoseDirectionLock = 'auto',
+): LookbookPoseDirectionLock {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return LOOKBOOK_POSE_DIRECTION_LOCK_VALUES.includes(normalized as LookbookPoseDirectionLock)
+    ? normalized as LookbookPoseDirectionLock
+    : fallback
+}
+
+function getLookbookThemeOption(theme: LookbookTheme) {
+  return LOOKBOOK_THEME_OPTIONS.find((item) => item.value === theme) || LOOKBOOK_THEME_OPTIONS[0]
+}
+
+function getLookbookThemeLocationFallback(theme: LookbookTheme, index: number): string {
+  if (theme === 'auto') {
+    return LOOKBOOK_NATURAL_LOCATION_FALLBACKS[index % LOOKBOOK_NATURAL_LOCATION_FALLBACKS.length]
+  }
+
+  const themedPool = LOOKBOOK_THEME_LOCATION_FALLBACKS[theme]
+  if (!themedPool || themedPool.length === 0) {
+    return LOOKBOOK_NATURAL_LOCATION_FALLBACKS[index % LOOKBOOK_NATURAL_LOCATION_FALLBACKS.length]
+  }
+
+  return themedPool[index % themedPool.length]
+}
+
+function resolveLookbookPoseDirection(
+  index: number,
+  poseDirectionLock: LookbookPoseDirectionLock,
+): PromptFacingDirection {
+  if (poseDirectionLock !== 'auto') {
+    return poseDirectionLock
+  }
+
+  return LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[index % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length]
+}
+
+function appendPoseDirectionLockHint(
+  action: string,
+  poseDirectionLock: LookbookPoseDirectionLock,
+): string {
+  if (poseDirectionLock === 'auto') {
+    return action
+  }
+
+  return appendSentenceIfMissing(
+    action,
+    `Pose direction lock active: keep body ${poseDirectionLock}-facing for this lookbook frame.`,
+  )
 }
 
 function normalizeProductCategoryGroup(value: unknown, fallback: ProductCategoryGroup = 'all'): ProductCategoryGroup {
@@ -1529,10 +1732,13 @@ function buildLookbookImagePromptSet(
   aspectRatio: '9:16' | '16:9',
   imageCount: LookbookImageCount,
   styleTone: LookbookStyleTone,
+  theme: LookbookTheme = 'auto',
+  poseDirectionLock: LookbookPoseDirectionLock = 'auto',
 ): LookbookImagePrompt[] {
   const prompts: LookbookImagePrompt[] = []
   const baseLocationFallback = buildLookbookPrimaryLocationFallback(contentType)
   const trimmedNotes = notes.trim()
+  const themeOption = getLookbookThemeOption(theme)
 
   for (let i = 0; i < imageCount; i += 1) {
     const blueprint = LOOKBOOK_SHOT_BLUEPRINTS[i % LOOKBOOK_SHOT_BLUEPRINTS.length]
@@ -1541,24 +1747,39 @@ function buildLookbookImagePromptSet(
     const variationDirective = cycle > 1
       ? `[SHOT VARIATION]: Variation ${cycle}. Change pose/camera angle/background mood while preserving exact face and garment identity.`
       : ''
-    const facingDirection = LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[i % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length]
-    const location = LOOKBOOK_NATURAL_LOCATION_FALLBACKS[i % LOOKBOOK_NATURAL_LOCATION_FALLBACKS.length] || baseLocationFallback
+    const facingDirection = resolveLookbookPoseDirection(i, poseDirectionLock)
+    const location = getLookbookThemeLocationFallback(theme, i) || baseLocationFallback
     const subject = buildDefaultFrameSubject(aspectRatio)
     const action = variationDirective
       ? `${blueprint.directive} Variation ${cycle}: change pose/camera/background mood while preserving exact identity and garment details.`
       : blueprint.directive
-    const resolvedAction = trimmedNotes.length > 0
+    let resolvedAction = trimmedNotes.length > 0
       ? appendSentenceIfMissing(action, `Creative notes: ${trimmedNotes}`)
       : action
-    const camera = cycle > 1
+    resolvedAction = appendSentenceIfMissing(resolvedAction, themeOption.promptHint)
+    resolvedAction = appendPoseDirectionLockHint(resolvedAction, poseDirectionLock)
+
+    const baseCamera = cycle > 1
       ? 'Fresh camera angle variation with stable axis, conversion-first garment readability, no split-screen.'
       : 'Fashion editorial camera framing with stable axis, full outfit readability, and realistic proportions.'
+    const camera = theme === 'party_night'
+      ? appendSentenceIfMissing(baseCamera, 'Keep elegant nightlife framing with premium venue depth and polished highlights.')
+      : theme === 'office_chic'
+        ? appendSentenceIfMissing(baseCamera, 'Keep polished office-chic framing with clean architectural lines and composed posture cues.')
+        : baseCamera
     const lighting = styleTone === 'sexy'
       ? 'Tasteful contour lighting with soft key and clean fill, body lines elegant and non-explicit.'
-      : 'Clean editorial soft lighting prioritizing texture clarity and product detail readability.'
-    const style = styleTone === 'sexy'
+      : theme === 'party_night'
+        ? 'Elegant evening lighting with soft highlights and clean garment detail readability.'
+        : theme === 'vacation_resort'
+          ? 'Bright airy daylight with clean skin tone rendering and realistic vacation atmosphere.'
+          : 'Clean editorial soft lighting prioritizing texture clarity and product detail readability.'
+    const baseStyle = styleTone === 'sexy'
       ? 'Tasteful sexy fashion editorial, classy confidence, non-explicit social-native lookbook.'
       : 'Classic social-native lookbook editorial with practical styling clarity and trust-first realism.'
+    const style = theme === 'auto'
+      ? baseStyle
+      : appendSentenceIfMissing(baseStyle, themeOption.styleHint)
 
     prompts.push({
       index: i,
@@ -1596,34 +1817,41 @@ function normalizeLookbookImagePromptList(
   aspectRatio: '9:16' | '16:9',
   imageCount: LookbookImageCount,
   styleTone: LookbookStyleTone = 'standard',
+  theme: LookbookTheme = 'auto',
+  poseDirectionLock: LookbookPoseDirectionLock = 'auto',
 ): LookbookImagePrompt[] {
+  const themeOption = getLookbookThemeOption(theme)
   const defaultStyleByTone = styleTone === 'sexy'
     ? 'Tasteful sexy fashion editorial, classy confidence, non-explicit social-native lookbook.'
     : 'Classic social-native lookbook editorial with practical styling clarity and trust-first realism.'
+  const defaultLocationByTheme = getLookbookThemeLocationFallback(theme, 0)
   const defaultFallback: LookbookImagePrompt = {
     index: 0,
     title: 'Lookbook Hero Frame',
     purpose: 'Primary hero frame for lookbook output',
     subject: buildDefaultFrameSubject(aspectRatio),
     action: 'Front-facing hero pose with clear outfit readability and realistic posture.',
-    facingDirection: 'front',
-    location: 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
+    facingDirection: resolveLookbookPoseDirection(0, poseDirectionLock),
+    location: defaultLocationByTheme,
     camera: 'Fashion editorial camera framing, stable axis, realistic proportions.',
     lighting: 'Clean editorial soft lighting with texture clarity.',
-    style: defaultStyleByTone,
+    style: theme === 'auto' ? defaultStyleByTone : appendSentenceIfMissing(defaultStyleByTone, themeOption.styleHint),
     prompt: '',
   }
   const safeFallback = fallback.length > 0 ? fallback : [defaultFallback]
   const normalizeFromFallback = (item: LookbookImagePrompt, index: number): LookbookImagePrompt => {
     const shotPurpose = item.purpose?.trim() || defaultFallback.purpose
     const subject = buildDefaultFrameSubject(aspectRatio)
-    const action = item.action?.trim() || shotPurpose
-    const fallbackFacing = LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[index % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length]
-    const facingDirection = normalizeLookbookFacingDirection(item.facingDirection, fallbackFacing)
-    const location = item.location?.trim() || defaultFallback.location || ''
+    const actionBase = item.action?.trim() || shotPurpose
+    const action = appendPoseDirectionLockHint(actionBase, poseDirectionLock)
+    const fallbackFacing = resolveLookbookPoseDirection(index, poseDirectionLock)
+    const parsedFacingDirection = normalizeLookbookFacingDirection(item.facingDirection, fallbackFacing)
+    const facingDirection = poseDirectionLock === 'auto' ? parsedFacingDirection : poseDirectionLock
+    const location = item.location?.trim() || getLookbookThemeLocationFallback(theme, index) || defaultFallback.location || ''
     const camera = item.camera?.trim() || defaultFallback.camera || ''
     const lighting = item.lighting?.trim() || defaultFallback.lighting || ''
-    const style = item.style?.trim() || defaultFallback.style || ''
+    const styleBase = item.style?.trim() || defaultFallback.style || ''
+    const style = theme === 'auto' ? styleBase : appendSentenceIfMissing(styleBase, themeOption.styleHint)
 
     return {
       ...item,
@@ -1678,25 +1906,28 @@ function normalizeLookbookImagePromptList(
         ? record.purpose.trim()
         : fallbackItem.purpose
       const subject = buildDefaultFrameSubject(aspectRatio)
-      const action = typeof record.action === 'string' && record.action.trim().length > 0
+      const actionBase = typeof record.action === 'string' && record.action.trim().length > 0
         ? record.action.trim()
         : (fallbackItem.action || purpose)
-      const facingDirection = normalizeLookbookFacingDirection(
+      const action = appendPoseDirectionLockHint(actionBase, poseDirectionLock)
+      const parsedFacingDirection = normalizeLookbookFacingDirection(
         record.facingDirection ?? record.action ?? record.prompt,
-        fallbackItem.facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[index % LOOKBOOK_NANO_BANANA_FACING_SEQUENCE.length],
+        fallbackItem.facingDirection || resolveLookbookPoseDirection(index, poseDirectionLock),
       )
+      const facingDirection = poseDirectionLock === 'auto' ? parsedFacingDirection : poseDirectionLock
       const location = typeof record.location === 'string' && record.location.trim().length > 0
         ? record.location.trim()
-        : (fallbackItem.location || defaultFallback.location || '')
+        : (fallbackItem.location || getLookbookThemeLocationFallback(theme, index) || defaultFallback.location || '')
       const camera = typeof record.camera === 'string' && record.camera.trim().length > 0
         ? record.camera.trim()
         : (fallbackItem.camera || defaultFallback.camera || '')
       const lighting = typeof record.lighting === 'string' && record.lighting.trim().length > 0
         ? record.lighting.trim()
         : (fallbackItem.lighting || defaultFallback.lighting || '')
-      const style = typeof record.style === 'string' && record.style.trim().length > 0
+      const styleBase = typeof record.style === 'string' && record.style.trim().length > 0
         ? record.style.trim()
         : (fallbackItem.style || defaultFallback.style || '')
+      const style = theme === 'auto' ? styleBase : appendSentenceIfMissing(styleBase, themeOption.styleHint)
       const rawPrompt = typeof record.prompt === 'string' && record.prompt.trim().length > 0
         ? record.prompt.trim()
         : fallbackItem.prompt
@@ -3902,6 +4133,8 @@ async function generateLookbookImagePromptWithGemini(
   notes: string,
   imageCount: LookbookImageCount,
   styleTone: LookbookStyleTone,
+  theme: LookbookTheme,
+  poseDirectionLock: LookbookPoseDirectionLock,
   contentType: ContentType = 'outfitideas',
 ): Promise<{
   masterDNA: string
@@ -3909,6 +4142,7 @@ async function generateLookbookImagePromptWithGemini(
   resolvedContentType: ResolvedContentType
 }> {
   const resolvedContentType = resolveLookbookImageContentType(contentType)
+  const themeOption = getLookbookThemeOption(theme)
   const fallbackMasterDNA = buildCharacterDNA(notes, resolvedContentType)
   const fallbackPromptSet = buildLookbookImagePromptSet(
     resolvedContentType,
@@ -3916,6 +4150,8 @@ async function generateLookbookImagePromptWithGemini(
     aspectRatio,
     imageCount,
     styleTone,
+    theme,
+    poseDirectionLock,
   )
 
   const parts: GeminiContentPart[] = []
@@ -3952,6 +4188,8 @@ INPUT:
 - Target content style: ${resolvedContentType.toUpperCase()}
 - Target aspect ratio: ${aspectRatio}
 - Lookbook style tone: ${styleTone.toUpperCase()}
+- Lookbook theme: ${theme.toUpperCase()} (${themeOption.label})
+- Pose direction lock: ${poseDirectionLock.toUpperCase()}
 ${notes ? `- User notes: ${notes}` : '- User notes: none'}
 
 TIKTOK SIGNAL REFERENCE:
@@ -3963,6 +4201,10 @@ REQUIREMENTS:
 - Do NOT include timeline language, keyframes, scenes, transitions, interpolation, or motion continuity instructions.
 - Do NOT mention real celebrities/public figures.
 - If style tone is SEXY: keep it tasteful, classy, fashion-first, and non-explicit.
+- Theme lock: ${theme === 'auto' ? 'Auto theme balance is allowed.' : `Keep every prompt aligned with this theme direction: ${themeOption.promptHint}`}
+- Pose direction lock: ${poseDirectionLock === 'auto'
+    ? 'Alternate natural facing direction across prompts for variety.'
+    : `Every prompt MUST keep facingDirection exactly "${poseDirectionLock}" and action text must reinforce the same body-facing direction.`}
 - For each image prompt, enforce Nano Banana Pro frame format parity with video keyframe format:
   SUBJECT -> ACTION -> FACING -> LOCATION -> CAMERA -> LIGHTING -> STYLE -> ASPECT RATIO.
 
@@ -4015,6 +4257,8 @@ Return strict JSON only:
       aspectRatio,
       imageCount,
       styleTone,
+      theme,
+      poseDirectionLock,
     )
 
     return {
@@ -4379,6 +4623,8 @@ function buildPromptResultFromHistoryItem(
     coerceLookbookImageCountFromLength(rawLookbookPrompts.length),
   )
   const metadataLookbookStyleTone = normalizeLookbookStyleTone(metadata.lookbookStyleTone, 'standard')
+  const metadataLookbookTheme = normalizeLookbookTheme(metadata.lookbookTheme, 'auto')
+  const metadataLookbookPoseDirectionLock = normalizeLookbookPoseDirectionLock(metadata.lookbookPoseDirectionLock, 'auto')
 
   const fallbackDurationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
   const keyframeCount = Math.max(
@@ -4396,7 +4642,14 @@ function buildPromptResultFromHistoryItem(
   const masterDNA = toHistoryString(promptRecord.masterDNA, buildCharacterDNA(item.notes || '', resolvedType))
   const imageOnlyPrompt = toHistoryString(
     promptRecord.createImagePrompt,
-    buildLookbookImageOnlyPrompt(resolvedType, item.notes || '', aspectRatio, metadataLookbookStyleTone),
+    buildLookbookImageOnlyPrompt(
+      resolvedType,
+      item.notes || '',
+      aspectRatio,
+      metadataLookbookStyleTone,
+      metadataLookbookTheme,
+      metadataLookbookPoseDirectionLock,
+    ),
   )
   const lookbookPromptFallback = buildLookbookImagePromptSet(
     resolvedType,
@@ -4404,6 +4657,8 @@ function buildPromptResultFromHistoryItem(
     aspectRatio,
     metadataLookbookImageCount,
     metadataLookbookStyleTone,
+    metadataLookbookTheme,
+    metadataLookbookPoseDirectionLock,
   )
   if (imageOnlyPrompt.length > 0) {
     lookbookPromptFallback[0] = {
@@ -4429,6 +4684,8 @@ function buildPromptResultFromHistoryItem(
     aspectRatio,
     metadataLookbookImageCount,
     metadataLookbookStyleTone,
+    metadataLookbookTheme,
+    metadataLookbookPoseDirectionLock,
   )
   const looksLikeImageOnly = metadataGenerationMode === 'lookbook_image'
     || (rawKeyframes.length === 0 && rawScenes.length === 0 && imageOnlyPrompt.length > 0)
@@ -5681,6 +5938,14 @@ export default function App() {
     const saved = localStorage.getItem('aff_lookbook_style_tone')
     return normalizeLookbookStyleTone(saved, 'standard')
   })
+  const [lookbookTheme, setLookbookTheme] = useState<LookbookTheme>(() => {
+    const saved = localStorage.getItem('aff_lookbook_theme')
+    return normalizeLookbookTheme(saved, 'auto')
+  })
+  const [lookbookPoseDirectionLock, setLookbookPoseDirectionLock] = useState<LookbookPoseDirectionLock>(() => {
+    const saved = localStorage.getItem('aff_lookbook_pose_direction_lock')
+    return normalizeLookbookPoseDirectionLock(saved, 'auto')
+  })
   const [productCategory, setProductCategory] = useState<ProductCategory>(() => {
     const saved = localStorage.getItem('aff_product_category')
     return normalizeProductCategory(saved, 'auto')
@@ -5753,6 +6018,8 @@ export default function App() {
   useEffect(() => { localStorage.setItem('aff_generation_mode', generationMode) }, [generationMode])
   useEffect(() => { localStorage.setItem('aff_lookbook_image_count', String(lookbookImageCount)) }, [lookbookImageCount])
   useEffect(() => { localStorage.setItem('aff_lookbook_style_tone', lookbookStyleTone) }, [lookbookStyleTone])
+  useEffect(() => { localStorage.setItem('aff_lookbook_theme', lookbookTheme) }, [lookbookTheme])
+  useEffect(() => { localStorage.setItem('aff_lookbook_pose_direction_lock', lookbookPoseDirectionLock) }, [lookbookPoseDirectionLock])
   useEffect(() => { localStorage.setItem('aff_product_category', productCategory) }, [productCategory])
   useEffect(() => { localStorage.setItem('aff_product_category_group', productCategoryGroup) }, [productCategoryGroup])
   useEffect(() => { localStorage.setItem('aff_auto_apply_product_category_type', autoApplyCategoryType ? '1' : '0') }, [autoApplyCategoryType])
@@ -5900,6 +6167,11 @@ export default function App() {
       coerceLookbookImageCountFromLength(packageLookbookPromptCount),
     )
     const restoredLookbookStyleTone = normalizeLookbookStyleTone(metadata.lookbookStyleTone, 'standard')
+    const restoredLookbookTheme = normalizeLookbookTheme(metadata.lookbookTheme, 'auto')
+    const restoredLookbookPoseDirectionLock = normalizeLookbookPoseDirectionLock(
+      metadata.lookbookPoseDirectionLock,
+      'auto',
+    )
 
     if (item.model.trim().length > 0) {
       setModel(item.model.trim())
@@ -5926,6 +6198,8 @@ export default function App() {
       setGenerationMode(restoredGenerationMode)
       setLookbookImageCount(restoredLookbookImageCount)
       setLookbookStyleTone(restoredLookbookStyleTone)
+      setLookbookTheme(restoredLookbookTheme)
+      setLookbookPoseDirectionLock(restoredLookbookPoseDirectionLock)
       setDuration(restoredDuration)
       setAspectRatio(restoredAspectRatio)
       setNotes(item.notes || '')
@@ -6000,6 +6274,8 @@ export default function App() {
         aspectRatio,
         lookbookImageCount,
         lookbookStyleTone,
+        lookbookTheme,
+        lookbookPoseDirectionLock,
       )
 
       return result.lookbookImagePrompts.map((item, index) => {
@@ -6050,6 +6326,8 @@ export default function App() {
           aspectRatio,
           lookbookImageCount,
           lookbookStyleTone,
+          lookbookTheme,
+          lookbookPoseDirectionLock,
         )
         fallbackSet[0] = {
           ...fallbackSet[0],
@@ -6123,6 +6401,8 @@ export default function App() {
   const isCurrentContentTypeAlignedWithCategory = contentType !== 'auto'
     && activeProductCategoryOption.suggestedTypes.includes(contentType as ResolvedContentType)
   const lookbookStyleToneLabel = lookbookStyleTone === 'sexy' ? 'Sexy' : 'Classic'
+  const lookbookThemeLabel = getLookbookThemeOption(lookbookTheme).label
+  const lookbookPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === lookbookPoseDirectionLock)?.label || 'Auto'
   const promptPrimaryLabel = generationMode === 'lookbook_image' ? 'Anh Lookbook' : 'Prompt Package'
   const loadingStages = generationMode === 'lookbook_image' ? LOOKBOOK_LOADING_STAGES : PROMPT_LOADING_STAGES
   const promptStatusKind = loading ? 'loading' : error ? 'error' : hasPromptResult ? 'success' : 'idle'
@@ -6135,10 +6415,10 @@ export default function App() {
       : hasPromptResult
         ? hasVideoPromptResult
           ? `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL}).`
-            : `Prompt anh lookbook da san sang (${currentLookbookPrompts.length} pics • ${lookbookStyleToneLabel}).`
+            : `Prompt anh lookbook da san sang (${currentLookbookPrompts.length} pics • ${lookbookStyleToneLabel} • ${lookbookThemeLabel} • pose ${lookbookPoseDirectionLockLabel}).`
         : canGenerate
           ? generationMode === 'lookbook_image'
-              ? `San sang tao ${lookbookImageCount} prompt anh lookbook (${lookbookStyleToneLabel}, khong video).`
+              ? `San sang tao ${lookbookImageCount} prompt anh lookbook (${lookbookStyleToneLabel} • ${lookbookThemeLabel} • pose ${lookbookPoseDirectionLockLabel}, khong video).`
             : `San sang tao Prompt Package (${FIXED_STRATEGY_DESC}).`
           : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
   const selectedSeoVariant = seoResult
@@ -6192,6 +6472,8 @@ export default function App() {
           notes,
           lookbookImageCount,
           lookbookStyleTone,
+          lookbookTheme,
+          lookbookPoseDirectionLock,
           contentType,
         )
 
@@ -6254,6 +6536,8 @@ export default function App() {
             sceneCount: 0,
             lookbookImageCount: lookbookResult.lookbookImagePrompts?.length || 0,
             lookbookStyleTone,
+            lookbookTheme,
+            lookbookPoseDirectionLock,
             generatedLocations: [],
             hasFaceImage: Boolean(faceImage),
             hasProductImage: Boolean(productImage),
@@ -6394,6 +6678,9 @@ export default function App() {
               resolvedContentType: resolvedType,
               duration,
               aspectRatio,
+              lookbookStyleTone,
+              lookbookTheme,
+              lookbookPoseDirectionLock,
               keyframeCount: res.keyframes.length,
               sceneCount: res.scenes.length,
               generatedLocations: generatedLocations.slice(0, 10),
@@ -6674,6 +6961,8 @@ export default function App() {
           `Aspect Ratio: ${aspectRatio}`,
           `Resolved Type: ${selectedContentType.toUpperCase()}`,
           `Lookbook Tone: ${lookbookStyleToneLabel}`,
+          `Lookbook Theme: ${lookbookThemeLabel}`,
+          `Pose Direction Lock: ${lookbookPoseDirectionLockLabel}`,
           '',
           '── CHARACTER DNA ──',
           result.masterDNA,
@@ -6767,6 +7056,8 @@ export default function App() {
           `RESOLVED TYPE: ${selectedContentType.toUpperCase()}`,
           'MODE: LOOKBOOK_IMAGE',
           `LOOKBOOK TONE: ${lookbookStyleToneLabel}`,
+          `LOOKBOOK THEME: ${lookbookThemeLabel}`,
+          `POSE DIRECTION LOCK: ${lookbookPoseDirectionLockLabel}`,
           `LOOKBOOK COUNT: ${lookbookPrompts.length}`,
           '',
           'CHARACTER DNA:', result.masterDNA,
@@ -7035,8 +7326,57 @@ export default function App() {
                     </div>
                   </div>
 
+                  <div className="input-group" style={{ marginBottom: 10 }}>
+                    <label className="input-label">
+                      <Palette size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Chu de lookbook
+                    </label>
+                    <div className="chip-group">
+                      {LOOKBOOK_THEME_OPTIONS.map((themeOption) => (
+                        <button
+                          key={`lookbook-theme-${themeOption.value}`}
+                          className={`chip ${lookbookTheme === themeOption.value ? 'active' : ''}`}
+                          onClick={() => setLookbookTheme(themeOption.value)}
+                          id={`lookbook-theme-${themeOption.value}`}
+                          style={lookbookTheme === themeOption.value ? {
+                            background: `color-mix(in srgb, ${themeOption.color} 15%, transparent)`,
+                            borderColor: themeOption.color,
+                            color: themeOption.color,
+                          } : {}}
+                        >
+                          {themeOption.label}
+                          <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                            {themeOption.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: 10 }}>
+                    <label className="input-label">
+                      <ArrowRight size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Khoa huong pose model
+                    </label>
+                    <div className="chip-group">
+                      {LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.map((poseOption) => (
+                        <button
+                          key={`lookbook-pose-lock-${poseOption.value}`}
+                          className={`chip ${lookbookPoseDirectionLock === poseOption.value ? 'active' : ''}`}
+                          onClick={() => setLookbookPoseDirectionLock(poseOption.value)}
+                          id={`lookbook-pose-lock-${poseOption.value}`}
+                        >
+                          {poseOption.label}
+                          <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                            {poseOption.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <p className="ai-task-hint" style={{ marginBottom: 0 }}>
-                    Mode nay tao bo {lookbookImageCount} prompt anh lookbook (anh tinh) theo format Nano Banana Pro: SUBJECT/ACTION/FACING/LOCATION/CAMERA/LIGHTING/STYLE/ASPECT RATIO. Tone sexy la goi cam thoi trang, khong noi dung 18+.
+                    Mode nay tao bo {lookbookImageCount} prompt anh lookbook (anh tinh) theo format Nano Banana Pro: SUBJECT/ACTION/FACING/LOCATION/CAMERA/LIGHTING/STYLE/ASPECT RATIO. Theme: {lookbookThemeLabel}. Pose lock: {lookbookPoseDirectionLockLabel}. Tone sexy la goi cam thoi trang, khong noi dung 18+.
                   </p>
                 </>
               )}
