@@ -306,13 +306,19 @@ type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
-type ProductCategory =
-  | 'auto'
-  | 'dam_tiec'
-  | 'dam_lua_body'
-  | 'set_di_bien'
-  | 'set_phoi_do_hang_ngay'
-  | 'do_tap_athleisure'
+type ProductCategoryGroup =
+  | 'all'
+  | 'tops'
+  | 'bottoms'
+  | 'dresses'
+  | 'skirts'
+  | 'outerwear'
+  | 'loungewear_sleepwear'
+  | 'lingerie_swimwear'
+  | 'activewear'
+  | 'traditional_festive'
+  | 'accessories_footwear'
+type ProductCategory = string
 type ProductLocationHistoryMap = Record<string, string[]>
 type OutfitTypeLocationHistoryMap = Partial<Record<ResolvedContentType, string[]>>
 
@@ -500,58 +506,367 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
 
 const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'boutiquefeed', 'outfitideas', 'review', 'ootd', 'ootdmirror']
 
+const PRODUCT_CATEGORY_GROUP_OPTIONS: Array<{
+  value: ProductCategoryGroup
+  label: string
+  desc: string
+}> = [
+  {
+    value: 'all',
+    label: 'Tat ca',
+    desc: 'Xem toan bo danh muc',
+  },
+  {
+    value: 'tops',
+    label: '1. Ao (Tops)',
+    desc: 'Ao thun, so mi, blouse, crop top, ao len, hoodie',
+  },
+  {
+    value: 'bottoms',
+    label: '2. Quan (Bottoms)',
+    desc: 'Jeans, quan tay, shorts, jogger, cargo, legging',
+  },
+  {
+    value: 'dresses',
+    label: '3. Dam (Dresses)',
+    desc: 'Theo dang, hoan canh, chat lieu',
+  },
+  {
+    value: 'skirts',
+    label: '4. Chan vay (Skirts)',
+    desc: 'Theo do dai, kieu dang, chat lieu',
+  },
+  {
+    value: 'outerwear',
+    label: '5. Ao khoac (Outerwear)',
+    desc: 'Khoac nhe, khoac giu am, utility jacket',
+  },
+  {
+    value: 'loungewear_sleepwear',
+    label: '6. Do mac nha & ngu',
+    desc: 'Bo mac nha, pijama, vay ngu, ao choang ngu',
+  },
+  {
+    value: 'lingerie_swimwear',
+    label: '7. Do lot & do boi',
+    desc: 'Bra, quan lot, shapewear, bikini, monokini',
+  },
+  {
+    value: 'activewear',
+    label: '8. Do tap & the thao',
+    desc: 'Sports bra, legging, seamless set, phu kien tap',
+  },
+  {
+    value: 'traditional_festive',
+    label: '9. Truyen thong & le hoi',
+    desc: 'Ao dai, ao ba ba, yem cach tan, suon xam',
+  },
+  {
+    value: 'accessories_footwear',
+    label: '10. Phu kien & giay dep',
+    desc: 'Giay dep, tui xach, non, kinh, that lung, trang suc',
+  },
+]
+
 const PRODUCT_CATEGORY_OPTIONS: Array<{
+  group: ProductCategoryGroup
   value: ProductCategory
   label: string
   desc: string
+  detailHint: string
   suggestedTypes: ResolvedContentType[]
   benchmarkHint: string
 }> = [
   {
+    group: 'all',
     value: 'auto',
     label: 'Auto Boutique',
     desc: 'He thong tu uu tien type convert cao',
+    detailHint: 'Mac dinh cho cac shop co nhieu dong san pham hoac du lieu con moi.',
     suggestedTypes: ['tiktokshop', 'boutiquefeed', 'outfitideas'],
     benchmarkHint: 'Phu hop khi ban chua ro san pham thuoc nhom nao; gom format chot don + review trust-first.',
   },
   {
-    value: 'dam_tiec',
-    label: 'Dam tiec',
-    desc: 'Occasion dress, silhouette + back detail',
-    suggestedTypes: ['partyoutfit', 'boutiquefeed', 'tiktokshop'],
-    benchmarkHint: 'Tu data boutique, nhom #damtiec / #damxinh co retention tot khi mo bang full-body reveal va fit proof.',
+    group: 'tops',
+    value: 'tops_tshirt',
+    label: 'Ao thun (T-shirts)',
+    desc: 'Tay ngan, tay dai, polo, oversize, baby tee',
+    detailHint: 'Ao thun tay ngan/tay dai, polo, oversize, baby tee.',
+    suggestedTypes: ['outfitideas', 'ootd', 'tiktokshop'],
+    benchmarkHint: 'Core SKU de chay save/share nhanh; nen uu tien mix-and-match + fit proof de tang CVR.',
   },
   {
-    value: 'dam_lua_body',
-    label: 'Dam lua / body',
-    desc: 'Ton dang, chat lieu va do rap',
+    group: 'tops',
+    value: 'tops_shirts',
+    label: 'Ao so mi (Shirts)',
+    desc: 'Cong so, kieu, lua/voan, form rong, khoac ngoai',
+    detailHint: 'So mi cong so, so mi kieu, so mi lua/voan, so mi form rong, so mi khoac ngoai.',
+    suggestedTypes: ['outfitideas', 'styling', 'boutiquefeed'],
+    benchmarkHint: 'Noi dung co huong dan phoi theo ngu canh (di lam/di choi) thuong giu watch-time tot.',
+  },
+  {
+    group: 'tops',
+    value: 'tops_blouses',
+    label: 'Ao kieu (Blouses)',
+    desc: 'Tre vai, lech vai, co vuong, co V, beo nhun, tay bong',
+    detailHint: 'Ao tre vai, lech vai, co vuong, co chu V, beo nhun, tay bong.',
+    suggestedTypes: ['ootd', 'boutiquefeed', 'styling'],
+    benchmarkHint: 'Nen mo bang silhouette + texture de tao cam giac cao cap va nu tinh ro hon.',
+  },
+  {
+    group: 'tops',
+    value: 'tops_croptops',
+    label: 'Ao ngan (Crop tops)',
+    desc: 'Croptop om sat, dang rong, tube top',
+    detailHint: 'Croptop om sat, croptop dang rong, ao ong (tube top).',
+    suggestedTypes: ['ootd', 'streetstyle', 'tiktokshop'],
+    benchmarkHint: 'Can nhan body proportion + cach phoi quan/vay de giam boi roi cho nguoi xem.',
+  },
+  {
+    group: 'tops',
+    value: 'tops_cami_tank_halter',
+    label: 'Hai day / ba lo / halter',
+    desc: 'Camisole, tank top, ao co yem',
+    detailHint: 'Ao hai day lua, camisole, ao ba lo, ao co yem (halter top).',
+    suggestedTypes: ['ootdmirror', 'outfitideas', 'streetstyle'],
+    benchmarkHint: 'Mirror fitcheck + layering la cong thuc an toan de cho thay phom va cach phoi.',
+  },
+  {
+    group: 'tops',
+    value: 'tops_sweaters_cardigan',
+    label: 'Ao len (Sweaters)',
+    desc: 'Co lo, co tim, gile, cardigan',
+    detailHint: 'Ao len co lo, co tim, ao len gile, cardigan.',
+    suggestedTypes: ['outfitideas', 'luxury', 'boutiquefeed'],
+    benchmarkHint: 'Tap trung vao chat lieu + layering de tao cam nhan premium va de ung dung.',
+  },
+  {
+    group: 'tops',
+    value: 'tops_hoodies_sweatshirts',
+    label: 'Ao ni (Hoodies & Sweatshirts)',
+    desc: 'Hoodie, sweater co tron, zip hoodie',
+    detailHint: 'Ao hoodie co mu, sweater co tron, ao ni khoa keo.',
+    suggestedTypes: ['streetstyle', 'haul', 'outfitideas'],
+    benchmarkHint: 'Nhom nay hop montage nhanh + lifestyle urban de giu do social-native.',
+  },
+  {
+    group: 'bottoms',
+    value: 'bottoms_jeans',
+    label: 'Quan jeans',
+    desc: 'Flare, wide leg, skinny, straight, rach, baggy',
+    detailHint: 'Jeans ong loe, ong rong, skinny, straight, jeans rach, baggy jeans.',
+    suggestedTypes: ['streetstyle', 'outfitideas', 'tiktokshop'],
+    benchmarkHint: 'Fit proof vung eo-hong-ong quan la yeu to quyet dinh conversion cho jeans.',
+  },
+  {
+    group: 'bottoms',
+    value: 'bottoms_trousers_fabric',
+    label: 'Quan tay / quan vai',
+    desc: 'Au cong so, ong suong, xep ly, lua',
+    detailHint: 'Quan tay au cong so, ong suong, xep ly, quan lua.',
+    suggestedTypes: ['outfitideas', 'styling', 'luxury'],
+    benchmarkHint: 'Nen trinh bay theo boi canh cong so va smart-casual de tang kha nang mua ngay.',
+  },
+  {
+    group: 'bottoms',
+    value: 'bottoms_shorts',
+    label: 'Quan shorts',
+    desc: 'Jean, kaki, da, xep ly, shorts the thao',
+    detailHint: 'Quan dui jean, shorts kaki, shorts da, shorts xep ly, shorts the thao.',
+    suggestedTypes: ['streetstyle', 'outfitideas', 'tiktokshop'],
+    benchmarkHint: 'Hook theo mua/he + boi canh ngoai troi se tang retention tot hon studio phang.',
+  },
+  {
+    group: 'bottoms',
+    value: 'bottoms_jogger_cargo_legging',
+    label: 'Quan nang dong / khac',
+    desc: 'Jogger, cargo, legging, tregging, quan lot long',
+    detailHint: 'Quan jogger, cargo pants, legging, tregging, quan lot long (mua dong).',
+    suggestedTypes: ['athleisure', 'streetstyle', 'outfitideas'],
+    benchmarkHint: 'Neu co legging/active item, can co movement proof de thuyet phuc tinh thoai mai.',
+  },
+  {
+    group: 'dresses',
+    value: 'dresses_by_silhouette',
+    label: 'Vay dam theo kieu dang',
+    desc: 'A-line, suong, xoe, body, duoi ca, slip, tre vai, cup nguc',
+    detailHint: 'Dam chu A, dam suong, dam xoe, dam body, dam duoi ca, slip dress, tre vai, cup nguc.',
+    suggestedTypes: ['partyoutfit', 'boutiquefeed', 'ootd'],
+    benchmarkHint: 'Silhouette reveal dau video + back/side proof la cong thuc on dinh cho nhom dam.',
+  },
+  {
+    group: 'dresses',
+    value: 'dresses_by_occasion',
+    label: 'Vay dam theo hoan canh',
+    desc: 'Cong so, da hoi/du tiec, dao pho, maxi di bien',
+    detailHint: 'Dam cong so, dam da hoi/du tiec, dam dao pho, dam maxi di bien.',
+    suggestedTypes: ['partyoutfit', 'tiktokshop', 'boutiquefeed'],
+    benchmarkHint: 'Dat boi canh su dung ro rang (office, event, vacation) giup rut ngan quyet dinh mua.',
+  },
+  {
+    group: 'dresses',
+    value: 'dresses_by_material',
+    label: 'Vay dam theo chat lieu',
+    desc: 'Lua/satin, ren, voan, thun, nhung, tweed',
+    detailHint: 'Dam lua/satin, ren, voan, thun, nhung, tweed.',
     suggestedTypes: ['boutiquefeed', 'tiktokshop', 'ootdmirror'],
-    benchmarkHint: 'Hop voi format review boutique ngan + hashtag #damlua #dambody #thoitranghottrend.',
+    benchmarkHint: 'Nhom nay can close-up texture va drape movement de tang trust va giam hoan tra.',
   },
   {
-    value: 'set_di_bien',
-    label: 'Set di bien / summer',
-    desc: 'Look he, movement + context ngoai troi',
-    suggestedTypes: ['streetstyle', 'outfitideas', 'ootd'],
-    benchmarkHint: 'Nen uu tien biet thuoc boi canh that (street/cafe/beach) thay vi background tron de giu social-native.',
+    group: 'skirts',
+    value: 'skirts_by_length',
+    label: 'Chan vay theo do dai',
+    desc: 'Mini, midi, maxi',
+    detailHint: 'Chan vay mini, midi, maxi.',
+    suggestedTypes: ['ootd', 'outfitideas', 'tiktokshop'],
+    benchmarkHint: 'Can lock full-body framing de nguoi xem danh gia dung do dai va ti le tong the.',
   },
   {
-    value: 'set_phoi_do_hang_ngay',
-    label: 'Set phoi do hang ngay',
-    desc: 'Mac di lam, di choi, de ung dung',
-    suggestedTypes: ['outfitideas', 'ootd', 'grwm'],
-    benchmarkHint: 'Nhom nay hieu qua voi saveable content: mix-and-match ro rang, caption ngan, proof de copy outfit.',
+    group: 'skirts',
+    value: 'skirts_by_shape',
+    label: 'Chan vay theo kieu dang',
+    desc: 'A-line, xep ly, but chi, xoe, duoi ca, xe ta, tang',
+    detailHint: 'Chan vay chu A, xep ly, but chi, xoe, duoi ca, xe ta, tang.',
+    suggestedTypes: ['outfitideas', 'styling', 'boutiquefeed'],
+    benchmarkHint: 'Noi dung phoi do theo 2-3 context se giup dang vay de ban hon dang review don le.',
   },
   {
-    value: 'do_tap_athleisure',
-    label: 'Do tap / athleisure',
-    desc: 'Gym-to-cafe, thoai mai va ton dang',
+    group: 'skirts',
+    value: 'skirts_by_material',
+    label: 'Chan vay theo chat lieu',
+    desc: 'Jean, da, kaki, da/tweed',
+    detailHint: 'Chan vay jean, da, kaki, da/tweed.',
+    suggestedTypes: ['review', 'boutiquefeed', 'tiktokshop'],
+    benchmarkHint: 'Material-led content (do day, form giu nep) thuong giam cart hesitation.',
+  },
+  {
+    group: 'outerwear',
+    value: 'outerwear_light_fall',
+    label: 'Ao khoac nhe / thu dong',
+    desc: 'Blazer, cardigan, denim jacket, biker, kaki',
+    detailHint: 'Blazer, cardigan, denim jacket, biker jacket, ao khoac kaki.',
+    suggestedTypes: ['streetstyle', 'outfitideas', 'styling'],
+    benchmarkHint: 'Layering truoc-sau giup cho thay gia tri do da dung va kha nang phoi do.',
+  },
+  {
+    group: 'outerwear',
+    value: 'outerwear_winter',
+    label: 'Ao khoac giu am / mua dong',
+    desc: 'Ao da, phao, mang to trench, long, tran bong',
+    detailHint: 'Ao khoac da, phao, mang to/trench coat, ao long, ao tran bong.',
+    suggestedTypes: ['streetstyle', 'luxury', 'tiktokshop'],
+    benchmarkHint: 'Nen show do day-chat va kha nang giu am bang movement + close-up chat lieu.',
+  },
+  {
+    group: 'outerwear',
+    value: 'outerwear_utility',
+    label: 'Ao khoac khac',
+    desc: 'Gio/chong nang/chong nuoc, varsity',
+    detailHint: 'Ao khoac gio (chong nang/chong nuoc), varsity jacket.',
+    suggestedTypes: ['streetstyle', 'haul', 'outfitideas'],
+    benchmarkHint: 'Tinh nang utility nen duoc quay trong boi canh thuc te de tang trust.',
+  },
+  {
+    group: 'loungewear_sleepwear',
+    value: 'loungewear_home_sets',
+    label: 'Bo mac nha',
+    desc: 'Bo lua, bo dui, bo cotton, do ni mua dong',
+    detailHint: 'Bo mac nha chat lua/dui/cotton va do ni mua dong.',
+    suggestedTypes: ['grwm', 'review', 'tiktokshop'],
+    benchmarkHint: 'Nhom comfort can nhan trai nghiem thuc te va do mem/thoang de thuyet phuc.',
+  },
+  {
+    group: 'loungewear_sleepwear',
+    value: 'loungewear_sleepwear',
+    label: 'Do ngu',
+    desc: 'Pijama tay dai/ngan, vay ngu lua/ren, ao choang ngu',
+    detailHint: 'Pijama tay dai-ngan, vay ngu lua/ren, ao choang ngu.',
+    suggestedTypes: ['grwm', 'boutiquefeed', 'tiktokshop'],
+    benchmarkHint: 'Giup nguoi xem hinh dung use-case toi/du lich voi tone nhe va trust-first.',
+  },
+  {
+    group: 'lingerie_swimwear',
+    value: 'lingerie_core',
+    label: 'Do lot (Lingerie)',
+    desc: 'Bra, quan lot, shapewear, bralette',
+    detailHint: 'Bra co gong/khong gong/mut dan, quan lot cotton/ren/khong vien, shapewear, bralette.',
+    suggestedTypes: ['review', 'boutiquefeed', 'tiktokshop'],
+    benchmarkHint: 'Can giu tone tinh te, thong tin practical (fit/support/material) va khong phan cam.',
+  },
+  {
+    group: 'lingerie_swimwear',
+    value: 'swimwear_core',
+    label: 'Do boi (Swimwear)',
+    desc: 'Bikini, monokini, rash guard, ao choang bien, sarong',
+    detailHint: 'Bikini 2 manh, monokini 1 manh, do boi dai tay, ao choang di bien, sarong.',
+    suggestedTypes: ['streetstyle', 'outfitideas', 'tiktokshop'],
+    benchmarkHint: 'Boi canh beach/pool va movement nhe giup thuyet phuc ve fit va wearability.',
+  },
+  {
+    group: 'activewear',
+    value: 'activewear_apparel',
+    label: 'Do tap (Activewear)',
+    desc: 'Sports bra, ao tap, legging, shorts, seamless set',
+    detailHint: 'Ao bra the thao, ao tap gym/yoga, legging, shorts the thao, seamless set.',
     suggestedTypes: ['athleisure', 'outfitideas', 'tiktokshop'],
-    benchmarkHint: 'Can nhan movement comfort + wearability hang ngay; tranh quay qua gym-only de khong mat tinh thuong mai.',
+    benchmarkHint: 'Movement comfort proof la bat buoc; tranh khung hinh tinh qua lau.',
+  },
+  {
+    group: 'activewear',
+    value: 'activewear_accessories',
+    label: 'Phu kien tap',
+    desc: 'Bang do, tat/vot chong truot',
+    detailHint: 'Bang do, tat/vot the thao chong truot.',
+    suggestedTypes: ['athleisure', 'review', 'tiktokshop'],
+    benchmarkHint: 'Noi dung combo phu kien + outfit thuong co gia tri don hang cao hon.',
+  },
+  {
+    group: 'traditional_festive',
+    value: 'traditional_festive_wear',
+    label: 'Trang phuc truyen thong & le hoi',
+    desc: 'Ao dai, ao ba ba, yem cach tan, suon xam',
+    detailHint: 'Ao dai truyen thong/cach tan, ao ba ba, yem cach tan, suon xam.',
+    suggestedTypes: ['ootd', 'partyoutfit', 'streetstyle'],
+    benchmarkHint: 'Can tap trung tinh van hoa + boi canh su kien de tao cam xuc va trust.',
+  },
+  {
+    group: 'accessories_footwear',
+    value: 'accessories_shoes',
+    label: 'Giay dep',
+    desc: 'Cao got, sneakers, sandal, dep bet, loafers, boot',
+    detailHint: 'Giay cao got (nhon/vuong), sneakers, sandal, dep bet, loafers/oxfords, boot.',
+    suggestedTypes: ['styling', 'outfitideas', 'tiktokshop'],
+    benchmarkHint: 'Nhom nay nen quay full-look de chung minh de phoi va ton tong the outfit.',
+  },
+  {
+    group: 'accessories_footwear',
+    value: 'accessories_bags',
+    label: 'Tui xach',
+    desc: 'Baguette, deo cheo, tote, ba lo, clutch',
+    detailHint: 'Tui kep nach (baguette), tui deo cheo, tote, ba lo thoi trang, clutch.',
+    suggestedTypes: ['styling', 'boutiquefeed', 'tiktokshop'],
+    benchmarkHint: 'Close-up khoang tui + strap + material la diem quyet dinh mua cho nhom bag.',
+  },
+  {
+    group: 'accessories_footwear',
+    value: 'accessories_addons',
+    label: 'Phu kien khac',
+    desc: 'Mu/non, kinh mat, that lung, khan, toc, trang suc',
+    detailHint: 'Mu/non, kinh mat, that lung, khan choang (lua/len), kep toc/no, trang suc thoi trang.',
+    suggestedTypes: ['styling', 'grwm', 'tiktokshop'],
+    benchmarkHint: 'Nen lam clip combo phu kien theo mood/case de tang save va add-to-cart.',
   },
 ]
 
+const PRODUCT_CATEGORY_GROUP_VALUES = PRODUCT_CATEGORY_GROUP_OPTIONS.map((item) => item.value) as ProductCategoryGroup[]
 const PRODUCT_CATEGORY_VALUES = PRODUCT_CATEGORY_OPTIONS.map((item) => item.value) as ProductCategory[]
+const LEGACY_PRODUCT_CATEGORY_ALIASES: Record<string, ProductCategory> = {
+  dam_tiec: 'dresses_by_occasion',
+  dam_lua_body: 'dresses_by_material',
+  set_di_bien: 'swimwear_core',
+  set_phoi_do_hang_ngay: 'tops_tshirt',
+  do_tap_athleisure: 'activewear_apparel',
+}
 
 const ALLOWED_LOCATION_KEYWORDS = [
   'vietnam',
@@ -1075,10 +1390,18 @@ function normalizeLookbookStyleTone(value: unknown, fallback: LookbookStyleTone 
   return normalized === 'sexy' ? 'sexy' : fallback
 }
 
+function normalizeProductCategoryGroup(value: unknown, fallback: ProductCategoryGroup = 'all'): ProductCategoryGroup {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return PRODUCT_CATEGORY_GROUP_VALUES.includes(normalized as ProductCategoryGroup)
+    ? normalized as ProductCategoryGroup
+    : fallback
+}
+
 function normalizeProductCategory(value: unknown, fallback: ProductCategory = 'auto'): ProductCategory {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
-  return PRODUCT_CATEGORY_VALUES.includes(normalized as ProductCategory)
-    ? normalized as ProductCategory
+  const remapped = LEGACY_PRODUCT_CATEGORY_ALIASES[normalized] || normalized
+  return PRODUCT_CATEGORY_VALUES.includes(remapped as ProductCategory)
+    ? remapped as ProductCategory
     : fallback
 }
 
@@ -5362,6 +5685,17 @@ export default function App() {
     const saved = localStorage.getItem('aff_product_category')
     return normalizeProductCategory(saved, 'auto')
   })
+  const [productCategoryGroup, setProductCategoryGroup] = useState<ProductCategoryGroup>(() => {
+    const savedGroup = localStorage.getItem('aff_product_category_group')
+    if (savedGroup !== null) {
+      return normalizeProductCategoryGroup(savedGroup, 'all')
+    }
+
+    const savedCategory = localStorage.getItem('aff_product_category')
+    const normalizedCategory = normalizeProductCategory(savedCategory, 'auto')
+    const matchedCategory = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === normalizedCategory)
+    return matchedCategory?.group || 'all'
+  })
   const [autoApplyCategoryType, setAutoApplyCategoryType] = useState(() => {
     const saved = localStorage.getItem('aff_auto_apply_product_category_type')
     return saved === null ? false : saved === '1'
@@ -5420,6 +5754,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('aff_lookbook_image_count', String(lookbookImageCount)) }, [lookbookImageCount])
   useEffect(() => { localStorage.setItem('aff_lookbook_style_tone', lookbookStyleTone) }, [lookbookStyleTone])
   useEffect(() => { localStorage.setItem('aff_product_category', productCategory) }, [productCategory])
+  useEffect(() => { localStorage.setItem('aff_product_category_group', productCategoryGroup) }, [productCategoryGroup])
   useEffect(() => { localStorage.setItem('aff_auto_apply_product_category_type', autoApplyCategoryType ? '1' : '0') }, [autoApplyCategoryType])
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
@@ -5761,7 +6096,26 @@ export default function App() {
       setContentType(primarySuggestedType)
     }
   }, [autoApplyCategoryType])
-  const activeProductCategoryOption = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === productCategory)
+  const applyProductCategoryGroup = useCallback((nextGroup: ProductCategoryGroup) => {
+    setProductCategoryGroup(nextGroup)
+
+    const optionsInGroup = nextGroup === 'all'
+      ? PRODUCT_CATEGORY_OPTIONS
+      : PRODUCT_CATEGORY_OPTIONS.filter((item) => item.group === nextGroup)
+
+    if (!optionsInGroup.some((item) => item.value === productCategory)) {
+      const fallbackCategory = optionsInGroup[0]?.value || 'auto'
+      applyProductCategory(fallbackCategory)
+    }
+  }, [applyProductCategory, productCategory])
+  const activeProductCategoryGroupOption = PRODUCT_CATEGORY_GROUP_OPTIONS.find((item) => item.value === productCategoryGroup)
+    || PRODUCT_CATEGORY_GROUP_OPTIONS[0]
+  const visibleProductCategoryOptions = productCategoryGroup === 'all'
+    ? PRODUCT_CATEGORY_OPTIONS
+    : PRODUCT_CATEGORY_OPTIONS.filter((item) => item.group === productCategoryGroup)
+  const activeProductCategoryOption = visibleProductCategoryOptions.find((item) => item.value === productCategory)
+    || PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === productCategory)
+    || visibleProductCategoryOptions[0]
     || PRODUCT_CATEGORY_OPTIONS[0]
   const activeProductCategorySuggestedLabels = activeProductCategoryOption.suggestedTypes
     .map((typeValue) => CONTENT_TYPES.find((item) => item.value === typeValue)?.label || typeValue.toUpperCase())
@@ -6734,9 +7088,30 @@ export default function App() {
               </div>
 
               <div className="input-group">
-                <label className="input-label">Chọn danh mục để gợi ý content type</label>
+                <label className="input-label">Chọn nhóm danh mục</label>
                 <div className="chip-group">
-                  {PRODUCT_CATEGORY_OPTIONS.map((category) => (
+                  {PRODUCT_CATEGORY_GROUP_OPTIONS.map((group) => (
+                    <button
+                      key={`product-category-group-${group.value}`}
+                      className={`chip ${productCategoryGroup === group.value ? 'active' : ''}`}
+                      onClick={() => applyProductCategoryGroup(group.value)}
+                      id={`product-category-group-${group.value}`}
+                    >
+                      {group.label}
+                      <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                        {group.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">
+                  Danh mục chi tiết ({visibleProductCategoryOptions.length})
+                </label>
+                <div className="chip-group">
+                  {visibleProductCategoryOptions.map((category) => (
                     <button
                       key={`product-category-${category.value}`}
                       className={`chip ${productCategory === category.value ? 'active' : ''}`}
@@ -6753,6 +7128,9 @@ export default function App() {
               </div>
 
               <div className="input-group" style={{ marginBottom: 0 }}>
+                <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 8 }}>
+                  Nhom dang xem: <strong>{activeProductCategoryGroupOption.label}</strong>. {activeProductCategoryOption.detailHint}
+                </p>
                 <label className="input-label">Loại nội dung phù hợp</label>
                 <div className="chip-group">
                   {activeProductCategoryOption.suggestedTypes.map((typeValue) => {
