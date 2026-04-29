@@ -2570,7 +2570,8 @@ async function generateWithGemini(
   usedLocationsForProduct: string[] = [],
   usedLocationsByOutfitType: OutfitTypeLocationHistoryMap = {},
   affiliateMode: AffiliateMode = 'balanced',
-  salesTemplate: SalesTemplate = 'hard'
+  salesTemplate: SalesTemplate = 'hard',
+  poseDirectionLock: LookbookPoseDirectionLock = 'auto',
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const { scenes: sceneCount, keyframes: keyframeCount } = durationInfo
@@ -2586,6 +2587,10 @@ async function generateWithGemini(
   const autoModeRule = affiliateMode === 'strict'
     ? 'STRICT AUTO MODE: only allow conversion-oriented types (tiktokshop, boutiquefeed, outfitideas, review, ootd, ootdmirror). If uncertain, default to tiktokshop.'
     : 'BALANCED AUTO MODE: allow broader creative variety but still prioritize conversion-friendly fashion formats.'
+  const hasVideoPoseDirectionLock = poseDirectionLock !== 'auto'
+  const videoPoseDirectionLockText = hasVideoPoseDirectionLock
+    ? poseDirectionLock.toUpperCase()
+    : 'AUTO'
   const salesTemplateRules = buildSalesTemplateRules(salesTemplate)
   const affiliateExecutionRules = `
 AFFILIATE CONVERSION OBJECTIVE:
@@ -3300,7 +3305,8 @@ Output STRICT JSON only:
         )
 
         if (
-          previousFacingDirection !== 'unknown'
+          !hasVideoPoseDirectionLock
+          && previousFacingDirection !== 'unknown'
           && currentFacingDirection !== 'unknown'
           && previousFacingDirection === currentFacingDirection
         ) {
@@ -3314,6 +3320,8 @@ Output STRICT JSON only:
 
         if (
           strict
+          &&
+          !hasVideoPoseDirectionLock
           &&
           !hasTurnCue
           && (previousFacingDirection === 'unknown' || currentFacingDirection === 'unknown')
@@ -3479,6 +3487,7 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - ${sceneCount} scene prompts for Veo 3.1 (8s each, first-frame -> last-frame)
 - Aspect ratio: ${aspectRatio}
 - LOCKED content type: ${finalContentType.toUpperCase()}
+- Video pose-direction lock: ${videoPoseDirectionLockText}
 
 AFFILIATE OBJECTIVE:
 ${affiliateObjectiveForFinal}
@@ -3961,7 +3970,9 @@ Return STRICT JSON only, same schema:
       const inferredFacing = extractKeyframeFacingDirection(actionBase, camera, record.facingDirection)
       const previous = i > 0 ? normalizedKeyframesForRule32[i - 1] : null
       const previousFacing = previous?.facingDirection || null
-      const resolvedFacing = pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
+      const resolvedFacing: ConcreteFacingDirection = hasVideoPoseDirectionLock
+        ? poseDirectionLock as ConcreteFacingDirection
+        : pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
 
       const actionHasFacingSignal = normalizeFacingDirectionToken(actionBase) !== 'unknown'
       const hasTurnSignal = i > 0
@@ -3969,14 +3980,20 @@ Return STRICT JSON only, same schema:
         : false
 
       let action = actionBase
-      if (i === 0) {
+      if (hasVideoPoseDirectionLock) {
         if (!actionHasFacingSignal || inferredFacing !== resolvedFacing) {
-          action = appendSentenceIfMissing(action, `Body facing ${toFacingDirectionLabel(resolvedFacing)}`)
+          action = appendSentenceIfMissing(action, `Body facing ${toFacingDirectionLabel(resolvedFacing)} throughout this keyframe`)
         }
       } else {
-        const transitionHint = `Turn/pivot from ${toFacingDirectionLabel(previousFacing || 'front')} to ${toFacingDirectionLabel(resolvedFacing)}, ending ${toFacingDirectionLabel(resolvedFacing)}`
-        if (!actionHasFacingSignal || !hasTurnSignal || inferredFacing !== resolvedFacing) {
-          action = appendSentenceIfMissing(action, transitionHint)
+        if (i === 0) {
+          if (!actionHasFacingSignal || inferredFacing !== resolvedFacing) {
+            action = appendSentenceIfMissing(action, `Body facing ${toFacingDirectionLabel(resolvedFacing)}`)
+          }
+        } else {
+          const transitionHint = `Turn/pivot from ${toFacingDirectionLabel(previousFacing || 'front')} to ${toFacingDirectionLabel(resolvedFacing)}, ending ${toFacingDirectionLabel(resolvedFacing)}`
+          if (!actionHasFacingSignal || !hasTurnSignal || inferredFacing !== resolvedFacing) {
+            action = appendSentenceIfMissing(action, transitionHint)
+          }
         }
       }
 
@@ -4624,7 +4641,7 @@ function buildPromptResultFromHistoryItem(
   )
   const metadataLookbookStyleTone = normalizeLookbookStyleTone(metadata.lookbookStyleTone, 'standard')
   const metadataLookbookTheme = normalizeLookbookTheme(metadata.lookbookTheme, 'auto')
-  const metadataLookbookPoseDirectionLock = normalizeLookbookPoseDirectionLock(metadata.lookbookPoseDirectionLock, 'auto')
+  const metadataLookbookPoseDirectionLock: LookbookPoseDirectionLock = 'auto'
 
   const fallbackDurationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
   const keyframeCount = Math.max(
@@ -5942,8 +5959,9 @@ export default function App() {
     const saved = localStorage.getItem('aff_lookbook_theme')
     return normalizeLookbookTheme(saved, 'auto')
   })
-  const [lookbookPoseDirectionLock, setLookbookPoseDirectionLock] = useState<LookbookPoseDirectionLock>(() => {
-    const saved = localStorage.getItem('aff_lookbook_pose_direction_lock')
+  const [videoPoseDirectionLock, setVideoPoseDirectionLock] = useState<LookbookPoseDirectionLock>(() => {
+    const saved = localStorage.getItem('aff_video_pose_direction_lock')
+      || localStorage.getItem('aff_lookbook_pose_direction_lock')
     return normalizeLookbookPoseDirectionLock(saved, 'auto')
   })
   const [productCategory, setProductCategory] = useState<ProductCategory>(() => {
@@ -6019,7 +6037,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('aff_lookbook_image_count', String(lookbookImageCount)) }, [lookbookImageCount])
   useEffect(() => { localStorage.setItem('aff_lookbook_style_tone', lookbookStyleTone) }, [lookbookStyleTone])
   useEffect(() => { localStorage.setItem('aff_lookbook_theme', lookbookTheme) }, [lookbookTheme])
-  useEffect(() => { localStorage.setItem('aff_lookbook_pose_direction_lock', lookbookPoseDirectionLock) }, [lookbookPoseDirectionLock])
+  useEffect(() => { localStorage.setItem('aff_video_pose_direction_lock', videoPoseDirectionLock) }, [videoPoseDirectionLock])
   useEffect(() => { localStorage.setItem('aff_product_category', productCategory) }, [productCategory])
   useEffect(() => { localStorage.setItem('aff_product_category_group', productCategoryGroup) }, [productCategoryGroup])
   useEffect(() => { localStorage.setItem('aff_auto_apply_product_category_type', autoApplyCategoryType ? '1' : '0') }, [autoApplyCategoryType])
@@ -6168,8 +6186,8 @@ export default function App() {
     )
     const restoredLookbookStyleTone = normalizeLookbookStyleTone(metadata.lookbookStyleTone, 'standard')
     const restoredLookbookTheme = normalizeLookbookTheme(metadata.lookbookTheme, 'auto')
-    const restoredLookbookPoseDirectionLock = normalizeLookbookPoseDirectionLock(
-      metadata.lookbookPoseDirectionLock,
+    const restoredVideoPoseDirectionLock = normalizeLookbookPoseDirectionLock(
+      metadata.videoPoseDirectionLock ?? metadata.lookbookPoseDirectionLock,
       'auto',
     )
 
@@ -6199,7 +6217,7 @@ export default function App() {
       setLookbookImageCount(restoredLookbookImageCount)
       setLookbookStyleTone(restoredLookbookStyleTone)
       setLookbookTheme(restoredLookbookTheme)
-      setLookbookPoseDirectionLock(restoredLookbookPoseDirectionLock)
+      setVideoPoseDirectionLock(restoredVideoPoseDirectionLock)
       setDuration(restoredDuration)
       setAspectRatio(restoredAspectRatio)
       setNotes(item.notes || '')
@@ -6275,7 +6293,7 @@ export default function App() {
         lookbookImageCount,
         lookbookStyleTone,
         lookbookTheme,
-        lookbookPoseDirectionLock,
+        'auto',
       )
 
       return result.lookbookImagePrompts.map((item, index) => {
@@ -6327,7 +6345,7 @@ export default function App() {
           lookbookImageCount,
           lookbookStyleTone,
           lookbookTheme,
-          lookbookPoseDirectionLock,
+          'auto',
         )
         fallbackSet[0] = {
           ...fallbackSet[0],
@@ -6402,7 +6420,7 @@ export default function App() {
     && activeProductCategoryOption.suggestedTypes.includes(contentType as ResolvedContentType)
   const lookbookStyleToneLabel = lookbookStyleTone === 'sexy' ? 'Sexy' : 'Classic'
   const lookbookThemeLabel = getLookbookThemeOption(lookbookTheme).label
-  const lookbookPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === lookbookPoseDirectionLock)?.label || 'Auto'
+  const videoPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === videoPoseDirectionLock)?.label || 'Auto'
   const promptPrimaryLabel = generationMode === 'lookbook_image' ? 'Anh Lookbook' : 'Prompt Package'
   const loadingStages = generationMode === 'lookbook_image' ? LOOKBOOK_LOADING_STAGES : PROMPT_LOADING_STAGES
   const promptStatusKind = loading ? 'loading' : error ? 'error' : hasPromptResult ? 'success' : 'idle'
@@ -6414,11 +6432,11 @@ export default function App() {
       ? 'Có lỗi khi tạo prompt. Kiểm tra thông báo để thử lại.'
       : hasPromptResult
         ? hasVideoPromptResult
-          ? `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL}).`
-            : `Prompt anh lookbook da san sang (${currentLookbookPrompts.length} pics • ${lookbookStyleToneLabel} • ${lookbookThemeLabel} • pose ${lookbookPoseDirectionLockLabel}).`
+          ? `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL} • pose ${videoPoseDirectionLockLabel}).`
+            : `Prompt anh lookbook da san sang (${currentLookbookPrompts.length} pics • ${lookbookStyleToneLabel} • ${lookbookThemeLabel}).`
         : canGenerate
           ? generationMode === 'lookbook_image'
-              ? `San sang tao ${lookbookImageCount} prompt anh lookbook (${lookbookStyleToneLabel} • ${lookbookThemeLabel} • pose ${lookbookPoseDirectionLockLabel}, khong video).`
+              ? `San sang tao ${lookbookImageCount} prompt anh lookbook (${lookbookStyleToneLabel} • ${lookbookThemeLabel}, khong video).`
             : `San sang tao Prompt Package (${FIXED_STRATEGY_DESC}).`
           : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
   const selectedSeoVariant = seoResult
@@ -6473,7 +6491,7 @@ export default function App() {
           lookbookImageCount,
           lookbookStyleTone,
           lookbookTheme,
-          lookbookPoseDirectionLock,
+          'auto',
           contentType,
         )
 
@@ -6537,7 +6555,6 @@ export default function App() {
             lookbookImageCount: lookbookResult.lookbookImagePrompts?.length || 0,
             lookbookStyleTone,
             lookbookTheme,
-            lookbookPoseDirectionLock,
             generatedLocations: [],
             hasFaceImage: Boolean(faceImage),
             hasProductImage: Boolean(productImage),
@@ -6588,6 +6605,7 @@ export default function App() {
             outfitTypeLocationHistory,
             FIXED_AFFILIATE_MODE,
             FIXED_SALES_TEMPLATE,
+            videoPoseDirectionLock,
           )
 
           pushLog(`[OK] Attempt ${attempt} succeeded — keyframes=${res.keyframes.length} scenes=${res.scenes.length}`)
@@ -6678,9 +6696,9 @@ export default function App() {
               resolvedContentType: resolvedType,
               duration,
               aspectRatio,
+              videoPoseDirectionLock,
               lookbookStyleTone,
               lookbookTheme,
-              lookbookPoseDirectionLock,
               keyframeCount: res.keyframes.length,
               sceneCount: res.scenes.length,
               generatedLocations: generatedLocations.slice(0, 10),
@@ -6939,6 +6957,7 @@ export default function App() {
           '── VIDEO PROMPT PACKAGE ──',
           `Duration: ${duration}s | Ratio: ${aspectRatio}`,
           `Resolved Type: ${selectedContentType.toUpperCase()}`,
+          `Pose Direction Lock: ${videoPoseDirectionLockLabel}`,
           `Affiliate Mode: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
           `Sales Template: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
           '',
@@ -6962,7 +6981,6 @@ export default function App() {
           `Resolved Type: ${selectedContentType.toUpperCase()}`,
           `Lookbook Tone: ${lookbookStyleToneLabel}`,
           `Lookbook Theme: ${lookbookThemeLabel}`,
-          `Pose Direction Lock: ${lookbookPoseDirectionLockLabel}`,
           '',
           '── CHARACTER DNA ──',
           result.masterDNA,
@@ -7037,6 +7055,7 @@ export default function App() {
       if (resultHasVideoFlow) {
         lines.push(
           `RESOLVED TYPE: ${selectedContentType.toUpperCase()}`,
+          `POSE DIRECTION LOCK: ${videoPoseDirectionLockLabel}`,
           `AFFILIATE MODE: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
           `SALES TEMPLATE: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
           '',
@@ -7057,7 +7076,6 @@ export default function App() {
           'MODE: LOOKBOOK_IMAGE',
           `LOOKBOOK TONE: ${lookbookStyleToneLabel}`,
           `LOOKBOOK THEME: ${lookbookThemeLabel}`,
-          `POSE DIRECTION LOCK: ${lookbookPoseDirectionLockLabel}`,
           `LOOKBOOK COUNT: ${lookbookPrompts.length}`,
           '',
           'CHARACTER DNA:', result.masterDNA,
@@ -7232,27 +7250,51 @@ export default function App() {
               </div>
 
               {generationMode === 'video_prompt' && (
-                <div className="input-group">
-                  <label className="input-label">
-                    <Clock size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-                    Thoi luong
-                  </label>
-                  <div className="chip-group">
-                    {DURATIONS.map(d => (
-                      <button
-                        key={d.value}
-                        className={`chip ${duration === d.value ? 'active' : ''}`}
-                        onClick={() => setDuration(d.value)}
-                        id={`duration-${d.value}`}
-                      >
-                        {d.label}
-                        <span style={{ fontSize: '0.65rem', opacity: 0.7, marginLeft: 4 }}>
-                          {d.scenes}sc/{d.keyframes}kf
-                        </span>
-                      </button>
-                    ))}
+                <>
+                  <div className="input-group">
+                    <label className="input-label">
+                      <Clock size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Thoi luong
+                    </label>
+                    <div className="chip-group">
+                      {DURATIONS.map(d => (
+                        <button
+                          key={d.value}
+                          className={`chip ${duration === d.value ? 'active' : ''}`}
+                          onClick={() => setDuration(d.value)}
+                          id={`duration-${d.value}`}
+                        >
+                          {d.label}
+                          <span style={{ fontSize: '0.65rem', opacity: 0.7, marginLeft: 4 }}>
+                            {d.scenes}sc/{d.keyframes}kf
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">
+                      <ArrowRight size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Khoa huong pose model (Video)
+                    </label>
+                    <div className="chip-group">
+                      {LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.map((poseOption) => (
+                        <button
+                          key={`video-pose-lock-${poseOption.value}`}
+                          className={`chip ${videoPoseDirectionLock === poseOption.value ? 'active' : ''}`}
+                          onClick={() => setVideoPoseDirectionLock(poseOption.value)}
+                          id={`video-pose-lock-${poseOption.value}`}
+                        >
+                          {poseOption.label}
+                          <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                            {poseOption.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* Aspect Ratio */}
@@ -7353,30 +7395,8 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="input-group" style={{ marginBottom: 10 }}>
-                    <label className="input-label">
-                      <ArrowRight size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-                      Khoa huong pose model
-                    </label>
-                    <div className="chip-group">
-                      {LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.map((poseOption) => (
-                        <button
-                          key={`lookbook-pose-lock-${poseOption.value}`}
-                          className={`chip ${lookbookPoseDirectionLock === poseOption.value ? 'active' : ''}`}
-                          onClick={() => setLookbookPoseDirectionLock(poseOption.value)}
-                          id={`lookbook-pose-lock-${poseOption.value}`}
-                        >
-                          {poseOption.label}
-                          <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
-                            {poseOption.desc}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
                   <p className="ai-task-hint" style={{ marginBottom: 0 }}>
-                    Mode nay tao bo {lookbookImageCount} prompt anh lookbook (anh tinh) theo format Nano Banana Pro: SUBJECT/ACTION/FACING/LOCATION/CAMERA/LIGHTING/STYLE/ASPECT RATIO. Theme: {lookbookThemeLabel}. Pose lock: {lookbookPoseDirectionLockLabel}. Tone sexy la goi cam thoi trang, khong noi dung 18+.
+                    Mode nay tao bo {lookbookImageCount} prompt anh lookbook (anh tinh) theo format Nano Banana Pro: SUBJECT/ACTION/FACING/LOCATION/CAMERA/LIGHTING/STYLE/ASPECT RATIO. Theme: {lookbookThemeLabel}. Tone sexy la goi cam thoi trang, khong noi dung 18+.
                   </p>
                 </>
               )}
