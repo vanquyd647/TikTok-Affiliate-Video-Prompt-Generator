@@ -306,6 +306,13 @@ type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
+type ProductCategory =
+  | 'auto'
+  | 'dam_tiec'
+  | 'dam_lua_body'
+  | 'set_di_bien'
+  | 'set_phoi_do_hang_ngay'
+  | 'do_tap_athleisure'
 type ProductLocationHistoryMap = Record<string, string[]>
 type OutfitTypeLocationHistoryMap = Partial<Record<ResolvedContentType, string[]>>
 
@@ -493,6 +500,59 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
 
 const STRICT_AUTO_ALLOWED_TYPES: ResolvedContentType[] = ['tiktokshop', 'boutiquefeed', 'outfitideas', 'review', 'ootd', 'ootdmirror']
 
+const PRODUCT_CATEGORY_OPTIONS: Array<{
+  value: ProductCategory
+  label: string
+  desc: string
+  suggestedTypes: ResolvedContentType[]
+  benchmarkHint: string
+}> = [
+  {
+    value: 'auto',
+    label: 'Auto Boutique',
+    desc: 'He thong tu uu tien type convert cao',
+    suggestedTypes: ['tiktokshop', 'boutiquefeed', 'outfitideas'],
+    benchmarkHint: 'Phu hop khi ban chua ro san pham thuoc nhom nao; gom format chot don + review trust-first.',
+  },
+  {
+    value: 'dam_tiec',
+    label: 'Dam tiec',
+    desc: 'Occasion dress, silhouette + back detail',
+    suggestedTypes: ['partyoutfit', 'boutiquefeed', 'tiktokshop'],
+    benchmarkHint: 'Tu data boutique, nhom #damtiec / #damxinh co retention tot khi mo bang full-body reveal va fit proof.',
+  },
+  {
+    value: 'dam_lua_body',
+    label: 'Dam lua / body',
+    desc: 'Ton dang, chat lieu va do rap',
+    suggestedTypes: ['boutiquefeed', 'tiktokshop', 'ootdmirror'],
+    benchmarkHint: 'Hop voi format review boutique ngan + hashtag #damlua #dambody #thoitranghottrend.',
+  },
+  {
+    value: 'set_di_bien',
+    label: 'Set di bien / summer',
+    desc: 'Look he, movement + context ngoai troi',
+    suggestedTypes: ['streetstyle', 'outfitideas', 'ootd'],
+    benchmarkHint: 'Nen uu tien biet thuoc boi canh that (street/cafe/beach) thay vi background tron de giu social-native.',
+  },
+  {
+    value: 'set_phoi_do_hang_ngay',
+    label: 'Set phoi do hang ngay',
+    desc: 'Mac di lam, di choi, de ung dung',
+    suggestedTypes: ['outfitideas', 'ootd', 'grwm'],
+    benchmarkHint: 'Nhom nay hieu qua voi saveable content: mix-and-match ro rang, caption ngan, proof de copy outfit.',
+  },
+  {
+    value: 'do_tap_athleisure',
+    label: 'Do tap / athleisure',
+    desc: 'Gym-to-cafe, thoai mai va ton dang',
+    suggestedTypes: ['athleisure', 'outfitideas', 'tiktokshop'],
+    benchmarkHint: 'Can nhan movement comfort + wearability hang ngay; tranh quay qua gym-only de khong mat tinh thuong mai.',
+  },
+]
+
+const PRODUCT_CATEGORY_VALUES = PRODUCT_CATEGORY_OPTIONS.map((item) => item.value) as ProductCategory[]
+
 const ALLOWED_LOCATION_KEYWORDS = [
   'vietnam',
   'viet nam',
@@ -594,9 +654,12 @@ const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster is strong and broad (#oo
 - FYP is too broad (#fyp ~8.7B) and should be secondary only, never the core fashion narrative.
 - Occasion-wear clusters are healthier with Vietnamese tags (#vayditiec ~243K, #damditiec ~119K) than literal #partyoutfit (~105K).`
 
-const BOUTIQUE_FEED_CHANNEL_BENCHMARK = `- Channel snapshot (@anvy.boutique): 186.4K followers, 2.6M likes, and multiple pinned videos in the 2.6M-3.2M view range.
+const BOUTIQUE_FEED_CHANNEL_BENCHMARK = `- Channel snapshot (@anvy.boutique): 186.7K followers, 2.6M likes, with multiple pinned videos in 2.6M-3.2M views.
+- Channel snapshot (@damitas_boutiquee): 87.3K followers, 392.6K likes, profile positioning as girls-fashion boutique.
+- Channel snapshot (@vyboutique225): 44.9K followers, 1.1M likes, boutique-style conversion feed cadence.
+- Channel snapshot (@any_boutique.gt): 33.6K followers, 522.5K likes, SHEIN-import boutique positioning and haul-style commerce framing.
+- Video-caption evidence (direct scrape from @anvy.boutique): #damxinh #damtiec #damlua #damthietke #setxinh #thoitranghottrend #goclamdep #xuhuong #anvyboutique.
 - Recurring caption behavior: short emotional hook + emoji stack, then concentrated hashtag bundle.
-- Strong hashtag bundle examples: #damxinh #damtiec #damlua #damthietke #setxinh #thoitranghottrend #goclamdep #xuhuong #anvyboutique.
 - High-performing narrative: immediate silhouette reveal, fit/tone-up proof (hack eo/ton dang), material cue, then concise verdict.
 - Trust pattern: practical first-person review framing (real experience, no hard-sell wall of CTA) while maintaining clear purchase intent.`
 
@@ -1010,6 +1073,13 @@ function normalizeLookbookImageCount(value: unknown, fallback: LookbookImageCoun
 function normalizeLookbookStyleTone(value: unknown, fallback: LookbookStyleTone = 'standard'): LookbookStyleTone {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
   return normalized === 'sexy' ? 'sexy' : fallback
+}
+
+function normalizeProductCategory(value: unknown, fallback: ProductCategory = 'auto'): ProductCategory {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : ''
+  return PRODUCT_CATEGORY_VALUES.includes(normalized as ProductCategory)
+    ? normalized as ProductCategory
+    : fallback
 }
 
 function coerceLookbookImageCountFromLength(length: number): LookbookImageCount {
@@ -5288,6 +5358,14 @@ export default function App() {
     const saved = localStorage.getItem('aff_lookbook_style_tone')
     return normalizeLookbookStyleTone(saved, 'standard')
   })
+  const [productCategory, setProductCategory] = useState<ProductCategory>(() => {
+    const saved = localStorage.getItem('aff_product_category')
+    return normalizeProductCategory(saved, 'auto')
+  })
+  const [autoApplyCategoryType, setAutoApplyCategoryType] = useState(() => {
+    const saved = localStorage.getItem('aff_auto_apply_product_category_type')
+    return saved === null ? false : saved === '1'
+  })
   const [contentType, setContentType] = useState<ContentType>('ootd')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
@@ -5341,6 +5419,8 @@ export default function App() {
   useEffect(() => { localStorage.setItem('aff_generation_mode', generationMode) }, [generationMode])
   useEffect(() => { localStorage.setItem('aff_lookbook_image_count', String(lookbookImageCount)) }, [lookbookImageCount])
   useEffect(() => { localStorage.setItem('aff_lookbook_style_tone', lookbookStyleTone) }, [lookbookStyleTone])
+  useEffect(() => { localStorage.setItem('aff_product_category', productCategory) }, [productCategory])
+  useEffect(() => { localStorage.setItem('aff_auto_apply_product_category_type', autoApplyCategoryType ? '1' : '0') }, [autoApplyCategoryType])
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
 
@@ -5672,6 +5752,22 @@ export default function App() {
   const hasResultsPanelContent = hasAnyResult || hasHistoryPanelData
   const activeWorkHistoryFilters = historyActionFilter !== 'all' || historySearchQuery.length > 0
   const historyShownCount = workHistory.length
+  const applyProductCategory = useCallback((nextCategory: ProductCategory) => {
+    setProductCategory(nextCategory)
+
+    const matchedCategory = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === nextCategory)
+    const primarySuggestedType = matchedCategory?.suggestedTypes[0]
+    if (autoApplyCategoryType && primarySuggestedType) {
+      setContentType(primarySuggestedType)
+    }
+  }, [autoApplyCategoryType])
+  const activeProductCategoryOption = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === productCategory)
+    || PRODUCT_CATEGORY_OPTIONS[0]
+  const activeProductCategorySuggestedLabels = activeProductCategoryOption.suggestedTypes
+    .map((typeValue) => CONTENT_TYPES.find((item) => item.value === typeValue)?.label || typeValue.toUpperCase())
+    .join(' / ')
+  const isCurrentContentTypeAlignedWithCategory = contentType !== 'auto'
+    && activeProductCategoryOption.suggestedTypes.includes(contentType as ResolvedContentType)
   const lookbookStyleToneLabel = lookbookStyleTone === 'sexy' ? 'Sexy' : 'Classic'
   const promptPrimaryLabel = generationMode === 'lookbook_image' ? 'Anh Lookbook' : 'Prompt Package'
   const loadingStages = generationMode === 'lookbook_image' ? LOOKBOOK_LOADING_STAGES : PROMPT_LOADING_STAGES
@@ -6590,6 +6686,115 @@ export default function App() {
                   </p>
                 </>
               )}
+            </div>
+
+            {/* Product Category */}
+            <div className="card" style={{ marginBottom: 16 }}>
+              <div className="card-title">
+                <Shirt /> Danh mục sản phẩm
+                <span
+                  style={{
+                    marginLeft: 'auto',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: '0.66rem',
+                    letterSpacing: '0.04em',
+                    textTransform: 'none',
+                    color: autoApplyCategoryType ? '#10b981' : 'var(--text-secondary)',
+                  }}
+                >
+                  {autoApplyCategoryType ? (
+                    <Eye size={12} style={{ color: '#10b981' }} />
+                  ) : (
+                    <EyeOff size={12} style={{ color: 'var(--text-secondary)' }} />
+                  )}
+                  {autoApplyCategoryType ? 'Auto ON' : 'Manual'}
+                </span>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Tự động đổi Loại nội dung</label>
+                <div className="chip-group">
+                  <button
+                    className={`chip ${autoApplyCategoryType ? 'active' : ''}`}
+                    onClick={() => setAutoApplyCategoryType(true)}
+                    id="auto-apply-category-type-on"
+                  >
+                    Bật
+                  </button>
+                  <button
+                    className={`chip ${!autoApplyCategoryType ? 'active' : ''}`}
+                    onClick={() => setAutoApplyCategoryType(false)}
+                    id="auto-apply-category-type-off"
+                  >
+                    Tắt
+                  </button>
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="input-label">Chọn danh mục để gợi ý content type</label>
+                <div className="chip-group">
+                  {PRODUCT_CATEGORY_OPTIONS.map((category) => (
+                    <button
+                      key={`product-category-${category.value}`}
+                      className={`chip ${productCategory === category.value ? 'active' : ''}`}
+                      onClick={() => applyProductCategory(category.value)}
+                      id={`product-category-${category.value}`}
+                    >
+                      {category.label}
+                      <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                        {category.desc}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="input-group" style={{ marginBottom: 0 }}>
+                <label className="input-label">Loại nội dung phù hợp</label>
+                <div className="chip-group">
+                  {activeProductCategoryOption.suggestedTypes.map((typeValue) => {
+                    const matchedType = CONTENT_TYPES.find((item) => item.value === typeValue)
+                    if (!matchedType) return null
+
+                    const Icon = matchedType.icon
+                    return (
+                      <button
+                        key={`suggested-type-${typeValue}`}
+                        className={`chip ${contentType === typeValue ? 'active' : ''}`}
+                        onClick={() => setContentType(typeValue)}
+                        id={`suggested-type-${typeValue}`}
+                        style={contentType === typeValue ? {
+                          background: `color-mix(in srgb, ${matchedType.color} 15%, transparent)`,
+                          borderColor: matchedType.color,
+                          color: matchedType.color,
+                        } : {}}
+                      >
+                        <Icon size={13} style={{ marginRight: 2 }} />
+                        {matchedType.label}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <p className="ai-task-hint" style={{ marginTop: 8, marginBottom: 0 }}>
+                  Benchmark boutique {`>30K`} followers: {activeProductCategoryOption.benchmarkHint}
+                </p>
+
+                {!autoApplyCategoryType && (
+                  <p className="ai-task-hint" style={{ marginTop: 8, marginBottom: 0 }}>
+                    Đang tắt tự động: chọn danh mục chỉ để tham khảo, bấm vào chip "Loại nội dung phù hợp" để áp dụng thủ công.
+                  </p>
+                )}
+
+                {!isCurrentContentTypeAlignedWithCategory && contentType !== 'auto' && (
+                  <p className="ai-task-hint" style={{ marginTop: 8, marginBottom: 0 }}>
+                    Gợi ý nhanh: danh mục này thường chạy tốt hơn với {activeProductCategorySuggestedLabels}.
+                  </p>
+                )}
+              </div>
             </div>
 
             {/* Content Type */}
