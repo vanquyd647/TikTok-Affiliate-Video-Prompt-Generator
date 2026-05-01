@@ -2636,6 +2636,30 @@ function hasKeyframeTurnCue(...values: Array<unknown>): boolean {
   return KEYFRAME_TURN_CUE_KEYWORDS.some((keyword) => normalized.includes(normalizeLocationKey(keyword)))
 }
 
+function removeTurnCuePhrases(value: string): string {
+  if (!value.trim()) return ''
+
+  let next = value
+  const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /\b(?:quarter|half|three(?:-|\s)?quarter)\s+turn\b/gi, replacement: ' ' },
+    { pattern: /\b(?:turn|pivot|rotate|rotation|swivel|spin|twirl)\b/gi, replacement: ' ' },
+    { pattern: /\blook\s+back\b/gi, replacement: ' ' },
+    { pattern: /\bover(?:-|\s)?shoulder\b/gi, replacement: ' ' },
+    { pattern: /\bturn\s+(?:away|toward)\b/gi, replacement: ' ' },
+    { pattern: /\bxoay\b/gi, replacement: ' ' },
+    { pattern: /\bquay\b/gi, replacement: ' ' },
+    { pattern: /\bnghieng\b/gi, replacement: ' ' },
+    { pattern: /\bdoi\s+lung\b/gi, replacement: ' ' },
+    { pattern: /\bquay\s+lung\b/gi, replacement: ' ' },
+  ]
+
+  for (const { pattern, replacement } of replacements) {
+    next = next.replace(pattern, replacement)
+  }
+
+  return normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
+}
+
 function isAllowedLocationCountry(value: string): boolean {
   const normalized = normalizeLocationKey(value)
   if (!normalized) return false
@@ -4294,6 +4318,10 @@ Return STRICT JSON only, same schema:
 
       let action = actionBase
       if (hasVideoPoseDirectionLock) {
+        if (i > 0 && previousFacing && previousFacing === resolvedFacing) {
+          action = removeTurnCuePhrases(action)
+        }
+
         if (!actionHasFacingSignal || inferredFacing !== resolvedFacing) {
           action = enforceActionFacingDirection(action, resolvedFacing)
         }
@@ -4304,6 +4332,7 @@ Return STRICT JSON only, same schema:
 
         if (i > 0) {
           if (resolvedFacing === previousFacing) {
+            action = removeTurnCuePhrases(action)
             action = appendSentenceIfMissing(
               action,
               `Keep ${toFacingDirectionLabel(resolvedFacing)} orientation stable to preserve complex garment details`,
@@ -4399,6 +4428,15 @@ Return STRICT JSON only, same schema:
       let safeNarrative = finalContentType === 'ootdmirror'
         ? applyMirrorHandSafetyToSceneNarrative(narrative, startFacing, endFacing)
         : narrative
+
+      if (startFacing && endFacing && startFacing === endFacing) {
+        safeNarrative = removeTurnCuePhrases(safeNarrative)
+        safeNarrative = appendSentenceIfMissing(
+          safeNarrative,
+          `Keep ${toFacingDirectionLabel(startFacing)} orientation continuity with subtle micro-movements only`,
+        )
+      }
+
       if (finalContentType === 'ootdmirror') {
         safeNarrative = enforceOotdMirrorSceneNarrative(safeNarrative)
       }
