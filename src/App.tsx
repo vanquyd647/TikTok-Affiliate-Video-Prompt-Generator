@@ -1236,6 +1236,16 @@ const RULE32_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
   'right',
 ] as const
 
+const LONG_DURATION_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
+  'front',
+  'three-quarter-left',
+  'front',
+  'three-quarter-right',
+  'left',
+  'front',
+  'right',
+] as const
+
 const DETAIL_SENSITIVE_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
   'front',
   'three-quarter-left',
@@ -2400,6 +2410,25 @@ function pickAlternatingFacingDirection(
   return previous === 'front' ? 'three-quarter-left' : 'front'
 }
 
+function isLeftFamilyFacingDirection(value: unknown): value is Extract<ConcreteFacingDirection, 'left' | 'three-quarter-left'> {
+  return value === 'left' || value === 'three-quarter-left'
+}
+
+function pickLongDurationFacingDirection(
+  index: number,
+  previous: ConcreteFacingDirection | null,
+): ConcreteFacingDirection {
+  const start = ((index % LONG_DURATION_FACING_SEQUENCE.length) + LONG_DURATION_FACING_SEQUENCE.length) % LONG_DURATION_FACING_SEQUENCE.length
+  for (let offset = 0; offset < LONG_DURATION_FACING_SEQUENCE.length; offset += 1) {
+    const candidate = LONG_DURATION_FACING_SEQUENCE[(start + offset) % LONG_DURATION_FACING_SEQUENCE.length]
+    if (candidate !== previous) {
+      return candidate
+    }
+  }
+
+  return previous === 'front' ? 'three-quarter-left' : 'front'
+}
+
 function isOppositeFacingDirection(
   previous: ConcreteFacingDirection,
   current: ConcreteFacingDirection,
@@ -3293,22 +3322,19 @@ USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
 
 RULES:
-- Location scope: Vietnam, China, South Korea only.
-- No duplicate locations against history lists above.
-- AI must self-select fresh real-world locations. Do not use fixed/preset location pools.
-- Choose ONE primary location and keep it consistent across all keyframes/scenes.
-- TikTok product-marketing policy: reject flat/plain seamless backgrounds (example: "minimalist high-end white studio background"). If using studio, keep contextual set depth (textured wall, practical props, realistic spacing).
-- USER NOTES PRIORITY: If user notes are provided, treat them as the highest-priority creative direction and follow them first.
-- Only deviate from user notes when mandatory constraints require it (schema, safety guardrails, location scope, interpolation continuity).
-- For OOTDMIRROR, enforce mirror-fitcheck setup across all scenes.
-- For OOTD, enforce single-corner contextual studio setup across all scenes (no plain seamless background).
-- For OutfitIdeas, choose mirror-fitcheck OR single-corner contextual studio and keep style consistent.
-- For BOUTIQUEFEED, enforce boutique review cadence: short hook caption energy, fit/material proof, trust-first verdict, concise hashtag-ready framing.
-- Build action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
-- For detail-sensitive garments (for example backless/strappy/multi-strap), avoid forced full-direction pose cycling; prefer stable facing continuity and controlled pivots.
-- Plan for retention arc: Hook -> Value -> Proof -> Close.
-- If content type label is niche or internal, express the plan using stronger natural TikTok behavior clusters.
-- Enforce celebrity/public-figure safety guardrails strictly.
+- [COMMON] Location scope: Vietnam, China, South Korea only.
+- [COMMON] Use fresh real-world locations only; do not reuse any location in history lists above and do not use fixed/preset location pools.
+- [COMMON] Choose ONE primary location and keep it consistent across all keyframes/scenes.
+- [COMMON] Follow retention arc: Hook -> Value -> Proof -> Close.
+- [COMMON] Keep action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
+- [COMMON] USER NOTES PRIORITY: if user notes are provided, follow them first; only deviate when mandatory constraints require it (schema, safety, location scope, interpolation continuity).
+- [COMMON] For detail-sensitive garments (for example backless/strappy/multi-strap), avoid forced full-direction cycling; prefer stable facing continuity and controlled pivots.
+- [TYPE=OOTDMIRROR] Enforce mirror-fitcheck setup across all scenes.
+- [TYPE=OOTD] Enforce single-corner contextual studio setup across all scenes (no plain seamless background).
+- [TYPE=OUTFITIDEAS] Choose mirror-fitcheck OR single-corner contextual studio and keep style consistent.
+- [TYPE=BOUTIQUEFEED] Enforce boutique review cadence: short hook caption energy, fit/material proof, trust-first verdict, concise hashtag-ready framing.
+- [TYPE-SPECIFIC] If the content type label is niche/internal, map execution to stronger natural TikTok behavior clusters.
+- Do not restate mandatory guardrail blocks above; treat those blocks as source of truth when overlap exists.
 
 Output STRICT JSON only:
 {
@@ -3411,6 +3437,10 @@ Output STRICT JSON only:
     const detailSensitiveFacingModeLabel = usesDetailSensitiveFacingMode
       ? `ACTIVE (${detailSensitiveFacingReason})`
       : 'INACTIVE'
+    const hasLongDurationDirectionalMode = duration >= 32 && !hasVideoPoseDirectionLock && !usesDetailSensitiveFacingMode
+    const longDurationDirectionalModeLabel = hasLongDurationDirectionalMode
+      ? `ACTIVE (duration=${duration}s)`
+      : 'INACTIVE'
 
     const facingRuleForGenerationPrompt = hasVideoPoseDirectionLock
       ? `32. VIDEO POSE-DIRECTION USER LOCK (OVERRIDE) — Apply the user lock across the full video.
@@ -3428,6 +3458,14 @@ Output STRICT JSON only:
   - Direction changes must be small controlled pivots; avoid abrupt opposite flips in consecutive keyframes.
   - ACTION text and facingDirection token must stay consistent on every keyframe.
   [AUTO ENFORCED FOR DETAIL-SENSITIVE GARMENTS]`
+      : hasLongDurationDirectionalMode
+        ? `32. LONG-DURATION DIRECTION CLARITY LOCK (>=32s) — For timeline stability, every keyframe must have explicit and readable body-facing direction.
+  - ACTION text and facingDirection token must align exactly on every keyframe.
+  - Follow stable long-form facing progression: front -> three-quarter-left -> front -> three-quarter-right -> left -> front -> right (loop if needed).
+  - Include at least two left-family keyframes ("three-quarter-left" or "left") across the full package.
+  - Avoid abrupt opposite 180-degree flips; use controlled pivots between adjacent keyframes.
+  - Goal: maximize face consistency and garment-detail continuity for Veo interpolation on longer outputs.
+  [AUTO ENFORCED FOR DURATION >= 32s]`
       : `32. CONSECUTIVE KEYFRAME FACING DIRECTION LOCK — Two adjacent keyframes MUST NOT place the subject facing the same body direction (e.g., both fully front-facing, both fully side-facing, both fully rear-facing). Every keyframe transition must include a discernible body turn or pivot.
   - For each keyframe, provide explicit body-facing intent in both action text and facingDirection token.
   - Allowed facingDirection tokens: "front", "back", "left", "right", "three-quarter-left", "three-quarter-right".
@@ -3440,11 +3478,15 @@ Output STRICT JSON only:
       ? `Enforce video pose-direction lock: all keyframes must keep facingDirection "${poseDirectionLock}" and ACTION text must stay direction-consistent with that lock.`
       : usesDetailSensitiveFacingMode
         ? 'Enforce detail-sensitive facing mode: keep a stable facing anchor for complex-garment fidelity, avoid forced full-direction cycling, and use only controlled micro-pivots when direction changes are required.'
+        : hasLongDurationDirectionalMode
+          ? 'Enforce long-duration direction clarity (>=32s): every keyframe must carry explicit matching ACTION/FACING direction, include at least two left-family beats (three-quarter-left or left), and follow stable front/3-4 progression without abrupt opposite flips.'
         : 'Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.'
     const facingRuleForMotionRepair = hasVideoPoseDirectionLock
       ? `Enforce video pose-direction lock: keep all keyframes facing "${poseDirectionLock}" and remove any conflicting direction phrases from ACTION text.`
       : usesDetailSensitiveFacingMode
         ? 'Enforce detail-sensitive continuity: allow stable same-facing holds for fidelity, avoid abrupt opposite direction jumps, and keep direction changes as small controlled pivots with explicit facingDirection tags.'
+        : hasLongDurationDirectionalMode
+          ? 'Enforce long-duration continuity (>=32s): preserve explicit matching facing tags per keyframe, keep controlled pivots, maintain at least two left-family beats, and avoid opposite-direction jumps that break facial/garment consistency.'
         : 'Enforce facing continuity lock: consecutive keyframes must not repeat the same body-facing direction; include explicit turn/pivot cues and facingDirection token per keyframe.'
 
     const affiliateObjectiveForFinal = AFFILIATE_VIDEO_OBJECTIVES[finalResolvedType]
@@ -3671,6 +3713,26 @@ Output STRICT JSON only:
         }
       }
 
+      if (hasLongDurationDirectionalMode) {
+        const leftFamilyCount = keyframes.reduce((count, item) => {
+          const keyframe = asRecord(item) ? item as Record<string, unknown> : null
+          if (!keyframe) return count
+
+          const action = toSafeText(keyframe.action, '')
+          const camera = toSafeText(keyframe.camera, '')
+          const facing = extractKeyframeFacingDirection(action, camera, keyframe.facingDirection)
+
+          return isLeftFamilyFacingDirection(facing) ? count + 1 : count
+        }, 0)
+
+        if (leftFamilyCount < 2) {
+          return {
+            ok: false,
+            reason: `long-duration mode requires at least 2 left-family keyframes, found ${leftFamilyCount}`,
+          }
+        }
+      }
+
       for (let i = 0; i < scenes.length; i += 1) {
         const scene = asRecord(scenes[i]) ? scenes[i] as Record<string, unknown> : null
         if (!scene) {
@@ -3828,6 +3890,7 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - Video pose-direction lock: ${videoPoseDirectionLockText}
 - Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
 - Detail-sensitive facing mode: ${detailSensitiveFacingModeLabel}
+- Long-duration direction mode: ${longDurationDirectionalModeLabel}
 
 AFFILIATE OBJECTIVE:
 ${affiliateObjectiveForFinal}
@@ -3985,20 +4048,12 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   Validate and repair the draft package to satisfy all constraints below:
   - Enforce CRITICAL RULES 1..32 exactly as defined in package generation stage.
   - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
-  - Reject flat/plain seamless backgrounds (example: "minimalist high-end white studio background"); keep contextual environment depth.
   - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
-  - AI must choose fresh locations itself and must avoid all locations listed in location-history constraints.
-  - Keep camera grammar coherent and avoid chaotic mixed movement in one scene.
   - Preserve character identity and garment fidelity with zero drift.
   - Treat USER NOTES as highest-priority intent and preserve them over default creative choices unless mandatory constraints conflict.
-  - Enforce style lock by type: OOTDMIRROR mirror-only, OOTD studio-only, OutfitIdeas fixed to its chosen setup unless narrative explicitly transitions.
-  - Keep product-first composition and TikTok retention pacing.
   - Use the same primary location lock in all keyframes/scenes.
-  - Enforce interpolation safety guardrails: micro-progression between adjacent keyframes, no abrupt opposite camera direction, no discontinuity keywords.
   - ${facingRuleForQaRepair}
-  - Enforce hand-anatomy continuity in mirror/reflection beats: exactly two hands, five fingers per hand, no fused/missing/extra fingers, and no hand-through-garment artifacts.
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
-  - For OOTDMIRROR: enforce observer-camera setup (camera in front of model), mirror behind model, and no handheld phone/camera in model hands.
 
 PRIMARY LOCATION LOCK (MANDATORY):
 ${primaryPlannedLocation.length > 0
@@ -4131,8 +4186,6 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - Avoid immediate opposite camera direction across adjacent scenes unless explicit turnaround beat is described.
 - Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - ${facingRuleForMotionRepair}
-- Enforce hand-anatomy continuity in mirror/reflection beats: exactly two hands, five fingers per hand, no fused/missing/extra fingers, and no hand-through-garment artifacts.
-- For OOTDMIRROR: keep observer-camera framing (front-facing model), mirror behind model, and remove any handheld recording-device behavior from actions/narrative.
 
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
@@ -4309,6 +4362,8 @@ Return STRICT JSON only, same schema:
         ? poseDirectionLock as ConcreteFacingDirection
         : usesDetailSensitiveFacingMode
           ? pickDetailSensitiveFacingDirection(i, previousFacing, inferredFacing)
+          : hasLongDurationDirectionalMode
+            ? pickLongDurationFacingDirection(i, previousFacing)
           : pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
 
       const actionHasFacingSignal = normalizeFacingDirectionToken(actionBase) !== 'unknown'
@@ -4345,7 +4400,16 @@ Return STRICT JSON only, same schema:
           }
         }
       } else {
-        if (i === 0) {
+        if (hasLongDurationDirectionalMode) {
+          action = enforceActionFacingDirection(action, resolvedFacing)
+
+          if (i > 0) {
+            action = appendSentenceIfMissing(
+              action,
+              `Use a controlled micro-pivot from ${toFacingDirectionLabel(previousFacing || 'front')} to ${toFacingDirectionLabel(resolvedFacing)} while preserving face and garment detail continuity`,
+            )
+          }
+        } else if (i === 0) {
           if (!actionHasFacingSignal || inferredFacing !== resolvedFacing) {
             action = appendSentenceIfMissing(action, `Body facing ${toFacingDirectionLabel(resolvedFacing)}`)
           }
@@ -5096,6 +5160,10 @@ function buildPromptResultFromHistoryItem(
     return 'Mirror fitcheck corner, Hoan Kiem, Hanoi, Vietnam'
   }
 
+  const defaultHistoryFacingSequence = duration >= 32
+    ? LONG_DURATION_FACING_SEQUENCE
+    : RULE32_FACING_SEQUENCE
+
   const keyframes: KeyframePrompt[] = Array.from({ length: normalizedKeyframeCount }, (_, index) => {
     const raw = toHistoryRecord(rawKeyframes[index]) || {}
 
@@ -5111,7 +5179,7 @@ function buildPromptResultFromHistoryItem(
     const timestamp = toHistoryString(raw.timestamp, `${Math.round((index * duration) / Math.max(normalizedKeyframeCount - 1, 1))}s`)
     const facingDirection = normalizeLookbookFacingDirection(
       raw.facingDirection ?? action ?? camera,
-      RULE32_FACING_SEQUENCE[index % RULE32_FACING_SEQUENCE.length],
+      defaultHistoryFacingSequence[index % defaultHistoryFacingSequence.length],
     )
     const fullPrompt = toHistoryString(
       raw.fullPrompt,
