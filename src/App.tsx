@@ -296,6 +296,27 @@ const CONTENT_TYPES = [
   { value: 'styling', label: 'Styling', icon: Wand2, desc: 'Fashion Styling Tips', color: '#ec4899' },
   { value: 'luxury', label: 'Luxury', icon: Star, desc: 'Old Money / Sophisticated', color: '#8b5cf6' },
   { value: 'streetstyle', label: 'Street Style', icon: TrendingUp, desc: 'Outdoor Urban Candid Walk', color: '#06b6d4' },
+  {
+    value: 'sunnyaura',
+    label: 'Sunny Aura',
+    icon: Sparkles,
+    desc: 'Natural Sunlight Glow',
+    color: '#fbbf24',
+    locationStyleKeywords: [
+      'sunlight',
+      'sunny',
+      'golden hour',
+      'window light',
+      'outdoor',
+      'street',
+      'cafe frontage',
+      'plaza',
+      'nang',
+      'anh nang',
+      'ngoai troi',
+      'gio vang',
+    ],
+  },
   { value: 'partyoutfit', label: 'Party Outfit', icon: Sparkles, desc: 'Đầm Tiệc / Occasion Dress', color: '#e879f9' },
 ] as const
 
@@ -634,6 +655,7 @@ const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'styling',
   'luxury',
   'streetstyle',
+  'sunnyaura',
   'partyoutfit',
 ]
 
@@ -1100,7 +1122,8 @@ const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster is strong and broad (#oo
 - Mirror-specific internal labels are weak (#ootdmirror ~1.2K), so natural outputs should anchor to #fitcheck / #mirrorselfie / #ootd language.
 - TikTok Shop + proof content is high-adoption (#tiktokshop ~121M, #review ~16.4M, #unboxing ~17.7M).
 - FYP is too broad (#fyp ~8.7B) and should be secondary only, never the core fashion narrative.
-- Occasion-wear clusters are healthier with Vietnamese tags (#vayditiec ~243K, #damditiec ~119K) than literal #partyoutfit (~105K).`
+- Occasion-wear clusters are healthier with Vietnamese tags (#vayditiec ~243K, #damditiec ~119K) than literal #partyoutfit (~105K).
+- Sample pattern from provided @tuyetmia204 links: short women-fashion clips (11-20s), minimal caption style (#mia #thoitrangnu), and daylight aura-first framing.`
 
 const BOUTIQUE_FEED_CHANNEL_BENCHMARK = `- Channel snapshot (@anvy.boutique): 186.7K followers, 2.6M likes, with multiple pinned videos in 2.6M-3.2M views.
 - Channel snapshot (@damitas_boutiquee): 87.3K followers, 392.6K likes, profile positioning as girls-fashion boutique.
@@ -1287,6 +1310,7 @@ const AFFILIATE_VIDEO_OBJECTIVES: Record<ResolvedContentType, string> = {
   styling: 'Teach actionable styling transformations that position the product as a high-utility wardrobe solution.',
   luxury: 'Communicate premium quality, silhouette precision, and refined aspirational value that justifies purchase.',
   streetstyle: 'Leverage authentic outdoor urban energy to showcase outfit wearability in real daily-life contexts, driving relatable purchase motivation.',
+  sunnyaura: 'Emphasize natural sunlight aura and wearable outfit readability with short-form creator-native pacing and soft conversion intent.',
   partyoutfit: 'Showcase occasion dress desirability with full silhouette reveal, back-design proof, fabric drape movement, and multi-occasion versatility to drive immediate purchase intent for #damditiec and event-wear buyers.',
 }
 
@@ -1426,6 +1450,14 @@ const SCENE_BEATS_MAP: Record<ResolvedContentType, Array<{ name: string; emoji: 
     { name: 'NATURAL MOVEMENT BEAT', emoji: '💫', cameraHint: 'Low-angle tracking shot capturing confident stride, hair movement, and natural body flow' },
     { name: 'STREET STYLE CLOSER', emoji: '🎬', cameraHint: 'Model turning back to camera with casual confidence, wide shot with golden-hour or natural outdoor light' },
   ],
+  sunnyaura: [
+    { name: 'SUNLIGHT HOOK REVEAL', emoji: '☀️', cameraHint: 'Open with a direct sunlight hit on the full outfit, plus one short on-screen text hook in the first 1-2 seconds' },
+    { name: 'GOLDEN DETAIL CHECK', emoji: '✨', cameraHint: 'Short push-in to highlight fabric texture and silhouette under warm daylight' },
+    { name: 'NATURAL WALK FLOW', emoji: '🚶‍♀️', cameraHint: 'Smooth tracking movement with relaxed creator-style walk and outfit readability' },
+    { name: 'LIGHT-SHIFT MOMENT', emoji: '🌤️', cameraHint: 'Shift angle to catch changing natural light across face and garment details' },
+    { name: 'AURA HOLD FRAME', emoji: '💫', cameraHint: 'Brief stable pose to lock sunlit glow and save-worthy composition' },
+    { name: 'SOFT CONFIDENCE CLOSER', emoji: '🎬', cameraHint: 'Clean natural close with warm daylight, no hard-sell gesture, full look still readable' },
+  ],
   partyoutfit: [
     { name: 'SILHOUETTE REVEAL HOOK', emoji: '✨', cameraHint: 'Slow full-body reveal from hemline up — show dress length, silhouette, and first impression of the occasion look' },
     { name: 'BACK DESIGN SHOWCASE', emoji: '🔄', cameraHint: 'Model pivots away from camera — slow tilt down back to highlight back cut-out, bow, lace, or corset detail' },
@@ -1451,6 +1483,7 @@ function buildCharacterDNA(notes: string, contentType: ResolvedContentType): str
     styling: 'Expert fashion advisor aesthetic, polished and informative',
     luxury: 'Old money aesthetic, understated elegance, timeless sophistication',
     streetstyle: 'Outdoor urban candid aesthetic, natural movement, real-world street fashion energy',
+    sunnyaura: 'Natural daylight aura aesthetic, warm sunlit glow, short-form social-native confidence framing',
     partyoutfit: 'Occasion-dress editorial aesthetic, elegant soft lighting, back-detail and silhouette storytelling, aspirational event setting',
   }
   return `[FACE PRESERVATION]: The model's face must be rendered with exact, hyper-realistic photographic likeness based on the provided face reference image.
@@ -1476,6 +1509,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
     styling: 'Fashion Styling Guide — showcase expert outfit coordination and versatility',
     luxury: 'Luxury / Old Money — timeless sophisticated style with understated elegance',
     streetstyle: 'Street Style — outdoor urban candid walk showcasing outfit in real-world daily-life settings',
+    sunnyaura: 'Sunny Aura — short daylight vibe clip with warm sunlight glow and natural fashion confidence',
     partyoutfit: 'Party Outfit / Occasion Dress — đầm tiệc, corset, silk dress showcase with back-design reveal, silhouette proof, and aspirational event setting',
   }
 
@@ -1505,6 +1539,7 @@ function buildCreateImagePrompt(contentType: ResolvedContentType, notes: string)
   contentType === 'athleisure' ? 'Urban sporty-chic, approachable lifestyle.' :
   contentType === 'haul' ? 'Energetic and approachable showcase.' :
   contentType === 'streetstyle' ? 'Outdoor urban candid fashion — natural golden-hour or daylight, street backdrop, authentic movement.' :
+  contentType === 'sunnyaura' ? 'Natural daylight aura aesthetic — short social-native fashion moments, sunlight glow, and wearable real-life vibe.' :
   contentType === 'partyoutfit' ? 'Occasion dress editorial — soft elegant studio or venue lighting, dress movement and back-detail emphasis, aspirational event atmosphere.' :
   'High-end editorial quality.'
 } Shot on Sony A7R IV, 85mm f/1.4 lens, ISO 100.
@@ -2138,6 +2173,15 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
 - Align visual rhythm with thoitrangnu/streetstyle cluster behavior: walking entrance → outfit proof → candid detail → urban environment moment.`
   }
 
+  if (contentType === 'sunnyaura') {
+    return `- Sunny-aura grammar: daylight-first hook, warm natural glow, and clean outfit readability from the first second.
+- Keep the structure short-form native (roughly 11-20s feel): hook -> glow/detail -> natural walk/pose -> soft close.
+- Use realistic sunlight contexts (street corner, cafe frontage, plaza, window-light edge) with believable depth.
+- Start with one concise on-screen text hook (question or confident statement) and keep caption minimal.
+- Caption/CTA tone should stay minimal and lifestyle-first; avoid aggressive hard-sell overlays.
+- Treat "sunnyaura" as an internal strategy label and map language to native women-fashion behavior (#thoitrangnu style).`
+  }
+
   if (contentType === 'partyoutfit') {
     return `- Occasion dress grammar (#damditiec / #vayditiec cluster): full silhouette reveal → back design showcase → fabric drape movement → waist/fit proof → occasion context → confident closer.
 - MANDATORY back-facing or pivot beat: every partyoutfit video must include at least one keyframe showing the garment\'s back design (the unique selling point most viewers want to verify before buying).
@@ -2182,6 +2226,12 @@ function buildTikTokTrendAlignmentRules(contentType: ResolvedContentType): strin
     return `- Adoption reality: #athleisure (~339K) is niche compared to broad women-fashion clusters.
 - Blend athleisure intent with wider wearable behavior from #ootd/#outfitinspo to avoid rigid niche output.
 - Emphasize real-day transitions over performance-only gym choreography.`
+  }
+
+  if (contentType === 'sunnyaura') {
+    return `- Evidence from provided links: repeated #mia + #thoitrangnu with minimal captioning and daylight aura framing.
+- Keep copy concise and let sunlight + silhouette carry the emotional hook.
+- Prioritize natural daylight readability over cinematic gimmicks or heavy conversion overlays.`
   }
 
   if (contentType === 'fyp') {
@@ -2837,7 +2887,7 @@ AFFILIATE EXECUTION RULES:
 
   const pipelineStartedAt = Date.now()
   const stageMetrics: Array<{ stage: string; attempt: number; durationMs: number; ok: boolean; note?: string }> = []
-  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'boutiquefeed', 'athleisure', 'haul', 'styling', 'luxury', 'streetstyle', 'partyoutfit']
+  const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'boutiquefeed', 'athleisure', 'haul', 'styling', 'luxury', 'streetstyle', 'sunnyaura', 'partyoutfit']
   const faceImageId = faceImage ? createProductImageId(faceImage) : 'none'
   const productImageId = productImage ? createProductImageId(productImage) : 'none'
   const notesFingerprint = createTextFingerprint(notes)
@@ -3238,7 +3288,7 @@ RULES:
 
 Output STRICT JSON only:
 {
-  ${isAuto ? '"recommendedContentType": "ootd|ootdmirror|grwm|outfitideas|fyp|review|tiktokshop|boutiquefeed|athleisure|haul|styling|luxury|streetstyle|partyoutfit",' : '"recommendedContentType": "same-as-requested",'}
+  ${isAuto ? '"recommendedContentType": "ootd|ootdmirror|grwm|outfitideas|fyp|review|tiktokshop|boutiquefeed|athleisure|haul|styling|luxury|streetstyle|sunnyaura|partyoutfit",' : '"recommendedContentType": "same-as-requested",'}
   "creativeDirection": "...",
   "storyArc": ["hook", "value", "proof", "close"],
   "locationCandidates": ["..."],
@@ -4184,6 +4234,7 @@ Return STRICT JSON only, same schema:
       styling: 'Purposeful modeling pose highlighting outfit coordination and styling impact',
       luxury: 'Composed understated movement exuding timeless elegance and quiet confidence',
       streetstyle: 'Natural outdoor walk movement showcasing outfit silhouette and wearability in authentic urban street setting',
+      sunnyaura: 'Sunlit confidence movement with short natural walk-pose rhythm and warm daylight aura readability',
       partyoutfit: 'Elegant full-body occasion dress reveal with back-design pivot and flowing fabric drape movement',
     }
 
@@ -4201,6 +4252,7 @@ Return STRICT JSON only, same schema:
       styling: 'Expert fashion editorial style, polished and educational',
       luxury: 'Old money sophisticated aesthetic, understated timeless elegance, neutral palette',
       streetstyle: 'Outdoor urban candid street fashion aesthetic, natural daylight or golden hour, authentic movement energy',
+      sunnyaura: 'Natural daylight aura aesthetic, warm golden-hour glow, and concise social-native women-fashion framing',
       partyoutfit: 'Occasion dress editorial aesthetic, soft elegant lighting, silhouette and back-detail emphasis, aspirational event venue atmosphere',
     }
 
@@ -5500,7 +5552,7 @@ Analyze the provided TikTok video carefully and return STRICT JSON only.
 ${trimmedNotes ? `Additional context from user: ${trimmedNotes}` : ''}
 
 ANALYSIS TASKS:
-1. Identify the content type (ootd, grwm, review, haul, tiktokshop, boutiquefeed, fyp, styling, athleisure, outfitideas, luxury, partyoutfit, streetstyle, or describe a custom type).
+1. Identify the content type (ootd, grwm, review, haul, tiktokshop, boutiquefeed, fyp, styling, athleisure, outfitideas, luxury, partyoutfit, streetstyle, sunnyaura, or describe a custom type).
 2. Estimate the total video duration in seconds.
 3. Describe the hook style (how the video grabs attention in the first 2 seconds).
 4. Describe the narrative structure (how the video flows from hook to close).
