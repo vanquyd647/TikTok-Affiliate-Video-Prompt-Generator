@@ -2303,9 +2303,23 @@ function enforceFitModelRuleOnKeyframe(
   return { action: nextAction, camera: nextCamera }
 }
 
-function getContentTypeStyleLock(contentType: ResolvedContentType): ContentStyleLock {
+function shouldUseMirrorOutfitIdeasStyle(notes: string): boolean {
+  const normalizedNotes = normalizeLocationKey(notes)
+  if (!normalizedNotes) return false
+
+  if (hasStyleKeyword(notes, MIRROR_LOCATION_STYLE_KEYWORDS)) {
+    return true
+  }
+
+  return normalizedNotes.includes('fitcheck') || normalizedNotes.includes('mirror') || normalizedNotes.includes('guong')
+}
+
+function getContentTypeStyleLock(contentType: ResolvedContentType, notes = ''): ContentStyleLock {
   if (contentType === 'ootdmirror') return 'mirror'
   if (contentType === 'ootd') return 'studio'
+  if (contentType === 'outfitideas') {
+    return shouldUseMirrorOutfitIdeasStyle(notes) ? 'mirror' : 'studio'
+  }
   return 'flex'
 }
 
@@ -2352,9 +2366,10 @@ function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string 
   }
 
   if (contentType === 'outfitideas') {
-    return `- Outfit ideas grammar: practical mix-and-match sequence, not random cinematic fragments.
+    return `- Outfit ideas grammar: practical mix-and-match sequence users can copy immediately, not mirror-first fitcheck storytelling.
 - Include at least one clear before/after styling switch and one save-worthy final composition.
-- Align pacing with fitcheck and outfitinspo behavior seen on TikTok.`
+- Keep at least 2-3 wearable combo ideas around a hero piece (work/cafe/date or similar contexts).
+- Default to non-mirror lookbook/styling composition; use mirror-fitcheck only when user notes explicitly request mirror or fitcheck.`
   }
 
   if (contentType === 'grwm') {
@@ -2466,9 +2481,15 @@ function buildTikTokTrendAlignmentRules(contentType: ResolvedContentType): strin
 - Keep trust-first recommendation framing (real experience) over hard-sell CTA blocks.`
   }
 
-  if (contentType === 'ootd' || contentType === 'outfitideas') {
+  if (contentType === 'outfitideas') {
+    return `- Mainstream adoption: #outfitideas (~24M) and #outfitinspo (~15.8M) are strong, while #ootdmirror (~1.2K) is niche.
+- For OutfitIdeas, prioritize practical mix-and-match value (copyable combinations) over mirror-specific fitcheck identity.
+- Default to contextual studio/lookbook flow and only switch to mirror-fitcheck when user notes explicitly request mirror behavior.`
+  }
+
+  if (contentType === 'ootd') {
     return `- Strong mainstream alignment: #ootd / #outfitideas / #fitcheck clusters are robust and natural for women fashion.
-- Prioritize saveable practical styling and readable silhouette over flashy transitions.`
+- Keep OOTD as single-look readability proof with clean silhouette continuity over flashy transition gimmicks.`
   }
 
   return `- Keep content type execution aligned with high-adoption women-fashion behaviors on TikTok.
@@ -3544,7 +3565,7 @@ RULES:
 - [COMMON] For detail-sensitive garments (for example backless/strappy/multi-strap), avoid forced full-direction cycling; prefer stable facing continuity and controlled pivots.
 - [TYPE=OOTDMIRROR] Enforce mirror-fitcheck setup across all scenes.
 - [TYPE=OOTD] Enforce single-corner contextual studio setup across all scenes (no plain seamless background).
-- [TYPE=OUTFITIDEAS] Choose mirror-fitcheck OR single-corner contextual studio and keep style consistent.
+- [TYPE=OUTFITIDEAS] Default to practical mix-and-match lookbook flow in a contextual studio/social setting; use mirror-fitcheck only when user notes explicitly request mirror or fitcheck.
 - [TYPE=BOUTIQUEFEED] Enforce boutique review cadence: short hook caption energy, fit/material proof, trust-first verdict, concise hashtag-ready framing.
 - [TYPE-SPECIFIC] If the content type label is niche/internal, map execution to stronger natural TikTok behavior clusters.
 - [TYPE-SPECIFIC] Lock fit-model framing by final content type using one of: strict_full_body | majority_full_body | balanced_full_body_proof.
@@ -3622,7 +3643,7 @@ Output STRICT JSON only:
     }
 
     const finalResolvedType = finalContentType as ResolvedContentType
-    const finalStyleLock = getContentTypeStyleLock(finalResolvedType)
+    const finalStyleLock = getContentTypeStyleLock(finalResolvedType, notes)
     const fitModelRuleLock = getFitModelRuleLock(finalResolvedType)
     const fitModelRuleLockInstructions = buildFitModelRuleLockInstructions(finalResolvedType, fitModelRuleLock)
     const fitModelRuleLockRepairHint = buildFitModelRuleLockRepairHint(finalResolvedType, fitModelRuleLock)
@@ -4211,10 +4232,10 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
 22. AUDIO IS OPTIONAL (IF USED) - Prefer silent-first visual storytelling. If adding SFX/ambience, describe it clearly but keep comprehension independent from audio.
 23. AUTHENTICITY + TRUST - Favor natural, believable social-native scenes; avoid over-stylized fake ad feel, low-value filler, and exaggerated claims.
 24. NO-CTA ENDING + TEMPLATE CONSISTENCY - Final scene should land a clean visual payoff with product clarity; explicit CTA is optional and never mandatory.
-25. OOTD FAMILY TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTDMIRROR, enforce mirror fitcheck flow only. For OOTD, enforce single-corner studio flow only. For OutfitIdeas, prioritize one of two proven setups: (A) Mirror fitcheck flow, or (B) Single-corner studio flow. [SUBORDINATE to Rule 30 — User Notes override format/flow]
+25. OOTD FAMILY TREND FORMAT (TIKTOK-ALIGNED) - For content type OOTDMIRROR, enforce mirror fitcheck flow only. For OOTD, enforce single-corner studio flow only. For OutfitIdeas, enforce practical mix-and-match lookbook flow by default (non-mirror), and allow mirror fitcheck only when User Notes explicitly request mirror/fitcheck behavior. [SUBORDINATE to Rule 30 — User Notes override format/flow]
 26. MIRROR FITCHECK SPEC - Use observer-camera framing (camera in front of model) with the mirror behind the model for reflection proof, keep full-body head-to-toe readability, do not let model hold phone/camera, and ensure no camera/tripod/operator reflection appears in the mirror. [SUBORDINATE to Rule 30 — User Notes may modify mirror spec]
 27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner with contextual depth (textured/decorated wall, practical props like rack/stool/shelf), soft controlled lighting, and consistent camera axis for all scenes; avoid plain seamless white/solid-color backdrops. [SUBORDINATE to Rule 30 — User Notes may modify studio spec]
-28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must keep its chosen setup (mirror or studio) consistent across all scenes unless there is an explicit narrative reason to transition. [SUBORDINATE to Rule 30 — User Notes may override style lock]
+28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must stay mix-and-match styling-first with non-mirror framing by default. If User Notes explicitly request mirror/fitcheck, keep that mirror setup consistent across scenes. [SUBORDINATE to Rule 30 — User Notes may override style lock]
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
 30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default style, tone, format, location, camera, and narrative choices in Rules 5–29 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Rule 31 (celebrity safety), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12) are the only truly non-negotiable constraints.
 31. CELEBRITY / PUBLIC-FIGURE SAFETY LOCK - Never depict/imitate/reference real celebrities/public figures/identifiable persons, never generate deepfake-style impersonation or fake endorsement/dialogue; if user asks for real person, convert to fictional archetype while preserving only general mood/style.
