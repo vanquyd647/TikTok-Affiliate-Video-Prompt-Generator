@@ -3734,6 +3734,17 @@ Output STRICT JSON only:
         .map((location) => normalizeLocationKey(location))
     )
 
+    const isLocationStructurallyValid = (location: string) => {
+      const candidate = location.trim()
+      if (candidate.length === 0) return false
+
+      return (
+        isAllowedLocationCountry(candidate)
+        && !isTikTokRestrictedFlatBackgroundLocation(candidate)
+        && matchesStyleLockForLocation(candidate, finalStyleLock)
+      )
+    }
+
     const isLocationCandidateAllowed = (location: string) => {
       const candidate = location.trim()
       if (candidate.length === 0) return false
@@ -3741,11 +3752,27 @@ Output STRICT JSON only:
       const candidateKey = normalizeLocationKey(candidate)
 
       return (
-        isAllowedLocationCountry(candidate)
-        && !isTikTokRestrictedFlatBackgroundLocation(candidate)
-        && matchesStyleLockForLocation(candidate, finalStyleLock)
+        isLocationStructurallyValid(candidate)
         && !blockedLocationKeys.has(candidateKey)
       )
+    }
+
+    const EMERGENCY_PRIMARY_LOCATIONS_BY_STYLE: Record<ContentStyleLock, string[]> = {
+      studio: [
+        'Single-corner content studio with textured wall and styling rack, Thu Duc, Ho Chi Minh City, Vietnam',
+        'Lookbook studio corner with decor shelf and softbox bounce, Xuan Wu, Nanjing, China',
+        'Fashion showroom studio corner with textured wall and stool prop, Mapo-gu, Seoul, South Korea',
+      ],
+      mirror: [
+        'Wardrobe mirror corner in a fashion fitting room, Hai Ba Trung, Hanoi, Vietnam',
+        'Full-length mirror fitting room inside women fashion boutique, Xuhui, Shanghai, China',
+        'Dressing-room mirror corner with neutral decor, Seongsu, Seoul, South Korea',
+      ],
+      flex: [
+        'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
+        'Urban shopping street corner near designer storefronts, Jingan, Shanghai, China',
+        'Outdoor fashion plaza near cafe storefronts, Gangnam, Seoul, South Korea',
+      ],
     }
 
     const aiPlannedLocationPool = planningResult.locationCandidates
@@ -4539,6 +4566,20 @@ Return STRICT JSON only, same schema:
       return aiPlannedLocationPool[0]
     }
 
+    const pickEmergencyPrimaryLocation = (): string => {
+      const stylePool = EMERGENCY_PRIMARY_LOCATIONS_BY_STYLE[finalStyleLock] || []
+      const backupPool = finalStyleLock === 'flex'
+        ? []
+        : EMERGENCY_PRIMARY_LOCATIONS_BY_STYLE.flex
+
+      const mergedPool = [...stylePool, ...backupPool]
+      const strictCandidate = mergedPool.find((location) => isLocationCandidateAllowed(location))
+      if (strictCandidate) return strictCandidate
+
+      const structuralCandidate = mergedPool.find((location) => isLocationStructurallyValid(location))
+      return structuralCandidate || ''
+    }
+
     const resolveLocationFromPackage = (value: unknown) => {
       if (primaryPlannedLocation.length > 0 && isLocationCandidateAllowed(primaryPlannedLocation)) {
         return primaryPlannedLocation
@@ -4554,8 +4595,37 @@ Return STRICT JSON only, same schema:
         return fallbackFromAiPlan
       }
 
+      const emergencyPrimaryLocation = pickEmergencyPrimaryLocation()
+      if (emergencyPrimaryLocation.length > 0) {
+        const fallbackType = blockedLocationKeys.has(normalizeLocationKey(emergencyPrimaryLocation))
+          ? 'structural_only'
+          : 'strict_ok'
+
+        stageMetrics.push({
+          stage: 'location_emergency_fallback',
+          attempt: 0,
+          durationMs: 0,
+          ok: true,
+          note: `${fallbackType}:${emergencyPrimaryLocation}`,
+        })
+
+        return emergencyPrimaryLocation
+      }
+
       const styleLockFallback = getStyleLockFallbackLocation(finalStyleLock)
       if (isLocationCandidateAllowed(styleLockFallback)) {
+        return styleLockFallback
+      }
+
+      if (isLocationStructurallyValid(styleLockFallback)) {
+        stageMetrics.push({
+          stage: 'location_emergency_fallback',
+          attempt: 0,
+          durationMs: 0,
+          ok: true,
+          note: `structural_only:${styleLockFallback}`,
+        })
+
         return styleLockFallback
       }
 
