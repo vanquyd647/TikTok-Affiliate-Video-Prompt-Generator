@@ -1117,13 +1117,18 @@ const TIKTOK_CONTEXTUAL_LOCATION_CUES = [
   'hotel',
 ] as const
 
-const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster is strong and broad (#ootd ~65M, #outfitideas ~23.5M, #fitcheck ~10M).
-- GRWM cluster is mainstream (#grwm ~22.8M) with strong alias behavior (#getreadywithme ~3.4M).
+const TIKTOK_OBSERVED_SIGNAL_BASELINE = `- OOTD cluster is strong and broad (#ootd ~66.3M, #outfitideas ~24M, #fitcheck ~10.2M).
+- GRWM cluster is mainstream (#grwm ~23M) with strong alias behavior (#getreadywithme ~3.4M).
 - Mirror-specific internal labels are weak (#ootdmirror ~1.2K), so natural outputs should anchor to #fitcheck / #mirrorselfie / #ootd language.
-- TikTok Shop + proof content is high-adoption (#tiktokshop ~121M, #review ~16.4M, #unboxing ~17.7M).
+- TikTok Shop + proof content is high-adoption (#tiktokshop ~123.6M, #review ~16.6M, #unboxing ~17.7M).
 - FYP is too broad (#fyp ~8.7B) and should be secondary only, never the core fashion narrative.
-- Occasion-wear clusters are healthier with Vietnamese tags (#vayditiec ~243K, #damditiec ~119K) than literal #partyoutfit (~105K).
+- Occasion-wear clusters are healthier with Vietnamese tags (#vayditiec ~243K, #damditiec ~119K) than literal #partyoutfit (~106.1K).
 - Sample pattern from provided @tuyetmia204 links: short women-fashion clips (11-20s), minimal caption style (#mia #thoitrangnu), and daylight aura-first framing.`
+
+const TIKTOK_FIT_MODEL_SIGNAL_BASELINE = `- Fit-model proof cluster is strong: #fitcheck ~10.2M, #ootd ~66.3M, #outfitideas ~24M, #outfitinspo ~15.8M.
+- Mirror-specific social proof remains meaningful via #mirrorselfie ~439K, while #ootdmirror is niche (~1.2K).
+- Commerce-heavy proof context is massive: #tiktokshop ~123.6M and #review ~16.6M.
+- Implication: fit-model framing should be locked by content type, not treated as one global framing style.`
 
 const BOUTIQUE_FEED_CHANNEL_BENCHMARK = `- Channel snapshot (@anvy.boutique): 186.7K followers, 2.6M likes, with multiple pinned videos in 2.6M-3.2M views.
 - Channel snapshot (@damitas_boutiquee): 87.3K followers, 392.6K likes, profile positioning as girls-fashion boutique.
@@ -1296,6 +1301,41 @@ const DETAIL_SENSITIVE_GARMENT_KEYWORDS = [
 ] as const
 
 type ContentStyleLock = 'mirror' | 'studio' | 'flex'
+type FitModelRuleLock = 'strict_full_body' | 'majority_full_body' | 'balanced_full_body_proof'
+
+const FIT_MODEL_RULE_LOCK_BY_CONTENT_TYPE: Record<ResolvedContentType, FitModelRuleLock> = {
+  ootd: 'majority_full_body',
+  ootdmirror: 'strict_full_body',
+  grwm: 'balanced_full_body_proof',
+  outfitideas: 'majority_full_body',
+  fyp: 'balanced_full_body_proof',
+  review: 'balanced_full_body_proof',
+  tiktokshop: 'balanced_full_body_proof',
+  boutiquefeed: 'majority_full_body',
+  athleisure: 'majority_full_body',
+  haul: 'balanced_full_body_proof',
+  styling: 'majority_full_body',
+  luxury: 'majority_full_body',
+  streetstyle: 'majority_full_body',
+  sunnyaura: 'majority_full_body',
+  partyoutfit: 'strict_full_body',
+}
+
+const FIT_MODEL_FULL_BODY_KEYWORDS = [
+  'full body',
+  'full-body',
+  'head to toe',
+  'head-to-toe',
+  'whole body',
+  'full look',
+  'full outfit',
+  'full silhouette',
+  'full outfit readability',
+  'silhouette readability',
+  'hemline and footwear',
+  'mirror full body',
+  'mirror full-body',
+] as const
 
 const STAGE_CACHE_TTL_MS = 5 * 60 * 1000
 type StageCacheEntry = {
@@ -2101,6 +2141,156 @@ function isTikTokRestrictedFlatBackgroundLocation(value: string): boolean {
   )
 
   return !hasContextualCue
+}
+
+function getFitModelRuleLock(contentType: ResolvedContentType): FitModelRuleLock {
+  return FIT_MODEL_RULE_LOCK_BY_CONTENT_TYPE[contentType]
+}
+
+function buildFitModelRuleLockMatrix(): string {
+  return `- strict_full_body: ootdmirror, partyoutfit.
+- majority_full_body: ootd, outfitideas, boutiquefeed, athleisure, styling, luxury, streetstyle, sunnyaura.
+- balanced_full_body_proof: grwm, fyp, review, tiktokshop, haul.`
+}
+
+function buildFitModelRuleLockInstructions(contentType: ResolvedContentType, lock: FitModelRuleLock): string {
+  if (lock === 'strict_full_body') {
+    return `- Locked content type: ${contentType.toUpperCase()} => strict_full_body.
+- Every keyframe should keep model head-to-toe visible with full garment silhouette readability.
+- Keep hemline and footwear readable; avoid crop styles that break fit evaluation.
+- Detail proof is allowed only if it still preserves full-look readability.
+- This lock is mandatory for package generation and repair.`
+  }
+
+  if (lock === 'majority_full_body') {
+    return `- Locked content type: ${contentType.toUpperCase()} => majority_full_body.
+- Keep full-body framing in most keyframes (hero/hook/close are mandatory full-look).
+- Medium/detail beats are allowed only when adjacent beats preserve full-look continuity.
+- Prioritize silhouette readability before cinematic movement complexity.
+- This lock is mandatory for package generation and repair.`
+  }
+
+  return `- Locked content type: ${contentType.toUpperCase()} => balanced_full_body_proof.
+- Keep at least one hook full-look, one mid proof anchor, and one closing full-look.
+- Allow medium/detail proof beats for material/fit verification, but keep silhouette continuity clear.
+- Never sacrifice purchase-relevant fit comprehension for aggressive camera cuts.
+- This lock is mandatory for package generation and repair.`
+}
+
+function buildFitModelRuleLockRepairHint(contentType: ResolvedContentType, lock: FitModelRuleLock): string {
+  if (lock === 'strict_full_body') {
+    return `Enforce ${contentType.toUpperCase()} strict_full_body lock: all keyframes must preserve head-to-toe full-look readability.`
+  }
+
+  if (lock === 'majority_full_body') {
+    return `Enforce ${contentType.toUpperCase()} majority_full_body lock: full-look framing must dominate timeline with only controlled detail exceptions.`
+  }
+
+  return `Enforce ${contentType.toUpperCase()} balanced_full_body_proof lock: keep hook/mid/close full-look anchors while allowing proof-oriented detail beats.`
+}
+
+function hasFullBodyFramingSignal(...values: Array<unknown>): boolean {
+  const normalized = normalizeLocationKey(values.filter((item): item is string => typeof item === 'string').join(' '))
+  if (!normalized) return false
+
+  return FIT_MODEL_FULL_BODY_KEYWORDS.some((keyword) => normalized.includes(normalizeLocationKey(keyword)))
+}
+
+function shouldForceFullBodyKeyframe(lock: FitModelRuleLock, index: number, keyframeCount: number): boolean {
+  if (keyframeCount <= 1) return true
+
+  if (lock === 'strict_full_body') return true
+
+  if (lock === 'majority_full_body') {
+    return index === 0 || index === keyframeCount - 1 || index % 2 === 0
+  }
+
+  const midAnchor = Math.floor((keyframeCount - 1) / 2)
+  return index === 0 || index === midAnchor || index === keyframeCount - 1
+}
+
+function getFitModelMinFullBodyCount(lock: FitModelRuleLock, keyframeCount: number): number {
+  if (keyframeCount <= 0) return 0
+
+  if (lock === 'strict_full_body') return keyframeCount
+  if (lock === 'majority_full_body') return Math.ceil(keyframeCount * 0.6)
+  return Math.min(keyframeCount, 3)
+}
+
+function validateFitModelCoverage(
+  keyframes: Array<Record<string, unknown>>,
+  lock: FitModelRuleLock,
+): { ok: boolean; reason?: string } {
+  if (keyframes.length === 0) {
+    return { ok: false, reason: 'fit-model coverage validation missing keyframes' }
+  }
+
+  const fullBodyCount = keyframes.reduce((count, item) => {
+    const action = typeof item.action === 'string' ? item.action : ''
+    const camera = typeof item.camera === 'string' ? item.camera : ''
+    return hasFullBodyFramingSignal(action, camera) ? count + 1 : count
+  }, 0)
+
+  const minRequired = getFitModelMinFullBodyCount(lock, keyframes.length)
+  if (fullBodyCount < minRequired) {
+    return {
+      ok: false,
+      reason: `fit-model lock ${lock} requires >=${minRequired} full-body keyframes, found ${fullBodyCount}`,
+    }
+  }
+
+  return { ok: true }
+}
+
+function enforceFitModelRuleOnKeyframe(
+  action: string,
+  camera: string,
+  lock: FitModelRuleLock,
+  contentType: ResolvedContentType,
+  index: number,
+  keyframeCount: number,
+): { action: string; camera: string } {
+  const enforceFullBody = shouldForceFullBodyKeyframe(lock, index, keyframeCount)
+  let nextAction = action
+  let nextCamera = camera
+
+  if (enforceFullBody) {
+    nextAction = appendSentenceIfMissing(
+      nextAction,
+      'Keep head-to-toe full-body visibility with clear hemline and footwear readability.',
+    )
+    nextCamera = appendSentenceIfMissing(
+      nextCamera,
+      'Use stable full-body framing and keep complete garment silhouette inside a central safe frame.',
+    )
+    return { action: nextAction, camera: nextCamera }
+  }
+
+  if (lock === 'majority_full_body') {
+    nextAction = appendSentenceIfMissing(
+      nextAction,
+      'Medium or detail framing is allowed only when adjacent beats preserve full-look outfit continuity.',
+    )
+    return { action: nextAction, camera: nextCamera }
+  }
+
+  nextAction = appendSentenceIfMissing(
+    nextAction,
+    'Detail proof is allowed, but preserve fit-line clarity and return to a full-look anchor in adjacent beats.',
+  )
+  nextCamera = appendSentenceIfMissing(
+    nextCamera,
+    'If using medium or close detail framing, keep silhouette continuity readable and avoid cropping key fit areas.',
+  )
+
+  if (contentType === 'tiktokshop' || contentType === 'review') {
+    nextAction = appendSentenceIfMissing(
+      nextAction,
+      'Maintain product-proof clarity for size, drape, and proportion before any close-up detail beat.',
+    )
+  }
+
+  return { action: nextAction, camera: nextCamera }
 }
 
 function getContentTypeStyleLock(contentType: ResolvedContentType): ContentStyleLock {
@@ -2927,6 +3117,13 @@ AFFILIATE EXECUTION RULES:
 - Do not choose FYP-style generic framing as a primary fashion identity.
 - If a niche internal label is selected, map to natural public-facing hashtag behavior.`
     : buildTikTokTrendAlignmentRules(contentType as ResolvedContentType)
+  const requestedFitModelLockRules = isAuto
+    ? `- AUTO mode: choose content type first, then lock fit-model framing by that resolved type.
+${buildFitModelRuleLockMatrix()}`
+    : buildFitModelRuleLockInstructions(
+      contentType as ResolvedContentType,
+      getFitModelRuleLock(contentType as ResolvedContentType),
+    )
   const boutiqueFeedChannelBenchmark = (isAuto || contentType === 'boutiquefeed')
     ? BOUTIQUE_FEED_CHANNEL_BENCHMARK
     : ''
@@ -3303,6 +3500,12 @@ ${boutiqueFeedChannelBenchmark}
 REQUESTED TYPE TREND ALIGNMENT:
 ${requestedTypeTrendAlignmentRules}
 
+TIKTOK FIT-MODEL SIGNAL BASELINE:
+${TIKTOK_FIT_MODEL_SIGNAL_BASELINE}
+
+FIT-MODEL LOCK FOR REQUESTED/RECOMMENDED TYPE (MANDATORY):
+${requestedFitModelLockRules}
+
 NATURALITY GUARDRAILS (MANDATORY):
 ${NATURALITY_PROMPT_GUARDRAILS}
 
@@ -3334,6 +3537,7 @@ RULES:
 - [TYPE=OUTFITIDEAS] Choose mirror-fitcheck OR single-corner contextual studio and keep style consistent.
 - [TYPE=BOUTIQUEFEED] Enforce boutique review cadence: short hook caption energy, fit/material proof, trust-first verdict, concise hashtag-ready framing.
 - [TYPE-SPECIFIC] If the content type label is niche/internal, map execution to stronger natural TikTok behavior clusters.
+- [TYPE-SPECIFIC] Lock fit-model framing by final content type using one of: strict_full_body | majority_full_body | balanced_full_body_proof.
 - Do not restate mandatory guardrail blocks above; treat those blocks as source of truth when overlap exists.
 
 Output STRICT JSON only:
@@ -3409,6 +3613,9 @@ Output STRICT JSON only:
 
     const finalResolvedType = finalContentType as ResolvedContentType
     const finalStyleLock = getContentTypeStyleLock(finalResolvedType)
+    const fitModelRuleLock = getFitModelRuleLock(finalResolvedType)
+    const fitModelRuleLockInstructions = buildFitModelRuleLockInstructions(finalResolvedType, fitModelRuleLock)
+    const fitModelRuleLockRepairHint = buildFitModelRuleLockRepairHint(finalResolvedType, fitModelRuleLock)
     const contentTypeNativeSignalRules = buildTikTokNativeSignalRules(finalResolvedType)
     const finalTypeTrendAlignmentRules = buildTikTokTrendAlignmentRules(finalResolvedType)
     const boutiqueFeedChannelBenchmarkForFinal = finalResolvedType === 'boutiquefeed'
@@ -3770,6 +3977,16 @@ Output STRICT JSON only:
         }
       }
 
+      if (strict) {
+        const fitModelCoverage = validateFitModelCoverage(
+          keyframes.filter((item): item is Record<string, unknown> => asRecord(item)),
+          fitModelRuleLock,
+        )
+        if (!fitModelCoverage.ok) {
+          return fitModelCoverage
+        }
+      }
+
       return { ok: true }
     }
 
@@ -3916,6 +4133,12 @@ ${contentTypeNativeSignalRules}
 CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
 ${finalTypeTrendAlignmentRules}
 
+TIKTOK FIT-MODEL SIGNAL BASELINE:
+${TIKTOK_FIT_MODEL_SIGNAL_BASELINE}
+
+FIT-MODEL LOCK BY CONTENT TYPE (MANDATORY):
+${fitModelRuleLockInstructions}
+
 NATURALITY GUARDRAILS (MANDATORY):
 ${NATURALITY_PROMPT_GUARDRAILS}
 
@@ -4053,6 +4276,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Treat USER NOTES as highest-priority intent and preserve them over default creative choices unless mandatory constraints conflict.
   - Use the same primary location lock in all keyframes/scenes.
   - ${facingRuleForQaRepair}
+  - ${fitModelRuleLockRepairHint}
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
 
 PRIMARY LOCATION LOCK (MANDATORY):
@@ -4071,6 +4295,12 @@ ${contentTypeNativeSignalRules}
 
 CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
 ${finalTypeTrendAlignmentRules}
+
+TIKTOK FIT-MODEL SIGNAL BASELINE:
+${TIKTOK_FIT_MODEL_SIGNAL_BASELINE}
+
+FIT-MODEL LOCK BY CONTENT TYPE (MANDATORY):
+${fitModelRuleLockInstructions}
 
 NATURALITY GUARDRAILS (MANDATORY):
 ${NATURALITY_PROMPT_GUARDRAILS}
@@ -4186,12 +4416,19 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - Avoid immediate opposite camera direction across adjacent scenes unless explicit turnaround beat is described.
 - Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - ${facingRuleForMotionRepair}
+- ${fitModelRuleLockRepairHint}
 
 TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
 ${contentTypeNativeSignalRules}
 
 CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
 ${finalTypeTrendAlignmentRules}
+
+TIKTOK FIT-MODEL SIGNAL BASELINE:
+${TIKTOK_FIT_MODEL_SIGNAL_BASELINE}
+
+FIT-MODEL LOCK BY CONTENT TYPE (MANDATORY):
+${fitModelRuleLockInstructions}
 
 NATURALITY GUARDRAILS (MANDATORY):
 ${NATURALITY_PROMPT_GUARDRAILS}
@@ -4420,6 +4657,17 @@ Return STRICT JSON only, same schema:
           }
         }
       }
+
+      const fitModelEnforced = enforceFitModelRuleOnKeyframe(
+        action,
+        camera,
+        fitModelRuleLock,
+        finalResolvedType,
+        i,
+        rawKeyframes.length,
+      )
+      action = fitModelEnforced.action
+      camera = fitModelEnforced.camera
 
       if (finalContentType === 'ootdmirror') {
         action = enforceOotdMirrorHandsFreeAction(action)
