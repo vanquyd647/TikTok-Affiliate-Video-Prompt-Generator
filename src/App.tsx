@@ -1329,6 +1329,9 @@ const FIT_MODEL_FULL_BODY_KEYWORDS = [
   'whole body',
   'full look',
   'full outfit',
+  'full-frame outfit',
+  'frame-filling full body',
+  'occupies most of frame',
   'full silhouette',
   'full outfit readability',
   'silhouette readability',
@@ -2157,6 +2160,7 @@ function buildFitModelRuleLockInstructions(contentType: ResolvedContentType, loc
   if (lock === 'strict_full_body') {
     return `- Locked content type: ${contentType.toUpperCase()} => strict_full_body.
 - Every keyframe should keep model head-to-toe visible with full garment silhouette readability.
+- Use frame-filling composition: outfit should occupy most of frame height (target ~80-90%) while head and footwear remain fully visible.
 - Keep hemline and footwear readable; avoid crop styles that break fit evaluation.
 - Detail proof is allowed only if it still preserves full-look readability.
 - This lock is mandatory for package generation and repair.`
@@ -2165,6 +2169,7 @@ function buildFitModelRuleLockInstructions(contentType: ResolvedContentType, loc
   if (lock === 'majority_full_body') {
     return `- Locked content type: ${contentType.toUpperCase()} => majority_full_body.
 - Keep full-body framing in most keyframes (hero/hook/close are mandatory full-look).
+- Mandatory full-look beats should be frame-filling (outfit occupies most of frame with minimal empty headroom/footroom).
 - Medium/detail beats are allowed only when adjacent beats preserve full-look continuity.
 - Prioritize silhouette readability before cinematic movement complexity.
 - This lock is mandatory for package generation and repair.`
@@ -2173,6 +2178,7 @@ function buildFitModelRuleLockInstructions(contentType: ResolvedContentType, loc
   return `- Locked content type: ${contentType.toUpperCase()} => balanced_full_body_proof.
 - Keep at least one hook full-look, one mid proof anchor, and one closing full-look.
 - Allow medium/detail proof beats for material/fit verification, but keep silhouette continuity clear.
+- Full-look anchors should avoid loose framing; keep outfit frame-filling enough for clear fit evaluation.
 - Never sacrifice purchase-relevant fit comprehension for aggressive camera cuts.
 - This lock is mandatory for package generation and repair.`
 }
@@ -2257,11 +2263,11 @@ function enforceFitModelRuleOnKeyframe(
   if (enforceFullBody) {
     nextAction = appendSentenceIfMissing(
       nextAction,
-      'Keep head-to-toe full-body visibility with clear hemline and footwear readability.',
+      'Keep head-to-toe full-body visibility and make outfit frame-filling with minimal empty headroom/footroom.',
     )
     nextCamera = appendSentenceIfMissing(
       nextCamera,
-      'Use stable full-body framing and keep complete garment silhouette inside a central safe frame.',
+      'Use stable full-body framing where outfit occupies roughly 80-90% of frame height, with head and footwear fully visible and no crop at key fit areas.',
     )
     return { action: nextAction, camera: nextCamera }
   }
@@ -2269,7 +2275,11 @@ function enforceFitModelRuleOnKeyframe(
   if (lock === 'majority_full_body') {
     nextAction = appendSentenceIfMissing(
       nextAction,
-      'Medium or detail framing is allowed only when adjacent beats preserve full-look outfit continuity.',
+      'Medium or detail framing is allowed only when adjacent beats preserve frame-filling full-look outfit continuity.',
+    )
+    nextCamera = appendSentenceIfMissing(
+      nextCamera,
+      'If this beat is not full-body, keep enough silhouette context and return immediately to frame-filling full-look composition in adjacent beats.',
     )
     return { action: nextAction, camera: nextCamera }
   }
@@ -6669,6 +6679,7 @@ export default function App() {
     return saved === null ? false : saved === '1'
   })
   const [contentType, setContentType] = useState<ContentType>('ootd')
+  const [isContentTypeManuallyLocked, setIsContentTypeManuallyLocked] = useState(false)
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingStageIndex, setLoadingStageIndex] = useState(0)
@@ -6907,6 +6918,7 @@ export default function App() {
       setAspectRatio(restoredAspectRatio)
       setNotes(item.notes || '')
       setContentType(restoredInputType)
+      setIsContentTypeManuallyLocked(restoredInputType !== 'auto')
       setSelectedContentType(restoredResolvedType)
       setResult(restoredPrompt)
       setSeoResult(null)
@@ -6924,6 +6936,7 @@ export default function App() {
       const restoredSeo = buildSeoResultFromHistoryItem(item)
 
       setContentType(restoredInputType)
+      setIsContentTypeManuallyLocked(restoredInputType !== 'auto')
       setSelectedContentType(restoredResolvedType)
       setSeoProductName(restoredSeo.productName)
       setSeoNotes(item.notes || '')
@@ -6943,6 +6956,7 @@ export default function App() {
       const restoredVoiceover = buildVoiceoverResultFromHistoryItem(item)
 
       setContentType(restoredInputType)
+      setIsContentTypeManuallyLocked(restoredInputType !== 'auto')
       setSelectedContentType(restoredResolvedType)
       setVoiceoverProductName(restoredVoiceover.productName)
       setVoiceoverNotes(item.notes || '')
@@ -7068,15 +7082,24 @@ export default function App() {
   const hasResultsPanelContent = hasAnyResult || hasHistoryPanelData
   const activeWorkHistoryFilters = historyActionFilter !== 'all' || historySearchQuery.length > 0
   const historyShownCount = workHistory.length
+  const applyManualContentType = useCallback((nextType: ContentType) => {
+    setContentType(nextType)
+    setIsContentTypeManuallyLocked(nextType !== 'auto')
+  }, [])
   const applyProductCategory = useCallback((nextCategory: ProductCategory) => {
     setProductCategory(nextCategory)
 
     const matchedCategory = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === nextCategory)
     const primarySuggestedType = matchedCategory?.suggestedTypes[0]
-    if (autoApplyCategoryType && primarySuggestedType) {
+    const shouldAutoApplyType = autoApplyCategoryType
+      && Boolean(primarySuggestedType)
+      && (!isContentTypeManuallyLocked || contentType === 'auto')
+
+    if (shouldAutoApplyType && primarySuggestedType) {
       setContentType(primarySuggestedType)
+      setIsContentTypeManuallyLocked(false)
     }
-  }, [autoApplyCategoryType])
+  }, [autoApplyCategoryType, contentType, isContentTypeManuallyLocked])
   const applyProductCategoryGroup = useCallback((nextGroup: ProductCategoryGroup) => {
     setProductCategoryGroup(nextGroup)
 
@@ -8188,7 +8211,7 @@ export default function App() {
                       <button
                         key={`suggested-type-${typeValue}`}
                         className={`chip ${contentType === typeValue ? 'active' : ''}`}
-                        onClick={() => setContentType(typeValue)}
+                        onClick={() => applyManualContentType(typeValue)}
                         id={`suggested-type-${typeValue}`}
                         style={contentType === typeValue ? {
                           background: `color-mix(in srgb, ${matchedType.color} 15%, transparent)`,
@@ -8213,6 +8236,12 @@ export default function App() {
                   </p>
                 )}
 
+                {autoApplyCategoryType && isContentTypeManuallyLocked && contentType !== 'auto' && (
+                  <p className="ai-task-hint" style={{ marginTop: 8, marginBottom: 0 }}>
+                    Dang khoa loai noi dung thu cong ({contentType.toUpperCase()}). Danh muc se khong tu dong ghi de cho den khi ban chon Auto.
+                  </p>
+                )}
+
                 {!isCurrentContentTypeAlignedWithCategory && contentType !== 'auto' && (
                   <p className="ai-task-hint" style={{ marginTop: 8, marginBottom: 0 }}>
                     Gợi ý nhanh: danh mục này thường chạy tốt hơn với {activeProductCategorySuggestedLabels}.
@@ -8234,7 +8263,7 @@ export default function App() {
                       <button
                         key={ct.value}
                         className={`chip ${contentType === ct.value ? 'active' : ''}`}
-                        onClick={() => setContentType(ct.value)}
+                        onClick={() => applyManualContentType(ct.value)}
                         id={`content-${ct.value}`}
                         style={contentType === ct.value ? {
                           background: `color-mix(in srgb, ${ct.color} 15%, transparent)`,
