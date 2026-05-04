@@ -2314,6 +2314,87 @@ function shouldUseMirrorOutfitIdeasStyle(notes: string): boolean {
   return normalizedNotes.includes('fitcheck') || normalizedNotes.includes('mirror') || normalizedNotes.includes('guong')
 }
 
+const USER_NOTES_LOCATION_TRANSITION_KEYWORDS = [
+  'multi location',
+  'multiple location',
+  'location transition',
+  'transition location',
+  'change location',
+  'different location',
+  'two location',
+  '2 location',
+  'location per scene',
+  'scene to scene location',
+  'location shift',
+  'doi dia diem',
+  'nhieu dia diem',
+  'chuyen canh',
+  'doi boi canh',
+] as const
+
+const USER_NOTES_OUTDOOR_STYLE_KEYWORDS = [
+  'outdoor',
+  'outside',
+  'street',
+  'rooftop',
+  'cafe',
+  'coffee shop',
+  'park',
+  'beach',
+  'garden',
+  'ngoai troi',
+  'duong pho',
+] as const
+
+function shouldAllowLocationTransitionsFromNotes(notes: string): boolean {
+  const normalizedNotes = normalizeLocationKey(notes)
+  if (!normalizedNotes) return false
+
+  return USER_NOTES_LOCATION_TRANSITION_KEYWORDS.some((keyword) =>
+    normalizedNotes.includes(keyword)
+  )
+}
+
+function resolveStyleLockWithUserNotes(
+  contentType: ResolvedContentType,
+  notes = '',
+): { styleLock: ContentStyleLock; overriddenByNotes: boolean } {
+  const defaultStyleLock = getContentTypeStyleLock(contentType, notes)
+  const normalizedNotes = normalizeLocationKey(notes)
+  if (!normalizedNotes) {
+    return { styleLock: defaultStyleLock, overriddenByNotes: false }
+  }
+
+  const mirrorRequested = (
+    hasStyleKeyword(notes, MIRROR_LOCATION_STYLE_KEYWORDS)
+    || normalizedNotes.includes('fitcheck')
+    || normalizedNotes.includes('mirror')
+    || normalizedNotes.includes('guong')
+  )
+  const studioRequested = hasStyleKeyword(notes, STUDIO_LOCATION_STYLE_KEYWORDS)
+  const outdoorRequested = USER_NOTES_OUTDOOR_STYLE_KEYWORDS.some((keyword) =>
+    normalizedNotes.includes(keyword)
+  )
+
+  const hasExplicitStyleSignal = mirrorRequested || studioRequested || outdoorRequested
+  if (!hasExplicitStyleSignal) {
+    return { styleLock: defaultStyleLock, overriddenByNotes: false }
+  }
+
+  let resolvedStyleLock: ContentStyleLock = 'flex'
+  if (mirrorRequested && !studioRequested && !outdoorRequested) {
+    resolvedStyleLock = 'mirror'
+  } else if (studioRequested && !mirrorRequested && !outdoorRequested) {
+    resolvedStyleLock = 'studio'
+  }
+
+  if (resolvedStyleLock === defaultStyleLock) {
+    return { styleLock: defaultStyleLock, overriddenByNotes: false }
+  }
+
+  return { styleLock: resolvedStyleLock, overriddenByNotes: true }
+}
+
 function getContentTypeStyleLock(contentType: ResolvedContentType, notes = ''): ContentStyleLock {
   if (contentType === 'ootdmirror') return 'mirror'
   if (contentType === 'ootd') return 'studio'
@@ -3143,6 +3224,10 @@ AFFILIATE EXECUTION RULES:
         ? formatLocationsForPrompt(locations)
         : `None yet for outfit type ${selectedType.toUpperCase()}`
     })()
+  const allowLocationTransitionsByNotes = shouldAllowLocationTransitionsFromNotes(notes)
+  const planningLocationContinuityRule = allowLocationTransitionsByNotes
+    ? '- [COMMON] USER NOTES explicitly request location transitions: allow controlled multi-location progression with clear continuity cues across adjacent scenes.'
+    : '- [COMMON] Choose ONE primary location and keep it consistent across all keyframes/scenes.'
   const requestedTypeTrendAlignmentRules = isAuto
     ? `- AUTO mode: prefer high-adoption women-fashion clusters (OOTD / OutfitIdeas / Fitcheck / TikTok Shop proof) before niche labels.
 - Do not choose FYP-style generic framing as a primary fashion identity.
@@ -3534,13 +3619,13 @@ ${requestedTypeTrendAlignmentRules}
 TIKTOK FIT-MODEL SIGNAL BASELINE:
 ${TIKTOK_FIT_MODEL_SIGNAL_BASELINE}
 
-FIT-MODEL LOCK FOR REQUESTED/RECOMMENDED TYPE (MANDATORY):
+FIT-MODEL LOCK FOR REQUESTED/RECOMMENDED TYPE (DEFAULT; SUBORDINATE TO USER NOTES):
 ${requestedFitModelLockRules}
 
-NATURALITY GUARDRAILS (MANDATORY):
+NATURALITY GUARDRAILS (DEFAULT; SUBORDINATE TO USER NOTES):
 ${NATURALITY_PROMPT_GUARDRAILS}
 
-HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
+HAND / ANATOMY CONSISTENCY GUARDRAILS (DEFAULT; SUBORDINATE TO USER NOTES):
 ${HAND_ANATOMY_GUARDRAILS}
 
 OOTDMIRROR REAR-MIRROR CAMERA LOCK (APPLIES WHEN TYPE=OOTDMIRROR):
@@ -3555,13 +3640,18 @@ ${CELEBRITY_POLICY_GUARDRAILS}
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
 
+USER NOTES OVERRIDE CONTRACT (APPLIES TO THIS PLANNING STAGE):
+- If USER NOTES conflict with default style/template/trend/type guidance, USER NOTES win.
+- Above guidance blocks are defaults, not hard creative constraints, when USER NOTES explicitly specify alternatives.
+- Non-negotiable constraints only: valid JSON schema, interpolation continuity safety (Rules 1, 2, 12), location scope lock (Rule 15), and celebrity/public-figure safety (Rule 31).
+
 RULES:
 - [COMMON] Location scope: Vietnam, China, South Korea only.
 - [COMMON] Use fresh real-world locations only; do not reuse any location in history lists above and do not use fixed/preset location pools.
-- [COMMON] Choose ONE primary location and keep it consistent across all keyframes/scenes.
+${planningLocationContinuityRule}
 - [COMMON] Follow retention arc: Hook -> Value -> Proof -> Close.
 - [COMMON] Keep action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
-- [COMMON] USER NOTES PRIORITY: if user notes are provided, follow them first; only deviate when mandatory constraints require it (schema, safety, location scope, interpolation continuity).
+- [COMMON] USER NOTES PRIORITY: if user notes are provided, always apply user intent first; default guidance may be used only for dimensions user notes do not specify.
 - [COMMON] For detail-sensitive garments (for example backless/strappy/multi-strap), avoid forced full-direction cycling; prefer stable facing continuity and controlled pivots.
 - [TYPE=OOTDMIRROR] Enforce mirror-fitcheck setup across all scenes.
 - [TYPE=OOTD] Enforce single-corner contextual studio setup across all scenes (no plain seamless background).
@@ -3569,7 +3659,7 @@ RULES:
 - [TYPE=BOUTIQUEFEED] Enforce boutique review cadence: short hook caption energy, fit/material proof, trust-first verdict, concise hashtag-ready framing.
 - [TYPE-SPECIFIC] If the content type label is niche/internal, map execution to stronger natural TikTok behavior clusters.
 - [TYPE-SPECIFIC] Lock fit-model framing by final content type using one of: strict_full_body | majority_full_body | balanced_full_body_proof.
-- Do not restate mandatory guardrail blocks above; treat those blocks as source of truth when overlap exists.
+- Do not restate guardrail blocks above; treat them as fallback defaults, subordinate to USER NOTES except non-negotiable constraints.
 
 Output STRICT JSON only:
 {
@@ -3643,7 +3733,10 @@ Output STRICT JSON only:
     }
 
     const finalResolvedType = finalContentType as ResolvedContentType
-    const finalStyleLock = getContentTypeStyleLock(finalResolvedType, notes)
+    const styleLockResolution = resolveStyleLockWithUserNotes(finalResolvedType, notes)
+    const finalStyleLock = styleLockResolution.styleLock
+    const isStyleLockOverriddenByNotes = styleLockResolution.overriddenByNotes
+    const enforceSinglePrimaryLocation = !allowLocationTransitionsByNotes
     const fitModelRuleLock = getFitModelRuleLock(finalResolvedType)
     const fitModelRuleLockInstructions = buildFitModelRuleLockInstructions(finalResolvedType, fitModelRuleLock)
     const fitModelRuleLockRepairHint = buildFitModelRuleLockRepairHint(finalResolvedType, fitModelRuleLock)
@@ -3711,7 +3804,7 @@ Output STRICT JSON only:
   - Reason: Veo 3.1 interpolates between frames but has zero reference for the garment back side; repeated same-direction framing forces hallucination of unknown back-of-garment details, causing severe outfit inconsistency.
   - Hand anatomy lock for mirror turns: preserve exactly two hands and five fingers per hand across adjacent keyframes; no fused/missing/extra fingers, no duplicated palms, and no hand-through-skirt artifacts.
   - If the narrative requires a held direction, break it with a slight 3/4 pivot before continuing.
-  [ALWAYS ENFORCED — not subordinate to Rule 30]`
+  [DEFAULT ENFORCEMENT — subordinate to Rule 30 when user notes explicitly require a different safe direction pattern]`
     const facingRuleForQaRepair = hasVideoPoseDirectionLock
       ? `Enforce video pose-direction lock: all keyframes must keep facingDirection "${poseDirectionLock}" and ACTION text must stay direction-consistent with that lock.`
       : usesDetailSensitiveFacingMode
@@ -3839,18 +3932,20 @@ Output STRICT JSON only:
         }
       }
 
-      const firstLocation = asRecord(keyframes[0]) ? toSafeText((keyframes[0] as Record<string, unknown>).location, '') : ''
-      const primaryLocationKey = normalizeLocationKey(firstLocation)
-      if (!primaryLocationKey) {
-        return { ok: false, reason: 'missing primary location in keyframe[0]' }
-      }
+      if (enforceSinglePrimaryLocation) {
+        const firstLocation = asRecord(keyframes[0]) ? toSafeText((keyframes[0] as Record<string, unknown>).location, '') : ''
+        const primaryLocationKey = normalizeLocationKey(firstLocation)
+        if (!primaryLocationKey) {
+          return { ok: false, reason: 'missing primary location in keyframe[0]' }
+        }
 
-      for (let i = 1; i < keyframes.length; i += 1) {
-        const keyframe = asRecord(keyframes[i]) ? keyframes[i] as Record<string, unknown> : null
-        const location = keyframe ? toSafeText(keyframe.location, '') : ''
-        const locationKey = normalizeLocationKey(location)
-        if (locationKey !== primaryLocationKey) {
-          return { ok: false, reason: `keyframe[${i}] location not consistent with primary location` }
+        for (let i = 1; i < keyframes.length; i += 1) {
+          const keyframe = asRecord(keyframes[i]) ? keyframes[i] as Record<string, unknown> : null
+          const location = keyframe ? toSafeText(keyframe.location, '') : ''
+          const locationKey = normalizeLocationKey(location)
+          if (locationKey !== primaryLocationKey) {
+            return { ok: false, reason: `keyframe[${i}] location not consistent with primary location` }
+          }
         }
       }
 
@@ -4166,6 +4261,8 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
 - Detail-sensitive facing mode: ${detailSensitiveFacingModeLabel}
 - Long-duration direction mode: ${longDurationDirectionalModeLabel}
+- Style lock mode: ${finalStyleLock.toUpperCase()}${isStyleLockOverriddenByNotes ? ' (USER-NOTES OVERRIDE)' : ' (DEFAULT)'}
+- Location continuity mode: ${enforceSinglePrimaryLocation ? 'SINGLE PRIMARY LOCATION' : 'USER-NOTES MULTI-LOCATION'}
 
 AFFILIATE OBJECTIVE:
 ${affiliateObjectiveForFinal}
@@ -4185,22 +4282,22 @@ ${boutiqueFeedChannelBenchmarkForFinal ? `BOUTIQUE FEED CHANNEL SNAPSHOT (REFERE
 ${boutiqueFeedChannelBenchmarkForFinal}
 ` : ''}
 
-TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
+TYPE-SPECIFIC TIKTOK SIGNALS (DEFAULT; SUBORDINATE TO RULE 30):
 ${contentTypeNativeSignalRules}
 
-CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
+CONTENT-TYPE TREND ALIGNMENT (DEFAULT; SUBORDINATE TO RULE 30):
 ${finalTypeTrendAlignmentRules}
 
 TIKTOK FIT-MODEL SIGNAL BASELINE:
 ${TIKTOK_FIT_MODEL_SIGNAL_BASELINE}
 
-FIT-MODEL LOCK BY CONTENT TYPE (MANDATORY):
+FIT-MODEL LOCK BY CONTENT TYPE (DEFAULT; SUBORDINATE TO RULE 30):
 ${fitModelRuleLockInstructions}
 
-NATURALITY GUARDRAILS (MANDATORY):
+NATURALITY GUARDRAILS (DEFAULT; SUBORDINATE TO RULE 30):
 ${NATURALITY_PROMPT_GUARDRAILS}
 
-HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
+HAND / ANATOMY CONSISTENCY GUARDRAILS (DEFAULT; SUBORDINATE TO RULE 30):
 ${HAND_ANATOMY_GUARDRAILS}
 
 OOTDMIRROR REAR-MIRROR CAMERA LOCK (APPLIES WHEN TYPE=OOTDMIRROR):
@@ -4218,23 +4315,31 @@ ${usedLocationsProductPrompt}
 LOCATIONS ALREADY USED FOR SAME OUTFIT TYPE (MUST AVOID REUSE):
 ${usedLocationsOutfitTypePrompt}
 
-PRIMARY LOCATION LOCK (MANDATORY):
-${primaryPlannedLocation.length > 0
-  ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
-  : 'Select one valid real-world location in Vietnam/China/South Korea and keep it identical across all keyframes/scenes.'}
+${enforceSinglePrimaryLocation ? 'PRIMARY LOCATION LOCK (DEFAULT; SUBORDINATE TO RULE 30):' : 'LOCATION CONTINUITY MODE (USER NOTES OVERRIDE ACTIVE):'}
+${enforceSinglePrimaryLocation
+  ? (
+    primaryPlannedLocation.length > 0
+      ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
+      : 'Select one valid real-world location in Vietnam/China/South Korea and keep it identical across all keyframes/scenes.'
+  )
+  : 'User notes request location transitions: allow controlled multi-location progression across scenes while preserving interpolation continuity and keeping all locations within Vietnam/China/South Korea.'}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
 
+USER NOTES OVERRIDE CONTRACT (GLOBAL PRECEDENCE):
+- If USER NOTES conflict with any default creative/style/template/type instruction, USER NOTES win.
+- This override also applies to type-specific trend signals, fit-model defaults, and Rule 32 direction heuristics.
+- Non-negotiable constraints only: valid output schema, required scene/keyframe counts, interpolation continuity safety (Rules 1, 2, 12), location scope lock (Rule 15), and celebrity/public-figure safety (Rule 31).
+
 ${notes ? `⚡ USER NOTES PRIORITY MODE — ACTIVE
 Rule 30 is the PRIMARY creative directive for this run.
-Rules 9, 11, 13, 17–20, 23–29 (style, tone, location, camera, format, narrative, pacing)
-are SUBORDINATE to User Notes wherever user intent conflicts with defaults.
+Rules 3–29 and Rule 32 defaults are SUBORDINATE to User Notes wherever user intent conflicts with defaults.
 Apply User Notes first; only fall back to defaults when User Notes are silent on a dimension.
-Truly non-negotiable: Rule 31 (celebrity safety), output schema structure, scene/keyframe counts,
-and VEO interpolation continuity (Rules 1, 2, 12).` : ''}
+Truly non-negotiable: Rule 31 (celebrity safety), Rule 15 (location scope), output schema structure,
+scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12).` : ''}
 
-CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style/format/location conflict; Rules 1, 2, 12, 31 and schema are always enforced]:
+CRITICAL RULES [Rule 30 has strongest creative authority. Rules 3–29 and Rule 32 defaults yield on conflict. Non-negotiable: Rules 1, 2, 12, 15, 31 plus schema/count integrity]:
 1. Each scene is exactly 8 seconds, using Veo 3.1 first-frame + last-frame interpolation.
 2. Keyframe chain must be SEAMLESS: last frame of scene N = first frame of scene N+1.
 3. Character identity must be perfectly consistent across all keyframes (face, body proportions, hair, skin tone).
@@ -4264,7 +4369,7 @@ CRITICAL RULES [Rules 1–29 yield to Rule 30 (User Notes) where narrative/style
 27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner with contextual depth (textured/decorated wall, practical props like rack/stool/shelf), soft controlled lighting, and consistent camera axis for all scenes; avoid plain seamless white/solid-color backdrops. [SUBORDINATE to Rule 30 — User Notes may modify studio spec]
 28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must stay mix-and-match styling-first with non-mirror framing by default. If User Notes explicitly request mirror/fitcheck, keep that mirror setup consistent across scenes. [SUBORDINATE to Rule 30 — User Notes may override style lock]
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
-30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default style, tone, format, location, camera, and narrative choices in Rules 5–29 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Rule 31 (celebrity safety), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12) are the only truly non-negotiable constraints.
+30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default creative/style/template/type instructions in Rules 3–29 and Rule 32 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Non-negotiable constraints are limited to Rule 31 (celebrity safety), Rule 15 (location scope), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12).
 31. CELEBRITY / PUBLIC-FIGURE SAFETY LOCK - Never depict/imitate/reference real celebrities/public figures/identifiable persons, never generate deepfake-style impersonation or fake endorsement/dialogue; if user asks for real person, convert to fictional archetype while preserving only general mood/style.
 ${facingRuleForGenerationPrompt}
 
@@ -4327,20 +4432,26 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
       const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
 
   Validate and repair the draft package to satisfy all constraints below:
-  - Enforce CRITICAL RULES 1..32 exactly as defined in package generation stage.
+  - Enforce CRITICAL RULES with Rule 30 precedence exactly as defined in package generation stage.
   - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
   - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
+  - Conflict resolution order is strict: USER NOTES > default creative/type/template guardrails > fallback heuristics.
   - Preserve character identity and garment fidelity with zero drift.
-  - Treat USER NOTES as highest-priority intent and preserve them over default creative choices unless mandatory constraints conflict.
-  - Use the same primary location lock in all keyframes/scenes.
+  - Treat USER NOTES as highest-priority intent and preserve them over default creative choices unless non-negotiable constraints conflict.
+  - Non-negotiable constraints only: valid JSON schema, required scene/keyframe counts, Rules 1, 2, 12, 15, and 31.
+  - Apply location continuity mode according to Rule 30 runtime decision (single-primary default or user-notes transition mode).
   - ${facingRuleForQaRepair}
   - ${fitModelRuleLockRepairHint}
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
 
-PRIMARY LOCATION LOCK (MANDATORY):
-${primaryPlannedLocation.length > 0
-    ? primaryPlannedLocation
-    : 'No pre-selected lock available. Keep one location consistent across all keyframes/scenes.'}
+${enforceSinglePrimaryLocation ? 'PRIMARY LOCATION LOCK (DEFAULT; SUBORDINATE TO RULE 30):' : 'LOCATION CONTINUITY MODE (USER NOTES OVERRIDE ACTIVE):'}
+${enforceSinglePrimaryLocation
+    ? (
+      primaryPlannedLocation.length > 0
+        ? primaryPlannedLocation
+        : 'No pre-selected lock available. Keep one location consistent across all keyframes/scenes.'
+    )
+    : 'User notes request location transitions: allow controlled multi-location progression while preserving continuity and VN/CN/KR scope.'}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
@@ -4348,22 +4459,22 @@ ${notes ? notes : 'None'}
 DRAFT PACKAGE JSON:
 ${safeJsonStringify(draftPackage)}
 
-TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
+TYPE-SPECIFIC TIKTOK SIGNALS (DEFAULT; SUBORDINATE TO RULE 30):
 ${contentTypeNativeSignalRules}
 
-CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
+CONTENT-TYPE TREND ALIGNMENT (DEFAULT; SUBORDINATE TO RULE 30):
 ${finalTypeTrendAlignmentRules}
 
 TIKTOK FIT-MODEL SIGNAL BASELINE:
 ${TIKTOK_FIT_MODEL_SIGNAL_BASELINE}
 
-FIT-MODEL LOCK BY CONTENT TYPE (MANDATORY):
+FIT-MODEL LOCK BY CONTENT TYPE (DEFAULT; SUBORDINATE TO RULE 30):
 ${fitModelRuleLockInstructions}
 
-NATURALITY GUARDRAILS (MANDATORY):
+NATURALITY GUARDRAILS (DEFAULT; SUBORDINATE TO RULE 30):
 ${NATURALITY_PROMPT_GUARDRAILS}
 
-HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
+HAND / ANATOMY CONSISTENCY GUARDRAILS (DEFAULT; SUBORDINATE TO RULE 30):
 ${HAND_ANATOMY_GUARDRAILS}
 
 OOTDMIRROR REAR-MIRROR CAMERA LOCK (APPLIES WHEN TYPE=OOTDMIRROR):
@@ -4408,7 +4519,7 @@ Return STRICT JSON only, same schema:
 TASK:
 - Repair ONLY location-related fields so the package satisfies constraints.
 - Keep masterDNA, actions, camera, lighting, style, and scene pacing unchanged unless absolutely necessary for continuity.
-- Enforce ONE primary location across all keyframes/scenes.
+- Enforce location continuity mode based on Rule 30 runtime decision (single-primary default or user-notes transition mode).
 - Preserve celebrity/public-figure safety guardrails (no real-person likeness or impersonation cues).
 
 LOCATION CONSTRAINTS:
@@ -4426,10 +4537,14 @@ ${usedLocationsOutfitTypePrompt}
 AI-PLANNED LOCATION CANDIDATES (PREFERRED):
 ${aiPlannedLocationPool.length > 0 ? aiPlannedLocationPool.join('\n') : 'None'}
 
-PRIMARY LOCATION LOCK (MANDATORY):
-${primaryPlannedLocation.length > 0
-  ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
-  : 'If unavailable, keep one valid location consistent across all keyframes/scenes.'}
+${enforceSinglePrimaryLocation ? 'PRIMARY LOCATION LOCK (DEFAULT; SUBORDINATE TO RULE 30):' : 'LOCATION CONTINUITY MODE (USER NOTES OVERRIDE ACTIVE):'}
+${enforceSinglePrimaryLocation
+  ? (
+    primaryPlannedLocation.length > 0
+      ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
+      : 'If unavailable, keep one valid location consistent across all keyframes/scenes.'
+  )
+  : 'User notes request location transitions: keep VN/CN/KR scope and continuity, but allow controlled multi-location progression across keyframes/scenes.'}
 
 FAILED VALIDATION REASON:
 ${strictLocationValidation.reason || 'unknown'}
@@ -4467,6 +4582,7 @@ TASK:
 - Keep location, character identity, garment fidelity, and style lock unchanged.
 - Maintain existing story arc and product-first composition.
 - Preserve celebrity/public-figure safety guardrails (no real-person likeness or impersonation cues).
+- Preserve USER NOTES intent for tone/style/narrative; only change fields required to resolve continuity and non-negotiable constraints.
 
 INTERPOLATION CONTINUITY REQUIREMENTS:
 - Adjacent keyframes must be micro-progression, not abrupt pose jumps.
@@ -4476,22 +4592,29 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - ${facingRuleForMotionRepair}
 - ${fitModelRuleLockRepairHint}
 
-TYPE-SPECIFIC TIKTOK SIGNALS (MANDATORY):
+USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
+${notes ? notes : 'None'}
+
+USER NOTES OVERRIDE CONTRACT:
+- Keep USER NOTES choices whenever they do not violate non-negotiable constraints (Rules 1, 2, 12, 15, 31 and schema/count integrity).
+- Default type/style/fit-model guidance below is subordinate to USER NOTES on conflict.
+
+TYPE-SPECIFIC TIKTOK SIGNALS (DEFAULT; SUBORDINATE TO RULE 30):
 ${contentTypeNativeSignalRules}
 
-CONTENT-TYPE TREND ALIGNMENT (MANDATORY):
+CONTENT-TYPE TREND ALIGNMENT (DEFAULT; SUBORDINATE TO RULE 30):
 ${finalTypeTrendAlignmentRules}
 
 TIKTOK FIT-MODEL SIGNAL BASELINE:
 ${TIKTOK_FIT_MODEL_SIGNAL_BASELINE}
 
-FIT-MODEL LOCK BY CONTENT TYPE (MANDATORY):
+FIT-MODEL LOCK BY CONTENT TYPE (DEFAULT; SUBORDINATE TO RULE 30):
 ${fitModelRuleLockInstructions}
 
-NATURALITY GUARDRAILS (MANDATORY):
+NATURALITY GUARDRAILS (DEFAULT; SUBORDINATE TO RULE 30):
 ${NATURALITY_PROMPT_GUARDRAILS}
 
-HAND / ANATOMY CONSISTENCY GUARDRAILS (MANDATORY):
+HAND / ANATOMY CONSISTENCY GUARDRAILS (DEFAULT; SUBORDINATE TO RULE 30):
 ${HAND_ANATOMY_GUARDRAILS}
 
 OOTDMIRROR REAR-MIRROR CAMERA LOCK (APPLIES WHEN TYPE=OOTDMIRROR):
@@ -4580,8 +4703,13 @@ Return STRICT JSON only, same schema:
       return structuralCandidate || ''
     }
 
-    const resolveLocationFromPackage = (value: unknown) => {
-      if (primaryPlannedLocation.length > 0 && isLocationCandidateAllowed(primaryPlannedLocation)) {
+    const resolveLocationFromPackage = (
+      value: unknown,
+      options: { preferPrimaryLock?: boolean } = {},
+    ) => {
+      const preferPrimaryLock = options.preferPrimaryLock ?? true
+
+      if (preferPrimaryLock && primaryPlannedLocation.length > 0 && isLocationCandidateAllowed(primaryPlannedLocation)) {
         return primaryPlannedLocation
       }
 
@@ -4632,8 +4760,15 @@ Return STRICT JSON only, same schema:
       throw new Error('No valid AI-selected primary location available')
     }
 
-    const primaryResolvedLocation = resolveLocationFromPackage(rawKeyframes[0]?.location)
-    const synchronizedKeyframeLocations = Array.from({ length: keyframeCount }, () => primaryResolvedLocation)
+    const primaryResolvedLocation = resolveLocationFromPackage(rawKeyframes[0]?.location, {
+      preferPrimaryLock: enforceSinglePrimaryLocation,
+    })
+    const resolvedKeyframeLocations = enforceSinglePrimaryLocation
+      ? Array.from({ length: keyframeCount }, () => primaryResolvedLocation)
+      : rawKeyframes.map((item) => {
+        const keyframe = asRecord(item) ? item as Record<string, unknown> : {}
+        return resolveLocationFromPackage(keyframe.location, { preferPrimaryLock: false })
+      })
 
     const fallbackActionByType: Record<Exclude<ContentType, 'auto'>, string> = {
       ootd: 'Confident outfit showcase pose and movement tailored for OOTD storytelling',
@@ -4789,7 +4924,7 @@ Return STRICT JSON only, same schema:
     // Build full prompts for each keyframe and scene
     const keyframes: KeyframePrompt[] = normalizedKeyframesForRule32.map((kf, i: number) => {
         const subject = buildDefaultFrameSubject(aspectRatio)
-      const location = synchronizedKeyframeLocations[i] || primaryResolvedLocation
+      const location = resolvedKeyframeLocations[i] || primaryResolvedLocation
 
       return {
         index: i,
