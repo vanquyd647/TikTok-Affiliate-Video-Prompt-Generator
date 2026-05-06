@@ -7106,12 +7106,12 @@ export default function App() {
   }, [loadWorkHistory])
 
   useEffect(() => {
-    if (result || seoResult || voiceoverResult) return
+    if (result || seoResult || voiceoverResult || tiktokAnalysisResult) return
     if (activeTab === 'history') return
     if (workHistoryLoading || workHistory.length > 0 || workHistoryError.trim().length > 0) {
       setActiveTab('history')
     }
-  }, [activeTab, result, seoResult, voiceoverResult, workHistory.length, workHistoryError, workHistoryLoading])
+  }, [activeTab, result, seoResult, tiktokAnalysisResult, voiceoverResult, workHistory.length, workHistoryError, workHistoryLoading])
 
   const applyWorkHistoryFilters = useCallback(() => {
     const nextQuery = historySearchInput.trim()
@@ -7436,6 +7436,8 @@ export default function App() {
     : null
   const resultsHeader = activeTab === 'history'
     ? 'Lich su da luu (MongoDB)'
+    : activeTab === 'tiktokanalysis'
+      ? 'Phan tich Video TikTok'
     : result
       ? hasVideoPromptResult
         ? `Prompt Package — ${duration}s / ${aspectRatio}`
