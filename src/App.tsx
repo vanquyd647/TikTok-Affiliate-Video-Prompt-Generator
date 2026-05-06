@@ -3185,7 +3185,39 @@ async function generateWithGemini(
     : 'BALANCED AUTO MODE: allow broader creative variety but still prioritize conversion-friendly fashion formats.'
   const normalizedProductCategory = normalizeProductCategory(productCategory, 'auto')
   const selectedProductCategoryOption = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === normalizedProductCategory)
+  const selectedProductCategoryGroup = selectedProductCategoryOption?.group || 'all'
+  const hasExplicitProductCategoryLock = normalizedProductCategory !== 'auto' && Boolean(selectedProductCategoryOption)
+  const isSkirtCategoryLock = hasExplicitProductCategoryLock && selectedProductCategoryGroup === 'skirts'
   const productCategoryLabel = selectedProductCategoryOption?.label || 'Auto Boutique'
+  const productCategoryHeroByGroup: Record<ProductCategoryGroup, string> = {
+    all: 'selected product category item',
+    tops: 'topwear item',
+    bottoms: 'bottomwear item',
+    dresses: 'dress item',
+    skirts: 'skirt item',
+    outerwear: 'outerwear item',
+    loungewear_sleepwear: 'loungewear/sleepwear item',
+    lingerie_swimwear: 'lingerie/swimwear item',
+    activewear: 'activewear item',
+    traditional_festive: 'traditional/festive item',
+    accessories_footwear: 'accessory/footwear item',
+  }
+  const productCategoryHeroLabel = hasExplicitProductCategoryLock
+    ? (productCategoryHeroByGroup[selectedProductCategoryGroup] || selectedProductCategoryOption?.label || 'selected product category item')
+    : 'auto'
+  const productCategoryFocusRules = hasExplicitProductCategoryLock
+    ? `PRODUCT CATEGORY FOCUS LOCK (MANDATORY):
+- Selected category is locked: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()}).
+- Treat ${productCategoryHeroLabel} as the only hero product in all keyframes and scenes.
+- If reference images include multiple garments, keep non-selected garments as styling context only and never describe them as the featured product.
+${isSkirtCategoryLock ? '- SKIRT-SPECIFIC LOCK: prioritize skirt fit, waistline, hemline, pleats/drape, and movement proof; corset/top can appear only as supporting styling context.' : ''}`
+    : 'PRODUCT CATEGORY FOCUS MODE: AUTO (no explicit category lock).'
+  const productCategoryFocusSentence = hasExplicitProductCategoryLock
+    ? `Hero product focus: ${productCategoryHeroLabel}.`
+    : ''
+  const productCategorySkirtFocusSentence = isSkirtCategoryLock
+    ? 'Skirt focus lock: upper garments (corset/top/blouse/shirt) are supporting styling only, not the featured product.'
+    : ''
   const hasVideoPoseDirectionLock = poseDirectionLock !== 'auto'
   const videoPoseDirectionLockText = hasVideoPoseDirectionLock
     ? poseDirectionLock.toUpperCase()
@@ -3570,6 +3602,9 @@ Rules:
 - Be concrete and concise.
 - Do not invent unavailable details.
 - Focus on preserving identity and garment fidelity.
+- ${hasExplicitProductCategoryLock
+  ? `Category lock is ACTIVE: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()}). If references contain multiple garments, set garmentFacts for this selected category as hero product and treat other pieces as supporting context only.`
+  : 'Category lock is AUTO: infer primary garment category from references.'}
 ${notes ? `USER NOTES: ${notes}` : ''}`
 
     const visualExtractCacheKey = JSON.stringify({
@@ -3619,7 +3654,10 @@ INPUT CONTEXT:
 - Affiliate mode: ${affiliateModeLabel}
 - Sales template: ${salesTemplateLabel}
 - Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
+- Product category lock state: ${hasExplicitProductCategoryLock ? 'LOCKED' : 'AUTO'}
 - Diversity seed: ${diversitySeed}
+
+${productCategoryFocusRules}
 
 VISUAL ANALYSIS JSON:
 ${safeJsonStringify(visualAnalysis)}
@@ -3676,6 +3714,7 @@ ${planningLocationContinuityRule}
 - [COMMON] Follow retention arc: Hook -> Value -> Proof -> Close.
 - [COMMON] Keep action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
 - [COMMON] USER NOTES PRIORITY: if user notes are provided, always apply user intent first; default guidance may be used only for dimensions user notes do not specify.
+- [COMMON] PRODUCT CATEGORY LOCK: when category lock is active, selected category is the hero product; non-selected garments are styling context only.
 - [COMMON] For detail-sensitive garments (for example backless/strappy/multi-strap), avoid forced full-direction cycling; prefer stable facing continuity and controlled pivots.
 - [TYPE=OOTDMIRROR] Enforce mirror-fitcheck setup across all scenes.
 - [TYPE=OOTD] Enforce single-corner contextual studio setup across all scenes (no plain seamless background).
@@ -4317,10 +4356,13 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - LOCKED content type: ${finalContentType.toUpperCase()}
 - Video pose-direction lock: ${videoPoseDirectionLockText}
 - Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
+- Product category lock state: ${hasExplicitProductCategoryLock ? 'LOCKED' : 'AUTO'}
 - Detail-sensitive facing mode: ${detailSensitiveFacingModeLabel}
 - Long-duration direction mode: ${longDurationDirectionalModeLabel}
 - Style lock mode: ${finalStyleLock.toUpperCase()}${isStyleLockOverriddenByNotes ? ' (USER-NOTES OVERRIDE)' : ' (DEFAULT)'}
 - Location continuity mode: ${enforceSinglePrimaryLocation ? 'SINGLE PRIMARY LOCATION' : 'USER-NOTES MULTI-LOCATION'}
+
+${productCategoryFocusRules}
 
 AFFILIATE OBJECTIVE:
 ${affiliateObjectiveForFinal}
@@ -4405,6 +4447,7 @@ CRITICAL RULES [Rule 30 has strongest creative authority. Rules 3–29 and Rule 
 5. Follow TikTok retention arc across timeline: Hook (0-3s) -> Value -> Proof -> Close.
 6. Scene 1 must create a strong visual hook in the first 1-3 seconds with immediate product readability.
 7. Infer scene context from garment/product characteristics, content type, and user notes; avoid generic preset randomness.
+7A. PRODUCT CATEGORY LOCK (WHEN ACTIVE) - Selected product category is the only hero product focus. If outfit has multiple garments, non-selected garments remain supporting context and must not be described as the featured product.
 8. NEVER use background, location, props, or lighting from the FACE reference image. Face image is identity-only.
 9. Keep one primary location coherent across all keyframes/scenes; do not change location unless user explicitly requests a transition. [SUBORDINATE to Rule 30 — User Notes may specify multi-location or location changes]
 10. Prompt detail quality must follow Veo best practice: each keyframe/scenes should be specific on Subject, Action, Camera, Composition, Style, and Ambiance/Lighting.
@@ -4497,10 +4540,13 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Preserve character identity and garment fidelity with zero drift.
   - Treat USER NOTES as highest-priority intent and preserve them over default creative choices unless non-negotiable constraints conflict.
   - Non-negotiable constraints only: valid JSON schema, required scene/keyframe counts, Rules 1, 2, 12, 15, and 31.
+  - Enforce product category lock: selected category must remain hero product focus whenever category lock is active.
   - Apply location continuity mode according to Rule 30 runtime decision (single-primary default or user-notes transition mode).
   - ${facingRuleForQaRepair}
   - ${fitModelRuleLockRepairHint}
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
+
+${productCategoryFocusRules}
 
 ${enforceSinglePrimaryLocation ? 'PRIMARY LOCATION LOCK (DEFAULT; SUBORDINATE TO RULE 30):' : 'LOCATION CONTINUITY MODE (USER NOTES OVERRIDE ACTIVE):'}
 ${enforceSinglePrimaryLocation
@@ -4639,6 +4685,7 @@ TASK:
 - Repair ONLY motion/camera continuity fields so interpolation between keyframes is physically plausible.
 - Keep location, character identity, garment fidelity, and style lock unchanged.
 - Maintain existing story arc and product-first composition.
+- Preserve product category hero focus lock when category is explicitly selected.
 - Preserve celebrity/public-figure safety guardrails (no real-person likeness or impersonation cues).
 - Preserve USER NOTES intent for tone/style/narrative; only change fields required to resolve continuity and non-negotiable constraints.
 
@@ -4649,6 +4696,8 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - ${facingRuleForMotionRepair}
 - ${fitModelRuleLockRepairHint}
+
+${productCategoryFocusRules}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
@@ -4738,6 +4787,42 @@ Return STRICT JSON only, same schema:
       if (typeof value !== 'string') return fallback
       const trimmed = value.trim()
       return trimmed.length > 0 ? trimmed : fallback
+    }
+
+    const rewriteSkirtHeroConflicts = (value: string): string => {
+      let next = value
+
+      next = next.replace(
+        /\b(?:hero|featured|primary|main)\s+(?:product|item|garment)?\s*(?:is|:)?\s*(?:the\s+|a\s+)?(?:corset(?:\s+top)?|top|blouse|shirt|camisole|cami|tank(?:\s+top)?|halter(?:\s+top)?)\b/gi,
+        'hero product is the skirt',
+      )
+      next = next.replace(
+        /\bfocus(?:es|ed|ing)?\s+on\s+(?:the\s+)?(?:corset(?:\s+top)?|top|blouse|shirt|camisole|cami|tank(?:\s+top)?|halter(?:\s+top)?)\b/gi,
+        'focus on the skirt silhouette',
+      )
+
+      return next
+    }
+
+    const applyProductCategoryFocusToText = (value: string): string => {
+      const trimmed = value.trim()
+      if (!trimmed) return trimmed
+      if (!hasExplicitProductCategoryLock) return trimmed
+
+      let next = trimmed
+      if (isSkirtCategoryLock) {
+        next = rewriteSkirtHeroConflicts(next)
+      }
+
+      if (productCategoryFocusSentence) {
+        next = appendSentenceIfMissing(next, productCategoryFocusSentence)
+      }
+
+      if (productCategorySkirtFocusSentence) {
+        next = appendSentenceIfMissing(next, productCategorySkirtFocusSentence)
+      }
+
+      return next
     }
 
     const pickAiPlannedLocationFallback = (): string => {
@@ -4969,6 +5054,8 @@ Return STRICT JSON only, same schema:
         camera = enforceOotdMirrorObserverCamera(camera)
       }
 
+      action = applyProductCategoryFocusToText(action)
+
       normalizedKeyframesForRule32.push({
         action,
         camera,
@@ -5046,6 +5133,7 @@ Return STRICT JSON only, same schema:
       if (finalContentType === 'ootdmirror') {
         safeNarrative = enforceOotdMirrorSceneNarrative(safeNarrative)
       }
+      safeNarrative = applyProductCategoryFocusToText(safeNarrative)
       let cameraMovement = toSafeString(
         sc.cameraMovement,
         SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].cameraHint
@@ -5091,10 +5179,12 @@ Return STRICT JSON only, same schema:
       stageMetrics,
     })
 
+    const rawMasterDNA = typeof parsed.masterDNA === 'string' && parsed.masterDNA.trim().length > 0
+      ? parsed.masterDNA
+      : buildCharacterDNA(notes, finalContentType as Exclude<ContentType, 'auto'>)
+
     return {
-      masterDNA: typeof parsed.masterDNA === 'string' && parsed.masterDNA.trim().length > 0
-        ? parsed.masterDNA
-        : buildCharacterDNA(notes, finalContentType as Exclude<ContentType, 'auto'>),
+      masterDNA: applyProductCategoryFocusToText(rawMasterDNA),
       keyframes,
       scenes,
       resolvedContentType: finalContentType as ResolvedContentType,
