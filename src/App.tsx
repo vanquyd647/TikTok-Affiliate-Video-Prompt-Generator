@@ -5587,7 +5587,6 @@ function buildPromptNotesFromTikTokAnalysis(
     .map((beat) => {
       const segments = [
         `${beat.timestamp} ${beat.beatName}`.trim(),
-        beat.description.trim(),
         beat.cameraHint.trim().length > 0 ? `Camera: ${beat.cameraHint.trim()}` : '',
         beat.narrationHint.trim().length > 0 ? `Narration: ${beat.narrationHint.trim()}` : '',
       ].filter((part) => part.length > 0)
@@ -5604,6 +5603,10 @@ function buildPromptNotesFromTikTokAnalysis(
   return [
     trimmedBaseNotes ? `[USER NOTES]\n${trimmedBaseNotes}` : '',
     trimmedAnalysisNotes ? `[ANALYSIS EXTRA NOTES]\n${trimmedAnalysisNotes}` : '',
+    '[HARD LOCK - INPUT ASSET PRIORITY]',
+    'Use ONLY the currently uploaded face image and product image for all visual identity and garment details.',
+    'Do NOT copy or infer face identity, body traits, outfit design, color, fabric, accessories, or props from the analyzed TikTok video.',
+    'Use TikTok analysis ONLY for story structure, pacing, beat timing, camera rhythm, and CTA flow.',
     '[TIKTOK ANALYSIS REFERENCE]',
     `Detected content type: ${analysis.detectedContentType}`,
     `Detected duration: ~${analysis.detectedDurationSec}s`,
@@ -5612,8 +5615,8 @@ function buildPromptNotesFromTikTokAnalysis(
     analysis.ctaStyle.trim().length > 0 ? `CTA style: ${analysis.ctaStyle.trim()}` : '',
     analysis.colorGrade.trim().length > 0 ? `Color grade: ${analysis.colorGrade.trim()}` : '',
     analysis.pacing.trim().length > 0 ? `Pacing: ${analysis.pacing.trim()}` : '',
-    beatSummary.length > 0 ? `Scene beats:\n${beatSummary}` : '',
-    scriptSnapshot.length > 0 ? `Reference script:\n${scriptSnapshot}` : '',
+    beatSummary.length > 0 ? `Scene beats (structure only):\n${beatSummary}` : '',
+    scriptSnapshot.length > 0 ? `Reference script template (adapt to current uploaded product + face only):\n${scriptSnapshot}` : '',
   ].filter((line) => line.trim().length > 0).join('\n\n')
 }
 
@@ -6319,6 +6322,13 @@ ANALYSIS TASKS:
    - Include stage directions in brackets e.g. [Camera: full-body reveal]
    - Cover hook → showcase → close structure
    - Be 150-250 words total
+
+STRICT OUTPUT CONSTRAINTS (MUST FOLLOW):
+- The downstream generator will use separate uploaded face/product images.
+- Do NOT preserve or copy any analyzed-video identity cues (face, body traits, age cues, hairstyle identity, accessories identity).
+- Do NOT preserve or copy analyzed-video garment specifics (exact outfit type, pattern, material, logo, colorway).
+- For generatedScript, keep wording product-agnostic with placeholders like [MODEL], [SAN PHAM], [BENEFIT 1], [CTA].
+- Focus only on reusable structure: hook logic, pacing, beat progression, camera rhythm, and CTA flow.
 
 Return this exact JSON schema (no extra keys, no markdown wrapping):
 {
@@ -8043,6 +8053,11 @@ export default function App() {
 
     if (!apiKey.trim()) {
       setTiktokAnalysisError('Vui long nhap Gemini API Key truoc khi tao prompt package.')
+      return
+    }
+
+    if (!faceImage || !productImage) {
+      setTiktokAnalysisError('Vui long tai ca anh Face va anh San pham dau vao. Prompt package tu phan tich TikTok chi su dung 2 anh dau vao nay.')
       return
     }
 
