@@ -5697,6 +5697,10 @@ function buildPromptNotesFromTikTokAnalysis(
     'Use ONLY the currently uploaded face image and product image for all visual identity and garment details.',
     'Do NOT copy or infer face identity, body traits, outfit design, color, fabric, accessories, or props from the analyzed TikTok video.',
     'Use TikTok analysis ONLY for story structure, pacing, beat timing, camera rhythm, and CTA flow.',
+    '[SCRIPT EXECUTION LOCK - MANDATORY]',
+    'Use the reference script template as the primary narrative skeleton for scene progression.',
+    'Scene narratives must follow script beats in order (hook -> value -> proof -> close).',
+    'If script includes bracketed camera/stage cues, map them into scene camera movement and action descriptions.',
     '[TIKTOK ANALYSIS REFERENCE]',
     `Detected content type: ${analysis.detectedContentType}`,
     `Detected duration: ~${analysis.detectedDurationSec}s`,
@@ -5706,8 +5710,43 @@ function buildPromptNotesFromTikTokAnalysis(
     analysis.colorGrade.trim().length > 0 ? `Color grade: ${analysis.colorGrade.trim()}` : '',
     analysis.pacing.trim().length > 0 ? `Pacing: ${analysis.pacing.trim()}` : '',
     beatSummary.length > 0 ? `Scene beats (structure only):\n${beatSummary}` : '',
-    scriptSnapshot.length > 0 ? `Reference script template (adapt to current uploaded product + face only):\n${scriptSnapshot}` : '',
+    scriptSnapshot.length > 0 ? `Reference script template (MANDATORY structure source, adapt to current uploaded product + face only):\n${scriptSnapshot}` : '',
   ].filter((line) => line.trim().length > 0).join('\n\n')
+}
+
+function buildTikTokScriptBeatReferences(script: string, sceneCount: number): string[] {
+  if (sceneCount <= 0) return []
+
+  const cleanedScript = script.trim()
+  if (cleanedScript.length === 0) return []
+
+  const fromLines = cleanedScript
+    .split(/\r?\n+/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => line
+      .replace(/^\d+\s*[-–]\s*\d+\s*s?\s*[:：-]?\s*/i, '')
+      .replace(/^[-*•]+\s*/, '')
+      .trim())
+    .filter((line) => line.length > 0)
+
+  const fallbackSentences = cleanedScript
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0)
+
+  const units = fromLines.length > 0 ? fromLines : fallbackSentences
+  if (units.length === 0) return []
+
+  const beats: string[] = []
+  for (let sceneIndex = 0; sceneIndex < sceneCount; sceneIndex += 1) {
+    const start = Math.floor((sceneIndex * units.length) / sceneCount)
+    const endExclusive = Math.max(start + 1, Math.floor(((sceneIndex + 1) * units.length) / sceneCount))
+    const chunk = units.slice(start, Math.min(endExclusive, units.length)).join(' ').trim()
+    beats.push(chunk || units[Math.min(start, units.length - 1)])
+  }
+
+  return beats.map((beat) => beat.replace(/\s+/g, ' ').trim())
 }
 
 function getWorkHistoryTimestampMs(item: WorkHistoryItem): number {
@@ -8225,6 +8264,37 @@ export default function App() {
             || (analysisContentType === 'auto'
               ? (FIXED_AFFILIATE_MODE === 'strict' ? 'tiktokshop' : 'outfitideas')
               : analysisContentType)
+
+          const scriptBeatReferences = buildTikTokScriptBeatReferences(
+            tiktokAnalysisResult.generatedScript,
+            res.scenes.length,
+          )
+
+          if (scriptBeatReferences.length > 0) {
+            res.scenes = res.scenes.map((scene, sceneIndex) => {
+              const beat = scriptBeatReferences[Math.min(sceneIndex, scriptBeatReferences.length - 1)]
+              if (!beat || beat.trim().length === 0) return scene
+
+              const narrativeWithScript = appendSentenceIfMissing(
+                scene.narrative,
+                `Script beat reference: ${beat}`,
+              )
+
+              const fullPromptLines = scene.fullPrompt
+                .split('\n')
+                .map((line) => line.startsWith('ACTION:')
+                  ? `ACTION: ${narrativeWithScript}`
+                  : line)
+
+              return {
+                ...scene,
+                narrative: narrativeWithScript,
+                fullPrompt: fullPromptLines.join('\n'),
+              }
+            })
+
+            pushLog(`[SCRIPT] Applied ${scriptBeatReferences.length} script beats to scene narratives`)
+          }
 
           res.createImagePrompt = buildCreateImagePrompt(resolvedType, analysisPromptNotes)
           setResult(res)
