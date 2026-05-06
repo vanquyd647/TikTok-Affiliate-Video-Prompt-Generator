@@ -5517,6 +5517,106 @@ function normalizeHistoryDuration(value: unknown, fallback = 32): number {
   return fallbackMatched ? fallbackMatched.value : DURATIONS[1].value
 }
 
+function resolveTikTokAnalysisContentType(value: unknown, fallback: ContentType = 'tiktokshop'): ContentType {
+  const fallbackType = CONTENT_TYPE_VALUES.includes(fallback as ContentType) ? fallback : 'tiktokshop'
+  const candidate = toHistoryString(value, '').toLowerCase()
+  if (!candidate) return fallbackType
+
+  if (CONTENT_TYPE_VALUES.includes(candidate as ContentType)) {
+    return candidate as ContentType
+  }
+
+  const compact = candidate.replace(/[^a-z0-9]/g, '')
+  const aliasMatches: Array<{ token: string; value: ContentType }> = [
+    { token: 'ootdmirror', value: 'ootdmirror' },
+    { token: 'outfitideas', value: 'outfitideas' },
+    { token: 'streetstyle', value: 'streetstyle' },
+    { token: 'partyoutfit', value: 'partyoutfit' },
+    { token: 'boutiquefeed', value: 'boutiquefeed' },
+    { token: 'tiktokshop', value: 'tiktokshop' },
+    { token: 'athleisure', value: 'athleisure' },
+    { token: 'sunnyaura', value: 'sunnyaura' },
+    { token: 'styling', value: 'styling' },
+    { token: 'luxury', value: 'luxury' },
+    { token: 'review', value: 'review' },
+    { token: 'grwm', value: 'grwm' },
+    { token: 'haul', value: 'haul' },
+    { token: 'fyp', value: 'fyp' },
+    { token: 'ootd', value: 'ootd' },
+  ]
+
+  const directMatch = aliasMatches.find((entry) => compact.includes(entry.token))
+  if (directMatch) return directMatch.value
+
+  if (compact.includes('tiktok') || compact.includes('shop')) return 'tiktokshop'
+  if (compact.includes('boutique')) return 'boutiquefeed'
+  if (compact.includes('mirror')) return 'ootdmirror'
+  if (compact.includes('lookbook') || compact.includes('outfitidea')) return 'outfitideas'
+  if (compact.includes('street')) return 'streetstyle'
+  if (compact.includes('party')) return 'partyoutfit'
+  if (compact.includes('sunny') || compact.includes('sun')) return 'sunnyaura'
+  if (compact.includes('getready')) return 'grwm'
+
+  return fallbackType
+}
+
+function resolveTikTokAnalysisDuration(value: unknown, fallback = 32): number {
+  const fallbackDuration = normalizeHistoryDuration(fallback, 32)
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return fallbackDuration
+
+  const closest = DURATIONS.reduce((best, option) => {
+    const bestGap = Math.abs(best.value - numeric)
+    const nextGap = Math.abs(option.value - numeric)
+    return nextGap < bestGap ? option : best
+  }, DURATIONS[0])
+
+  return closest.value
+}
+
+function buildPromptNotesFromTikTokAnalysis(
+  analysis: TikTokAnalysisResult,
+  baseNotes: string,
+  analysisNotes: string,
+): string {
+  const trimmedBaseNotes = baseNotes.trim()
+  const trimmedAnalysisNotes = analysisNotes.trim()
+
+  const beatSummary = analysis.sceneBeats
+    .slice(0, 6)
+    .map((beat) => {
+      const segments = [
+        `${beat.timestamp} ${beat.beatName}`.trim(),
+        beat.description.trim(),
+        beat.cameraHint.trim().length > 0 ? `Camera: ${beat.cameraHint.trim()}` : '',
+        beat.narrationHint.trim().length > 0 ? `Narration: ${beat.narrationHint.trim()}` : '',
+      ].filter((part) => part.length > 0)
+
+      return `- ${segments.join(' | ')}`
+    })
+    .join('\n')
+
+  const script = analysis.generatedScript.trim()
+  const scriptSnapshot = script.length > 1600
+    ? `${script.slice(0, 1600)}...`
+    : script
+
+  return [
+    trimmedBaseNotes ? `[USER NOTES]\n${trimmedBaseNotes}` : '',
+    trimmedAnalysisNotes ? `[ANALYSIS EXTRA NOTES]\n${trimmedAnalysisNotes}` : '',
+    '[TIKTOK ANALYSIS REFERENCE]',
+    `Detected content type: ${analysis.detectedContentType}`,
+    `Detected duration: ~${analysis.detectedDurationSec}s`,
+    analysis.hookStyle.trim().length > 0 ? `Hook style: ${analysis.hookStyle.trim()}` : '',
+    analysis.narrativeStructure.trim().length > 0 ? `Narrative structure: ${analysis.narrativeStructure.trim()}` : '',
+    analysis.ctaStyle.trim().length > 0 ? `CTA style: ${analysis.ctaStyle.trim()}` : '',
+    analysis.colorGrade.trim().length > 0 ? `Color grade: ${analysis.colorGrade.trim()}` : '',
+    analysis.pacing.trim().length > 0 ? `Pacing: ${analysis.pacing.trim()}` : '',
+    beatSummary.length > 0 ? `Scene beats:\n${beatSummary}` : '',
+    scriptSnapshot.length > 0 ? `Reference script:\n${scriptSnapshot}` : '',
+  ].filter((line) => line.trim().length > 0).join('\n\n')
+}
+
 function getWorkHistoryTimestampMs(item: WorkHistoryItem): number {
   const msFromNumber = Number.isFinite(item.createdAtMs) ? Number(item.createdAtMs) : NaN
   const msFromString = item.createdAt ? Date.parse(item.createdAt) : NaN
@@ -7933,6 +8033,249 @@ export default function App() {
     }
   }
 
+  const handleGeneratePromptFromTikTokAnalysis = async () => {
+    const MAX_ATTEMPTS = 3
+
+    if (!tiktokAnalysisResult) {
+      setTiktokAnalysisError('Chua co ket qua phan tich TikTok de tao prompt package.')
+      return
+    }
+
+    if (!apiKey.trim()) {
+      setTiktokAnalysisError('Vui long nhap Gemini API Key truoc khi tao prompt package.')
+      return
+    }
+
+    const fallbackContentType: ContentType = contentType === 'auto' ? 'tiktokshop' : contentType
+    const analysisContentType = resolveTikTokAnalysisContentType(
+      tiktokAnalysisResult.detectedContentType,
+      fallbackContentType,
+    )
+    const analysisDuration = resolveTikTokAnalysisDuration(tiktokAnalysisResult.detectedDurationSec, duration)
+    const analysisPromptNotes = buildPromptNotesFromTikTokAnalysis(tiktokAnalysisResult, notes, tiktokAnalysisNotes)
+
+    setGenerationMode('video_prompt')
+    setDuration(analysisDuration)
+    setContentType(analysisContentType)
+    setIsContentTypeManuallyLocked(analysisContentType !== 'auto')
+
+    setLoading(true)
+    setSelectedHistoryId(null)
+    setLoadingStageIndex(0)
+    setPromptToast({
+      kind: 'loading',
+      message: 'Dang tao Prompt Package tu phan tich TikTok, vui long cho trong giay lat...',
+    })
+    setError('')
+    setResult(null)
+    setErrorLogLines([])
+
+    const logLines: string[] = []
+    const pushLog = (line: string) => { logLines.push(line) }
+
+    pushLog(`[START] ${new Date().toISOString()} — source=tiktok-analysis model=${model} duration=${analysisDuration}s ratio=${aspectRatio} type=${analysisContentType}`)
+
+    try {
+      const currentProductImageId = productImage ? createProductImageId(productImage) : null
+      const usedLocationsForProduct = currentProductImageId
+        ? (productLocationHistory[currentProductImageId] || [])
+        : []
+
+      let lastAttemptError: Error | null = null
+
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (attempt > 1) {
+          pushLog(`[RETRY] Attempt ${attempt}/${MAX_ATTEMPTS} — retrying after failure...`)
+          setPromptToast({
+            kind: 'loading',
+            message: `Thu lai lan ${attempt}/${MAX_ATTEMPTS}...`,
+          })
+          setLoadingStageIndex(0)
+        } else {
+          pushLog(`[START] Attempt ${attempt}/${MAX_ATTEMPTS}`)
+        }
+
+        try {
+          const res = await generateWithGemini(
+            apiKey,
+            model,
+            faceImage,
+            productImage,
+            analysisDuration,
+            aspectRatio,
+            analysisPromptNotes,
+            analysisContentType,
+            usedLocationsForProduct,
+            outfitTypeLocationHistory,
+            FIXED_AFFILIATE_MODE,
+            FIXED_SALES_TEMPLATE,
+            videoPoseDirectionLock,
+            productCategory,
+          )
+
+          pushLog(`[OK] Attempt ${attempt} succeeded — keyframes=${res.keyframes.length} scenes=${res.scenes.length}`)
+          setErrorLogLines([...logLines])
+
+          const resolvedType: ResolvedContentType = res.resolvedContentType
+            || (analysisContentType === 'auto'
+              ? (FIXED_AFFILIATE_MODE === 'strict' ? 'tiktokshop' : 'outfitideas')
+              : analysisContentType)
+
+          res.createImagePrompt = buildCreateImagePrompt(resolvedType, analysisPromptNotes)
+          setResult(res)
+          setSelectedContentType(resolvedType)
+          setActiveTab('keyframes')
+          setPromptToast({
+            kind: 'success',
+            message: `Da tao Prompt Package tu phan tich TikTok${attempt > 1 ? ` (sau ${attempt} lan thu)` : ''}.`,
+          })
+
+          const generatedLocations = Array.from(
+            new Set(
+              res.keyframes
+                .map((keyframe) => keyframe.location.trim())
+                .filter((location) => location.length > 0)
+            )
+          )
+
+          const promptPackageForHistory = {
+            masterDNA: res.masterDNA,
+            createImagePrompt: res.createImagePrompt || '',
+            keyframes: res.keyframes.map((keyframe) => ({
+              index: keyframe.index,
+              timestamp: keyframe.timestamp,
+              subject: keyframe.subject,
+              action: keyframe.action,
+              facingDirection: keyframe.facingDirection || '',
+              location: keyframe.location,
+              camera: keyframe.camera,
+              lighting: keyframe.lighting,
+              style: keyframe.style,
+              fullPrompt: keyframe.fullPrompt,
+            })),
+            scenes: res.scenes.map((scene) => ({
+              index: scene.index,
+              timeRange: scene.timeRange,
+              narrative: scene.narrative,
+              startPose: scene.startPose,
+              endPose: scene.endPose,
+              cameraMovement: scene.cameraMovement,
+              locationFlow: scene.locationFlow || '',
+              fullPrompt: scene.fullPrompt,
+            })),
+          }
+
+          const workHistoryGeneratedAt = Date.now()
+
+          if (generatedLocations.length > 0) {
+            if (currentProductImageId) {
+              setProductLocationHistory((prev) => {
+                const existing = prev[currentProductImageId] || []
+                const merged = Array.from(new Set([...generatedLocations, ...existing]))
+                return {
+                  ...prev,
+                  [currentProductImageId]: merged.slice(0, MAX_LOCATION_HISTORY_PER_PRODUCT),
+                }
+              })
+            }
+
+            setOutfitTypeLocationHistory((prev) => {
+              const existing = prev[resolvedType] || []
+              const merged = Array.from(new Set([...generatedLocations, ...existing]))
+              return {
+                ...prev,
+                [resolvedType]: merged.slice(0, MAX_LOCATION_HISTORY_PER_OUTFIT_TYPE),
+              }
+            })
+          }
+
+          const historyNotes = notes.trim().length > 0
+            ? notes.trim()
+            : tiktokAnalysisNotes.trim()
+
+          void persistWorkHistory({
+            action: 'prompt',
+            model,
+            contentType: resolvedType,
+            notes: historyNotes,
+            generatedAt: workHistoryGeneratedAt,
+            metadata: {
+              generationMode: 'video_prompt',
+              generationSource: 'tiktok_analysis',
+              inputContentType: analysisContentType,
+              resolvedContentType: resolvedType,
+              duration: analysisDuration,
+              aspectRatio,
+              videoPoseDirectionLock,
+              lookbookStyleTone,
+              lookbookTheme,
+              keyframeCount: res.keyframes.length,
+              sceneCount: res.scenes.length,
+              generatedLocations: generatedLocations.slice(0, 10),
+              hasFaceImage: Boolean(faceImage),
+              hasProductImage: Boolean(productImage),
+              tiktokAnalysis: {
+                detectedContentType: tiktokAnalysisResult.detectedContentType,
+                detectedDurationSec: tiktokAnalysisResult.detectedDurationSec,
+                hookStyle: tiktokAnalysisResult.hookStyle,
+                narrativeStructure: tiktokAnalysisResult.narrativeStructure,
+                ctaStyle: tiktokAnalysisResult.ctaStyle,
+                colorGrade: tiktokAnalysisResult.colorGrade,
+                pacing: tiktokAnalysisResult.pacing,
+                sceneBeatCount: tiktokAnalysisResult.sceneBeats.length,
+              },
+              promptPackage: promptPackageForHistory,
+            },
+          })
+            .then(() => loadWorkHistory({ silent: true }))
+            .catch((saveError) => {
+              console.warn(
+                'Could not save prompt work history:',
+                saveError instanceof Error ? saveError.message : saveError
+              )
+            })
+
+          return
+        } catch (attemptErr: any) {
+          const msg = attemptErr?.message || 'Unknown error'
+          pushLog(`✖ [ERROR] Attempt ${attempt} failed: ${msg}`)
+          lastAttemptError = attemptErr instanceof Error ? attemptErr : new Error(msg)
+
+          const isRetryable = !msg.toLowerCase().includes('api key')
+            && !msg.toLowerCase().includes('quota')
+            && !msg.toLowerCase().includes('permission')
+            && attempt < MAX_ATTEMPTS
+
+          if (!isRetryable) {
+            pushLog('[WARN] Error is not retryable or max attempts reached. Stopping.')
+            break
+          }
+        }
+      }
+
+      const finalMsg = lastAttemptError?.message || 'Failed to generate prompts from TikTok analysis'
+      pushLog(`[ERROR] All ${MAX_ATTEMPTS} attempts failed. Last error: ${finalMsg}`)
+      setErrorLogLines([...logLines])
+      setError(finalMsg)
+      setPromptToast({
+        kind: 'error',
+        message: finalMsg,
+      })
+    } catch (err: any) {
+      const message = err?.message || 'Failed to generate prompts from TikTok analysis'
+      pushLog(`[ERROR] Fatal: ${message}`)
+      setErrorLogLines([...logLines])
+      setError(message)
+      setPromptToast({
+        kind: 'error',
+        message,
+      })
+    } finally {
+      setLoading(false)
+      setPromptToast((prev) => (prev?.kind === 'loading' ? null : prev))
+    }
+  }
+
   // Export All
   const handleExportAll = () => {
     if (!hasAnyResult) return
@@ -9458,6 +9801,34 @@ export default function App() {
                   {/* TikTok Analysis Tab */}
                   {tiktokAnalysisResult && activeTab === 'tiktokanalysis' && (
                     <>
+                      <div className="prompt-card" style={{ borderColor: 'rgba(14,165,233,0.35)', marginBottom: 14 }}>
+                        <div className="prompt-card-body">
+                          <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 10 }}>
+                            Dung ket qua phan tich (content type + duration + scene beats + script) de tao Prompt Package video theo cung nhip cau truc.
+                          </p>
+                          <button
+                            type="button"
+                            className={`btn-generate btn-generate-secondary ${loading ? 'loading' : ''}`}
+                            onClick={handleGeneratePromptFromTikTokAnalysis}
+                            disabled={loading || tiktokAnalysisLoading || !canGenerate}
+                            style={{ background: 'linear-gradient(135deg, #0284c7, #0ea5e9)' }}
+                          >
+                            {loading ? (
+                              <>
+                                <div className="spinner" />
+                                Dang tao Prompt Package tu phan tich...
+                              </>
+                            ) : (
+                              <>
+                                <Wand2 size={18} />
+                                Tao Prompt Package tu Phan tich TikTok
+                                <ArrowRight size={16} />
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
                       {/* Overview */}
                       <div className="dna-section" style={{ marginBottom: 16 }}>
                         <div className="dna-title" style={{ color: '#0ea5e9' }}>
