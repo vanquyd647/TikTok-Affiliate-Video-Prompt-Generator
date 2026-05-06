@@ -5742,56 +5742,6 @@ function resolveTikTokAnalysisDuration(value: unknown, fallback = 32): number {
   return closest.value
 }
 
-function buildPromptNotesFromTikTokAnalysis(
-  analysis: TikTokAnalysisResult,
-  baseNotes: string,
-  analysisNotes: string,
-): string {
-  const trimmedBaseNotes = baseNotes.trim()
-  const trimmedAnalysisNotes = analysisNotes.trim()
-
-  const beatSummary = analysis.sceneBeats
-    .slice(0, 6)
-    .map((beat) => {
-      const segments = [
-        `${beat.timestamp} ${beat.beatName}`.trim(),
-        beat.cameraHint.trim().length > 0 ? `Camera: ${beat.cameraHint.trim()}` : '',
-        beat.narrationHint.trim().length > 0 ? `Narration: ${beat.narrationHint.trim()}` : '',
-      ].filter((part) => part.length > 0)
-
-      return `- ${segments.join(' | ')}`
-    })
-    .join('\n')
-
-  const script = analysis.generatedScript.trim()
-  const scriptSnapshot = script.length > 1600
-    ? `${script.slice(0, 1600)}...`
-    : script
-
-  return [
-    trimmedBaseNotes ? `[USER NOTES]\n${trimmedBaseNotes}` : '',
-    trimmedAnalysisNotes ? `[ANALYSIS EXTRA NOTES]\n${trimmedAnalysisNotes}` : '',
-    '[HARD LOCK - INPUT ASSET PRIORITY]',
-    'Use ONLY the currently uploaded face image and product image for all visual identity and garment details.',
-    'Do NOT copy or infer face identity, body traits, outfit design, color, fabric, accessories, or props from the analyzed TikTok video.',
-    'Use TikTok analysis ONLY for story structure, pacing, beat timing, camera rhythm, and CTA flow.',
-    '[SCRIPT EXECUTION LOCK - MANDATORY]',
-    'Use the reference script template as the primary narrative skeleton for scene progression.',
-    'Scene narratives must follow script beats in order (hook -> value -> proof -> close).',
-    'If script includes bracketed camera/stage cues, map them into scene camera movement and action descriptions.',
-    '[TIKTOK ANALYSIS REFERENCE]',
-    `Detected content type: ${analysis.detectedContentType}`,
-    `Detected duration: ~${analysis.detectedDurationSec}s`,
-    analysis.hookStyle.trim().length > 0 ? `Hook style: ${analysis.hookStyle.trim()}` : '',
-    analysis.narrativeStructure.trim().length > 0 ? `Narrative structure: ${analysis.narrativeStructure.trim()}` : '',
-    analysis.ctaStyle.trim().length > 0 ? `CTA style: ${analysis.ctaStyle.trim()}` : '',
-    analysis.colorGrade.trim().length > 0 ? `Color grade: ${analysis.colorGrade.trim()}` : '',
-    analysis.pacing.trim().length > 0 ? `Pacing: ${analysis.pacing.trim()}` : '',
-    beatSummary.length > 0 ? `Scene beats (structure only):\n${beatSummary}` : '',
-    scriptSnapshot.length > 0 ? `Reference script template (MANDATORY structure source, adapt to current uploaded product + face only):\n${scriptSnapshot}` : '',
-  ].filter((line) => line.trim().length > 0).join('\n\n')
-}
-
 function buildTikTokScriptBeatReferences(script: string, sceneCount: number): string[] {
   if (sceneCount <= 0) return []
 
@@ -6607,6 +6557,279 @@ Return this exact JSON schema (no extra keys, no markdown wrapping):
     }
   } catch (error: any) {
     throw new Error(error?.message || 'Gemini TikTok analysis failed')
+  }
+}
+
+async function generatePromptPackageFromTikTokAnalysisWithGemini(
+  apiKey: string,
+  model: string,
+  faceImage: string | null,
+  productImage: string | null,
+  duration: number,
+  aspectRatio: '9:16' | '16:9',
+  analysis: TikTokAnalysisResult,
+  reviewNotes: string,
+): Promise<GenerateResult> {
+  const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
+  const sceneCount = durationInfo.scenes
+  const keyframeCount = durationInfo.keyframes
+  const resolvedContentTypeCandidate = resolveTikTokAnalysisContentType(analysis.detectedContentType, 'outfitideas')
+  const resolvedContentType: ResolvedContentType = resolvedContentTypeCandidate === 'auto'
+    ? 'outfitideas'
+    : resolvedContentTypeCandidate
+
+  const reviewProductBrief = reviewNotes.trim().length > 0
+    ? reviewNotes.trim()
+    : 'San pham can review duoc xac dinh tu input hien tai.'
+
+  const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
+  const sceneBeatSummary = analysis.sceneBeats
+    .slice(0, 8)
+    .map((beat) => [
+      `${beat.timestamp} ${beat.beatName}`.trim(),
+      beat.description.trim(),
+      beat.cameraHint.trim().length > 0 ? `Camera: ${beat.cameraHint.trim()}` : '',
+      beat.narrationHint.trim().length > 0 ? `Narration: ${beat.narrationHint.trim()}` : '',
+    ].filter((part) => part.length > 0).join(' | '))
+    .join('\n')
+
+  const parts: GeminiContentPart[] = []
+  if (faceImage) {
+    const faceBase64 = faceImage.split(',')[1] || faceImage
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: faceBase64,
+      },
+    })
+    parts.push({ text: 'FACE INPUT LOCK: preserve face identity from this input image only.' })
+  }
+
+  if (productImage) {
+    const productBase64 = productImage.split(',')[1] || productImage
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: productBase64,
+      },
+    })
+    parts.push({ text: 'PRODUCT INPUT LOCK: this input image is the product to review and is the only source of product details.' })
+  }
+
+  const prompt = `You are a TikTok prompt-packaging specialist in DETACHED ANALYSIS MODE.
+
+GOAL:
+- Build a complete prompt package from TikTok analysis result while staying detached from the default core rule stack.
+- Keep only video configuration logic (duration, aspect ratio, scene/keyframe counts).
+
+VIDEO CONFIG:
+- Duration: ${duration}s
+- Aspect ratio: ${aspectRatio}
+- Required scenes: ${sceneCount}
+- Required keyframes: ${keyframeCount}
+
+REVIEW PRODUCT SOURCE (MANDATORY):
+- Review product context must come from REVIEW NOTES below.
+- Product visual details must come only from current PRODUCT input image (if provided).
+
+REVIEW NOTES (PRIMARY PRODUCT CONTEXT):
+${reviewProductBrief}
+
+TIKTOK ANALYSIS (STRUCTURE-ONLY REFERENCE):
+- detectedContentType: ${analysis.detectedContentType}
+- detectedDurationSec: ${analysis.detectedDurationSec}
+- hookStyle: ${analysis.hookStyle}
+- narrativeStructure: ${analysis.narrativeStructure}
+- ctaStyle: ${analysis.ctaStyle}
+- colorGrade: ${analysis.colorGrade}
+- pacing: ${analysis.pacing}
+
+SCENE BEATS:
+${sceneBeatSummary || 'No explicit scene beats provided'}
+
+SCRIPT TEMPLATE TO FOLLOW:
+${analysis.generatedScript || 'No script provided'}
+
+HARD CONSTRAINTS:
+- Do not apply any external/core template enforcement.
+- Use analyzed TikTok video only as structure and rhythm reference.
+- Never copy product identity/outfit details from analyzed TikTok video.
+- Keep product review focus anchored to REVIEW NOTES and current PRODUCT input image.
+- Maintain believable social-native movement and camera continuity.
+
+Return STRICT JSON only in this schema:
+{
+  "masterDNA": "...",
+  "keyframes": [
+    {
+      "index": 0,
+      "action": "...",
+      "facingDirection": "front|back|left|right|three-quarter-left|three-quarter-right",
+      "location": "...",
+      "camera": "...",
+      "lighting": "...",
+      "style": "..."
+    }
+  ],
+  "scenes": [
+    {
+      "index": 0,
+      "narrative": "...",
+      "cameraMovement": "..."
+    }
+  ]
+}
+
+Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
+
+  try {
+    const parsed = await requestGeminiJsonWithParts(
+      apiKey,
+      model,
+      [...parts, { text: prompt }],
+      0.66,
+      6144,
+    )
+
+    const asRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
+    const toSafeString = (value: unknown, fallback: string) => {
+      if (typeof value !== 'string') return fallback
+      const trimmed = value.trim()
+      return trimmed.length > 0 ? trimmed : fallback
+    }
+
+    const resolveFacing = (value: unknown, fallback: ConcreteFacingDirection): ConcreteFacingDirection => {
+      const parsedFacing = normalizeFacingDirectionToken(value)
+      return parsedFacing === 'unknown' ? fallback : parsedFacing
+    }
+
+    const parsedRecord: Record<string, unknown> = asRecord(parsed) ? parsed : {}
+    const rawKeyframes: unknown[] = Array.isArray(parsedRecord.keyframes)
+      ? parsedRecord.keyframes
+      : []
+    const rawScenes: unknown[] = Array.isArray(parsedRecord.scenes)
+      ? parsedRecord.scenes
+      : []
+
+    const keyframes: KeyframePrompt[] = Array.from({ length: keyframeCount }, (_, index) => {
+      const raw = asRecord(rawKeyframes[index]) ? rawKeyframes[index] as Record<string, unknown> : {}
+      const scriptBeatIndex = Math.min(
+        sceneCount - 1,
+        Math.floor((index * sceneCount) / Math.max(1, keyframeCount - 1)),
+      )
+      const fallbackScriptBeat = scriptBeatReferences[scriptBeatIndex]
+      const fallbackAction = fallbackScriptBeat
+        ? `Product review movement follows script beat: ${fallbackScriptBeat}`
+        : (analysis.sceneBeats[scriptBeatIndex]?.description || 'Natural product review motion with clear detail demonstration.')
+
+      const action = toSafeString(raw.action, fallbackAction)
+      const fallbackFacing = RULE32_FACING_SEQUENCE[index % RULE32_FACING_SEQUENCE.length]
+      const facingDirection = resolveFacing(raw.facingDirection ?? raw.action, fallbackFacing)
+      const location = toSafeString(raw.location, 'Street fashion corner near shopping district, Hoan Kiem, Hanoi, Vietnam')
+      const camera = toSafeString(
+        raw.camera,
+        analysis.sceneBeats[scriptBeatIndex]?.cameraHint || 'Social-native camera framing with controlled movement and stable axis.',
+      )
+      const lighting = toSafeString(raw.lighting, `Natural soft lighting with ${analysis.colorGrade || 'balanced'} color mood and clear product details.`)
+      const style = toSafeString(raw.style, `TikTok social-native product review style; pacing ${analysis.pacing || 'mid-pace'}.`)
+      const timestamp = `${Math.round((index * duration) / Math.max(1, keyframeCount - 1))}s`
+      const subject = buildDefaultFrameSubject(aspectRatio)
+
+      return {
+        index,
+        timestamp,
+        subject,
+        action,
+        facingDirection,
+        location,
+        camera,
+        lighting,
+        style,
+        fullPrompt: buildNanoBananaProFramePrompt({
+          subject,
+          action,
+          facingDirection,
+          location,
+          camera,
+          lighting,
+          style,
+          aspectRatio,
+        }),
+      }
+    })
+
+    const rawMasterDNA = toSafeString(parsedRecord.masterDNA, '')
+    const masterDNA = rawMasterDNA.length > 0
+      ? rawMasterDNA
+      : [
+        '[FACE LOCK]: Keep face identity from current input image only (if provided).',
+        '[PRODUCT LOCK]: Keep product details from current input image only (if provided).',
+        `[REVIEW PRODUCT NOTES]: ${reviewProductBrief}`,
+        '[ANALYSIS TRANSFER]: Use TikTok analysis as structure-only reference (hook/value/proof/close).',
+      ].join('\n')
+
+    const scenes: ScenePrompt[] = Array.from({ length: sceneCount }, (_, index) => {
+      const raw = asRecord(rawScenes[index]) ? rawScenes[index] as Record<string, unknown> : {}
+      const startSec = Math.round((index * duration) / sceneCount)
+      const endSec = Math.round(((index + 1) * duration) / sceneCount)
+      const scriptBeat = scriptBeatReferences[index] || analysis.sceneBeats[index]?.narrationHint || analysis.sceneBeats[index]?.description || ''
+      const fallbackNarrative = scriptBeat.length > 0
+        ? `Follow script beat: ${scriptBeat}`
+        : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
+
+      const narrative = appendSentenceIfMissing(
+        toSafeString(raw.narrative, fallbackNarrative),
+        scriptBeat.length > 0 ? `Script beat reference: ${scriptBeat}` : '',
+      )
+
+      const cameraMovement = toSafeString(
+        raw.cameraMovement,
+        analysis.sceneBeats[index]?.cameraHint || 'Controlled camera movement with stable direction and social-native pacing.',
+      )
+
+      const startPose = keyframes[index]?.action || ''
+      const endPose = keyframes[index + 1]?.action || keyframes[index]?.action || ''
+      const startLocation = keyframes[index]?.location || ''
+      const endLocation = keyframes[index + 1]?.location || startLocation
+      const locationFlow = normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
+        ? `Hold location: ${startLocation}`
+        : `${startLocation} -> ${endLocation}`
+      const composition = keyframes[index]?.camera || ''
+      const lighting = keyframes[index]?.lighting || ''
+      const timeRange = `${startSec}s-${endSec}s`
+
+      return {
+        index,
+        timeRange,
+        subject: masterDNA,
+        narrative,
+        startPose,
+        endPose,
+        composition,
+        cameraMovement,
+        lighting,
+        locationFlow,
+        fullPrompt: [
+          `SUBJECT: ${masterDNA}`,
+          `ACTION: ${narrative}`,
+          composition ? `COMPOSITION: ${composition}` : '',
+          `CAMERA: ${cameraMovement}`,
+          lighting ? `LIGHTING: ${lighting}` : '',
+        ].filter(Boolean).join('\n'),
+      }
+    })
+
+    return {
+      masterDNA,
+      keyframes,
+      scenes,
+      createImagePrompt: buildCreateImagePrompt(resolvedContentType, reviewProductBrief),
+      resolvedContentType,
+      affiliateModeUsed: FIXED_AFFILIATE_MODE,
+      salesTemplateUsed: FIXED_SALES_TEMPLATE,
+    }
+  } catch (error: any) {
+    throw new Error(error?.message || 'Gemini detached TikTok prompt package generation failed')
   }
 }
 
@@ -8263,18 +8486,15 @@ export default function App() {
       return
     }
 
-    if (!faceImage || !productImage) {
-      setTiktokAnalysisError('Vui long tai ca anh Face va anh San pham dau vao. Prompt package tu phan tich TikTok chi su dung 2 anh dau vao nay.')
-      return
-    }
-
     const fallbackContentType: ContentType = contentType === 'auto' ? 'tiktokshop' : contentType
     const analysisContentType = resolveTikTokAnalysisContentType(
       tiktokAnalysisResult.detectedContentType,
       fallbackContentType,
     )
     const analysisDuration = resolveTikTokAnalysisDuration(tiktokAnalysisResult.detectedDurationSec, duration)
-    const analysisPromptNotes = buildPromptNotesFromTikTokAnalysis(tiktokAnalysisResult, notes, tiktokAnalysisNotes)
+    const reviewProductNotes = tiktokAnalysisNotes.trim().length > 0
+      ? tiktokAnalysisNotes.trim()
+      : 'San pham can review duoc xac dinh tu input hien tai.'
 
     setGenerationMode('video_prompt')
     setDuration(analysisDuration)
@@ -8295,13 +8515,10 @@ export default function App() {
     const logLines: string[] = []
     const pushLog = (line: string) => { logLines.push(line) }
 
-    pushLog(`[START] ${new Date().toISOString()} — source=tiktok-analysis model=${model} duration=${analysisDuration}s ratio=${aspectRatio} type=${analysisContentType}`)
+    pushLog(`[START] ${new Date().toISOString()} — source=tiktok-analysis-detached model=${model} duration=${analysisDuration}s ratio=${aspectRatio} type=${analysisContentType}`)
 
     try {
       const currentProductImageId = productImage ? createProductImageId(productImage) : null
-      const usedLocationsForProduct = currentProductImageId
-        ? (productLocationHistory[currentProductImageId] || [])
-        : []
 
       let lastAttemptError: Error | null = null
 
@@ -8318,21 +8535,15 @@ export default function App() {
         }
 
         try {
-          const res = await generateWithGemini(
+          const res = await generatePromptPackageFromTikTokAnalysisWithGemini(
             apiKey,
             model,
             faceImage,
             productImage,
             analysisDuration,
             aspectRatio,
-            analysisPromptNotes,
-            analysisContentType,
-            usedLocationsForProduct,
-            outfitTypeLocationHistory,
-            FIXED_AFFILIATE_MODE,
-            FIXED_SALES_TEMPLATE,
-            videoPoseDirectionLock,
-            productCategory,
+            tiktokAnalysisResult,
+            reviewProductNotes,
           )
 
           pushLog(`[OK] Attempt ${attempt} succeeded — keyframes=${res.keyframes.length} scenes=${res.scenes.length}`)
@@ -8343,38 +8554,8 @@ export default function App() {
               ? (FIXED_AFFILIATE_MODE === 'strict' ? 'tiktokshop' : 'outfitideas')
               : analysisContentType)
 
-          const scriptBeatReferences = buildTikTokScriptBeatReferences(
-            tiktokAnalysisResult.generatedScript,
-            res.scenes.length,
-          )
-
-          if (scriptBeatReferences.length > 0) {
-            res.scenes = res.scenes.map((scene, sceneIndex) => {
-              const beat = scriptBeatReferences[Math.min(sceneIndex, scriptBeatReferences.length - 1)]
-              if (!beat || beat.trim().length === 0) return scene
-
-              const narrativeWithScript = appendSentenceIfMissing(
-                scene.narrative,
-                `Script beat reference: ${beat}`,
-              )
-
-              const fullPromptLines = scene.fullPrompt
-                .split('\n')
-                .map((line) => line.startsWith('ACTION:')
-                  ? `ACTION: ${narrativeWithScript}`
-                  : line)
-
-              return {
-                ...scene,
-                narrative: narrativeWithScript,
-                fullPrompt: fullPromptLines.join('\n'),
-              }
-            })
-
-            pushLog(`[SCRIPT] Applied ${scriptBeatReferences.length} script beats to scene narratives`)
-          }
-
-          res.createImagePrompt = buildCreateImagePrompt(resolvedType, analysisPromptNotes)
+          pushLog('[SCRIPT] Detached analysis script mode active (structure transferred without core-rule forcing)')
+          res.createImagePrompt = buildCreateImagePrompt(resolvedType, reviewProductNotes)
           setResult(res)
           setSelectedContentType(resolvedType)
           setActiveTab('keyframes')
@@ -8442,9 +8623,7 @@ export default function App() {
             })
           }
 
-          const historyNotes = notes.trim().length > 0
-            ? notes.trim()
-            : tiktokAnalysisNotes.trim()
+          const historyNotes = reviewProductNotes
 
           void persistWorkHistory({
             action: 'prompt',
@@ -8454,7 +8633,8 @@ export default function App() {
             generatedAt: workHistoryGeneratedAt,
             metadata: {
               generationMode: 'video_prompt',
-              generationSource: 'tiktok_analysis',
+              generationSource: 'tiktok_analysis_detached',
+              reviewProductSource: 'tiktok_analysis_notes',
               inputContentType: analysisContentType,
               resolvedContentType: resolvedType,
               duration: analysisDuration,
@@ -9401,9 +9581,12 @@ export default function App() {
                   className="input-field"
                   value={tiktokAnalysisNotes}
                   onChange={(e) => setTiktokAnalysisNotes(e.target.value)}
-                  placeholder="Ví dụ: video bán áo sơ mi, phong cách OOTD, muốn kịch bản theo tone tự nhiên..."
+                  placeholder="Ví dụ: san pham can review la chan vay xep ly den, nhan manh form A-line, eo cao, de phoi do di lam..."
                   rows={2}
                 />
+                <p className="ai-task-hint" style={{ marginTop: 6, marginBottom: 0 }}>
+                  O phan nay dung de mo ta san pham can review. Khi tao Prompt Package tu phan tich TikTok, he thong uu tien thong tin nay cho noi dung san pham.
+                </p>
               </div>
 
               <button
@@ -10057,7 +10240,7 @@ export default function App() {
                       <div className="prompt-card" style={{ borderColor: 'rgba(14,165,233,0.35)', marginBottom: 14 }}>
                         <div className="prompt-card-body">
                           <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 10 }}>
-                            Dung ket qua phan tich (content type + duration + scene beats + script) de tao Prompt Package video theo cung nhip cau truc.
+                            Dung ket qua phan tich de chuyen giao nhip cau truc video (hook/beat/script) trong detached mode. Luong nay khong ep core-rule stack; cau hinh video giu nguyen theo duration/aspect ratio, va san pham review uu tien theo "Ghi chu them (tuy chon)".
                           </p>
                           <button
                             type="button"
