@@ -3187,36 +3187,64 @@ async function generateWithGemini(
   const selectedProductCategoryOption = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === normalizedProductCategory)
   const selectedProductCategoryGroup = selectedProductCategoryOption?.group || 'all'
   const hasExplicitProductCategoryLock = normalizedProductCategory !== 'auto' && Boolean(selectedProductCategoryOption)
-  const isSkirtCategoryLock = hasExplicitProductCategoryLock && selectedProductCategoryGroup === 'skirts'
   const productCategoryLabel = selectedProductCategoryOption?.label || 'Auto Boutique'
+  const productCategoryDetailHint = selectedProductCategoryOption?.detailHint || ''
+  const isTikTokAnalysisReferenceMode = /\[TIKTOK ANALYSIS REFERENCE\]/i.test(notes)
   const productCategoryHeroByGroup: Record<ProductCategoryGroup, string> = {
-    all: 'selected product category item',
-    tops: 'topwear item',
-    bottoms: 'bottomwear item',
-    dresses: 'dress item',
-    skirts: 'skirt item',
-    outerwear: 'outerwear item',
-    loungewear_sleepwear: 'loungewear/sleepwear item',
-    lingerie_swimwear: 'lingerie/swimwear item',
-    activewear: 'activewear item',
-    traditional_festive: 'traditional/festive item',
-    accessories_footwear: 'accessory/footwear item',
+    all: 'selected product from the product reference image',
+    tops: 'selected topwear product from the product reference image',
+    bottoms: 'selected bottomwear product from the product reference image',
+    dresses: 'selected dress product from the product reference image',
+    skirts: 'selected skirt product from the product reference image',
+    outerwear: 'selected outerwear product from the product reference image',
+    loungewear_sleepwear: 'selected loungewear/sleepwear product from the product reference image',
+    lingerie_swimwear: 'selected lingerie/swimwear product from the product reference image',
+    activewear: 'selected activewear product from the product reference image',
+    traditional_festive: 'selected traditional/festive product from the product reference image',
+    accessories_footwear: 'selected accessory/footwear product from the product reference image',
+  }
+  const productCategoryReviewFocusByGroup: Record<ProductCategoryGroup, string> = {
+    all: 'Review exactly the selected product from the product image with clear fit/material/detail proof.',
+    tops: 'Review topwear proof points from the product image: neckline/strap/sleeve/cut, bust fit, fabric texture, and upper-body movement.',
+    bottoms: 'Review bottomwear proof points from the product image: waistband, rise, hip-thigh fit, leg silhouette, drape, and movement.',
+    dresses: 'Review dress proof points from the product image: neckline, waist shaping, silhouette, length, hemline, drape, and movement.',
+    skirts: 'Review skirt proof points from the product image: waistline, silhouette/cut, length, hemline, pleats/slit, drape, and movement.',
+    outerwear: 'Review outerwear proof points from the product image: shoulder fit, layering room, closure details, material structure, and movement comfort.',
+    loungewear_sleepwear: 'Review loungewear/sleepwear proof points from the product image: softness, comfort fit, stretch, and day-night wearability.',
+    lingerie_swimwear: 'Review lingerie/swimwear proof points from the product image: support/coverage, strap/cup fit, stretch recovery, and comfort in motion.',
+    activewear: 'Review activewear proof points from the product image: compression/support zones, stretch, sweat-friendly comfort, and movement stability.',
+    traditional_festive: 'Review traditional/festive proof points from the product image: cultural silhouette fidelity, material details, fit, and movement elegance.',
+    accessories_footwear: 'Review accessory/footwear proof points from the product image: structure, comfort, finish details, and practical wear use-cases.',
   }
   const productCategoryHeroLabel = hasExplicitProductCategoryLock
-    ? (productCategoryHeroByGroup[selectedProductCategoryGroup] || selectedProductCategoryOption?.label || 'selected product category item')
+    ? (productCategoryHeroByGroup[selectedProductCategoryGroup] || selectedProductCategoryOption?.label || 'selected product from the product reference image')
     : 'auto'
+  const productCategoryReviewFocusText = hasExplicitProductCategoryLock
+    ? productCategoryReviewFocusByGroup[selectedProductCategoryGroup] || productCategoryReviewFocusByGroup.all
+    : ''
   const productCategoryFocusRules = hasExplicitProductCategoryLock
     ? `PRODUCT CATEGORY FOCUS LOCK (MANDATORY):
 - Selected category is locked: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()}).
-- Treat ${productCategoryHeroLabel} as the only hero product in all keyframes and scenes.
+- Determine hero product by selected category using the PRODUCT reference image, not by whichever garment appears largest.
+- Treat ${productCategoryHeroLabel} as the only review hero product in all keyframes and scenes.
 - If reference images include multiple garments, keep non-selected garments as styling context only and never describe them as the featured product.
-${isSkirtCategoryLock ? '- SKIRT-SPECIFIC LOCK: prioritize skirt fit, waistline, hemline, pleats/drape, and movement proof; corset/top can appear only as supporting styling context.' : ''}`
+- ${productCategoryDetailHint ? `Category detail anchor: ${productCategoryDetailHint}` : 'Category detail anchor: use selected category cues visible in the product image.'}
+- Category review focus: ${productCategoryReviewFocusText}`
     : 'PRODUCT CATEGORY FOCUS MODE: AUTO (no explicit category lock).'
   const productCategoryFocusSentence = hasExplicitProductCategoryLock
-    ? `Hero product focus: ${productCategoryHeroLabel}.`
+    ? `Hero review product: ${productCategoryLabel}, extracted from the product reference image.`
     : ''
-  const productCategorySkirtFocusSentence = isSkirtCategoryLock
-    ? 'Skirt focus lock: upper garments (corset/top/blouse/shirt) are supporting styling only, not the featured product.'
+  const productCategoryReviewFocusSentence = hasExplicitProductCategoryLock
+    ? `Category review focus: ${productCategoryReviewFocusText}`
+    : ''
+  const tiktokAnalysisReferenceLockRules = isTikTokAnalysisReferenceMode
+    ? `TIKTOK SCRIPT TRANSFER LOCK (MANDATORY):
+- Use analyzed TikTok video only as script/beat/camera-rhythm reference.
+- Never copy product identity/outfit details from analyzed video.
+- Hero product and review evidence must come from current input product image and selected category lock.`
+    : 'TIKTOK SCRIPT TRANSFER LOCK: inactive.'
+  const tiktokAnalysisReferenceLockSentence = isTikTokAnalysisReferenceMode
+    ? 'TikTok analysis is structure-only reference; product review must stay anchored to the current input product image.'
     : ''
   const hasVideoPoseDirectionLock = poseDirectionLock !== 'auto'
   const videoPoseDirectionLockText = hasVideoPoseDirectionLock
@@ -3605,6 +3633,7 @@ Rules:
 - ${hasExplicitProductCategoryLock
   ? `Category lock is ACTIVE: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()}). If references contain multiple garments, set garmentFacts for this selected category as hero product and treat other pieces as supporting context only.`
   : 'Category lock is AUTO: infer primary garment category from references.'}
+- ${tiktokAnalysisReferenceLockRules}
 ${notes ? `USER NOTES: ${notes}` : ''}`
 
     const visualExtractCacheKey = JSON.stringify({
@@ -3658,6 +3687,7 @@ INPUT CONTEXT:
 - Diversity seed: ${diversitySeed}
 
 ${productCategoryFocusRules}
+${tiktokAnalysisReferenceLockRules}
 
 VISUAL ANALYSIS JSON:
 ${safeJsonStringify(visualAnalysis)}
@@ -3715,6 +3745,7 @@ ${planningLocationContinuityRule}
 - [COMMON] Keep action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
 - [COMMON] USER NOTES PRIORITY: if user notes are provided, always apply user intent first; default guidance may be used only for dimensions user notes do not specify.
 - [COMMON] PRODUCT CATEGORY LOCK: when category lock is active, selected category is the hero product; non-selected garments are styling context only.
+- [COMMON] TIKTOK SCRIPT TRANSFER LOCK: when active, use analyzed TikTok video as structure-only reference; product identity/review details must come from current input product image.
 - [COMMON] For detail-sensitive garments (for example backless/strappy/multi-strap), avoid forced full-direction cycling; prefer stable facing continuity and controlled pivots.
 - [TYPE=OOTDMIRROR] Enforce mirror-fitcheck setup across all scenes.
 - [TYPE=OOTD] Enforce single-corner contextual studio setup across all scenes (no plain seamless background).
@@ -4363,6 +4394,7 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - Location continuity mode: ${enforceSinglePrimaryLocation ? 'SINGLE PRIMARY LOCATION' : 'USER-NOTES MULTI-LOCATION'}
 
 ${productCategoryFocusRules}
+${tiktokAnalysisReferenceLockRules}
 
 AFFILIATE OBJECTIVE:
 ${affiliateObjectiveForFinal}
@@ -4547,6 +4579,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
 
 ${productCategoryFocusRules}
+${tiktokAnalysisReferenceLockRules}
 
 ${enforceSinglePrimaryLocation ? 'PRIMARY LOCATION LOCK (DEFAULT; SUBORDINATE TO RULE 30):' : 'LOCATION CONTINUITY MODE (USER NOTES OVERRIDE ACTIVE):'}
 ${enforceSinglePrimaryLocation
@@ -4698,6 +4731,7 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 - ${fitModelRuleLockRepairHint}
 
 ${productCategoryFocusRules}
+${tiktokAnalysisReferenceLockRules}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
@@ -4789,37 +4823,81 @@ Return STRICT JSON only, same schema:
       return trimmed.length > 0 ? trimmed : fallback
     }
 
-    const rewriteSkirtHeroConflicts = (value: string): string => {
+    const rewriteCategoryHeroConflicts = (value: string): string => {
       let next = value
+      const heroReplacement = `hero product is the selected ${productCategoryLabel} from the product reference image`
+      const focusReplacement = 'focus on selected product details from the product reference image'
 
-      next = next.replace(
-        /\b(?:hero|featured|primary|main)\s+(?:product|item|garment)?\s*(?:is|:)?\s*(?:the\s+|a\s+)?(?:corset(?:\s+top)?|top|blouse|shirt|camisole|cami|tank(?:\s+top)?|halter(?:\s+top)?)\b/gi,
-        'hero product is the skirt',
-      )
-      next = next.replace(
-        /\bfocus(?:es|ed|ing)?\s+on\s+(?:the\s+)?(?:corset(?:\s+top)?|top|blouse|shirt|camisole|cami|tank(?:\s+top)?|halter(?:\s+top)?)\b/gi,
-        'focus on the skirt silhouette',
-      )
+      const replaceHeroAndFocusMentions = (termPattern: string, shouldReplace: boolean) => {
+        if (!shouldReplace) return
+
+        const heroPattern = new RegExp(`\\b(?:hero|featured|primary|main)\\s+(?:product|item|garment)?\\s*(?:is|:)?\\s*(?:the\\s+|a\\s+)?${termPattern}\\b`, 'gi')
+        const focusPattern = new RegExp(`\\bfocus(?:es|ed|ing)?\\s+on\\s+(?:the\\s+)?${termPattern}\\b`, 'gi')
+        next = next.replace(heroPattern, heroReplacement)
+        next = next.replace(focusPattern, focusReplacement)
+      }
+
+      replaceHeroAndFocusMentions('(?:corset(?:\\s+top)?|top|blouse|shirt|camisole|cami|tank(?:\\s+top)?|halter(?:\\s+top)?)', selectedProductCategoryGroup !== 'tops')
+      replaceHeroAndFocusMentions('(?:pants?|trousers?|jeans?|shorts?|joggers?|leggings?|cargo(?:\\s+pants?)?)', selectedProductCategoryGroup !== 'bottoms')
+      replaceHeroAndFocusMentions('(?:skirts?|mini\\s*skirt|midi\\s*skirt|maxi\\s*skirt|chan\\s*vay)', selectedProductCategoryGroup !== 'skirts')
+      replaceHeroAndFocusMentions('(?:dresses?|gowns?|slip\\s*dress)', selectedProductCategoryGroup !== 'dresses')
+      replaceHeroAndFocusMentions('(?:blazers?|jackets?|coats?|cardigans?|outerwear|trench(?:\\s+coat)?)', selectedProductCategoryGroup !== 'outerwear')
+      replaceHeroAndFocusMentions('(?:lingerie|bra|bralette|panty|panties|shapewear|swimwear|bikini|monokini|one\\s*piece|two\\s*piece)', selectedProductCategoryGroup !== 'lingerie_swimwear')
+      replaceHeroAndFocusMentions('(?:activewear|sports\\s*bra|training\\s*top|gym\\s*set|workout\\s*set)', selectedProductCategoryGroup !== 'activewear')
+      replaceHeroAndFocusMentions('(?:pajama|loungewear|sleepwear|nightgown|robe)', selectedProductCategoryGroup !== 'loungewear_sleepwear')
+      replaceHeroAndFocusMentions('(?:ao\\s*dai|cheongsam|qipao|traditional\\s*dress|festive\\s*dress)', selectedProductCategoryGroup !== 'traditional_festive')
+      replaceHeroAndFocusMentions('(?:heels?|sneakers?|sandals?|boots?|flats?|loafers?|bags?|handbags?|clutches?|belts?|scarves?|sunglasses?)', selectedProductCategoryGroup !== 'accessories_footwear')
 
       return next
     }
 
-    const applyProductCategoryFocusToText = (value: string): string => {
+    const categoryReviewSignalRegexByGroup: Partial<Record<ProductCategoryGroup, RegExp>> = {
+      tops: /\\b(neckline|strap|sleeve|upper-body|bust|collar|top|shirt|blouse|corset|cami)\\b/i,
+      bottoms: /\\b(waist|rise|hip|thigh|leg|hem|drape|bottom|trouser|jean|pants|short)\\b/i,
+      dresses: /\\b(dress|neckline|waist|hemline|silhouette|length|drape|gown)\\b/i,
+      skirts: /\\b(skirt|waistline|hemline|pleat|slit|drape|silhouette|mini|midi|maxi|chan\\s*vay)\\b/i,
+      outerwear: /\\b(outerwear|jacket|blazer|coat|closure|layer|shoulder)\\b/i,
+      loungewear_sleepwear: /\\b(loungewear|sleepwear|pajama|comfort|soft|stretch|relaxed\\s*fit)\\b/i,
+      lingerie_swimwear: /\\b(lingerie|swimwear|coverage|support|strap|cup|stretch|body\\s*fit)\\b/i,
+      activewear: /\\b(activewear|support|compression|stretch|training|workout|movement)\\b/i,
+      traditional_festive: /\\b(traditional|festive|silhouette|cultural|elegant\\s*movement|formal\\s*fit)\\b/i,
+      accessories_footwear: /\\b(footwear|shoe|heel|sole|comfort|bag|strap|hardware|finish)\\b/i,
+    }
+
+    const applyProductCategoryFocusToText = (
+      value: string,
+      mode: 'dna' | 'action' | 'narrative' = 'narrative',
+    ): string => {
       const trimmed = value.trim()
       if (!trimmed) return trimmed
       if (!hasExplicitProductCategoryLock) return trimmed
 
-      let next = trimmed
-      if (isSkirtCategoryLock) {
-        next = rewriteSkirtHeroConflicts(next)
+      let next = rewriteCategoryHeroConflicts(trimmed)
+
+      if (mode === 'dna') {
+        if (productCategoryFocusSentence) {
+          next = appendSentenceIfMissing(next, productCategoryFocusSentence)
+        }
+        if (productCategoryReviewFocusSentence) {
+          next = appendSentenceIfMissing(next, productCategoryReviewFocusSentence)
+        }
+        if (tiktokAnalysisReferenceLockSentence) {
+          next = appendSentenceIfMissing(next, tiktokAnalysisReferenceLockSentence)
+        }
+        return next
       }
 
-      if (productCategoryFocusSentence) {
-        next = appendSentenceIfMissing(next, productCategoryFocusSentence)
+      const reviewSignalRegex = categoryReviewSignalRegexByGroup[selectedProductCategoryGroup]
+      const hasReviewSignals = reviewSignalRegex ? reviewSignalRegex.test(next) : false
+      if (!hasReviewSignals && productCategoryReviewFocusSentence) {
+        next = appendSentenceIfMissing(next, productCategoryReviewFocusSentence)
       }
 
-      if (productCategorySkirtFocusSentence) {
-        next = appendSentenceIfMissing(next, productCategorySkirtFocusSentence)
+      if (isTikTokAnalysisReferenceMode && tiktokAnalysisReferenceLockSentence) {
+        const hasTransferLockSignal = /\\b(structure-only|script transfer|input product image|product reference image)\\b/i.test(next)
+        if (!hasTransferLockSignal) {
+          next = appendSentenceIfMissing(next, tiktokAnalysisReferenceLockSentence)
+        }
       }
 
       return next
@@ -5054,7 +5132,7 @@ Return STRICT JSON only, same schema:
         camera = enforceOotdMirrorObserverCamera(camera)
       }
 
-      action = applyProductCategoryFocusToText(action)
+      action = applyProductCategoryFocusToText(action, 'action')
 
       normalizedKeyframesForRule32.push({
         action,
@@ -5133,7 +5211,7 @@ Return STRICT JSON only, same schema:
       if (finalContentType === 'ootdmirror') {
         safeNarrative = enforceOotdMirrorSceneNarrative(safeNarrative)
       }
-      safeNarrative = applyProductCategoryFocusToText(safeNarrative)
+      safeNarrative = applyProductCategoryFocusToText(safeNarrative, 'narrative')
       let cameraMovement = toSafeString(
         sc.cameraMovement,
         SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].cameraHint
@@ -5184,7 +5262,7 @@ Return STRICT JSON only, same schema:
       : buildCharacterDNA(notes, finalContentType as Exclude<ContentType, 'auto'>)
 
     return {
-      masterDNA: applyProductCategoryFocusToText(rawMasterDNA),
+      masterDNA: applyProductCategoryFocusToText(rawMasterDNA, 'dna'),
       keyframes,
       scenes,
       resolvedContentType: finalContentType as ResolvedContentType,
