@@ -1815,6 +1815,30 @@ STYLE: ${style}
 ASPECT RATIO: ${aspectRatio}`
 }
 
+const KEYFRAME_COPY_SAFETY_RULES = [
+  'Không được lộ trong ảnh "thiết bị CAMERA, đèn chiếu, Khắc Sáng".',
+  'Không có text note trong ảnh.',
+] as const
+
+function appendKeyframeCopySafetyRule(prompt: string): string {
+  const base = prompt.trim()
+  const normalizedBase = normalizeLocationKey(base)
+  const missingRules = KEYFRAME_COPY_SAFETY_RULES.filter((rule) => {
+    const normalizedRule = normalizeLocationKey(rule)
+    return normalizedRule.length > 0 && !normalizedBase.includes(normalizedRule)
+  })
+
+  if (base.length === 0) {
+    return missingRules.join('\n')
+  }
+
+  if (missingRules.length === 0) {
+    return base
+  }
+
+  return `${base}\n${missingRules.join('\n')}`
+}
+
 function buildLookbookPrimaryLocationFallback(_contentType: ResolvedContentType): string {
   return LOOKBOOK_NATURAL_LOCATION_FALLBACKS[0]
 }
@@ -8029,7 +8053,7 @@ export default function App() {
           `SALES TEMPLATE: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
           '',
           'CHARACTER DNA:', result.masterDNA, '',
-          'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => kf.fullPrompt), '',
+          'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => appendKeyframeCopySafetyRule(kf.fullPrompt)), '',
           'SCENE PROMPTS:', ...result.scenes.map(sc => sc.fullPrompt),
           ...(result.createImagePrompt ? ['', 'CREATE IMAGE PROMPT:', result.createImagePrompt] : []),
         )
@@ -9044,7 +9068,7 @@ export default function App() {
                             <span className="prompt-card-time">{kf.timestamp}</span>
                           </div>
                           <div className="prompt-card-body">
-                            <CopyButton text={kf.fullPrompt} />
+                            <CopyButton text={appendKeyframeCopySafetyRule(kf.fullPrompt)} />
                             <div className="prompt-text">
                               <strong>SUBJECT:</strong> {kf.subject}
                               {'\n'}<strong>ACTION:</strong> {kf.action}
