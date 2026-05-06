@@ -101,6 +101,7 @@ interface TikTokScriptBeat {
   timestamp: string
   beatName: string
   description: string
+  contextHint: string
   cameraHint: string
   narrationHint: string
 }
@@ -1158,7 +1159,7 @@ const OOTDMIRROR_REAR_MIRROR_GUARDRAILS = `- Applies only when resolved content 
 - Never show camera, tripod, operator, or recording gear in the mirror reflection.`
 
 const VEO_INTERPOLATION_GUARDRAILS = `- First/last-frame interpolation must use micro-progression between adjacent keyframes (small pose delta, no sudden body jump).
-- Keep one dominant camera movement per 8s scene; avoid mixed or contradictory camera instructions.
+- Keep one dominant camera movement per 8s scene; the only allowed hybrid motion is "Dolly in zoom out" or "Dolly out zoom in".
 - Preserve camera axis and movement direction across adjacent scenes unless an explicit turn-around beat is written.
 - Avoid discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - Keep subject, action, camera, composition, and ambiance explicit for each keyframe/scene prompt.
@@ -1186,6 +1187,44 @@ const MOTION_DISCONTINUITY_KEYWORDS = [
   'warp',
   'chaotic random',
 ] as const
+
+const SCENE_CAMERA_POSITION_OPTIONS = [
+  'Center',
+  'Left',
+  'Right',
+  'High',
+  'Low',
+  'Closer',
+  'Further',
+] as const
+
+type SceneCameraPositionOption = typeof SCENE_CAMERA_POSITION_OPTIONS[number]
+
+const SCENE_CAMERA_MOTION_OPTIONS = [
+  'Dolly in',
+  'Dolly out',
+  'Orbit left',
+  'Orbit right',
+  'Orbit up',
+  'Orbit low',
+  'Dolly in zoom out',
+  'Dolly out zoom in',
+] as const
+
+type SceneCameraMotionOption = typeof SCENE_CAMERA_MOTION_OPTIONS[number]
+
+const SCENE_CAMERA_HYBRID_MOTION_OPTIONS: readonly SceneCameraMotionOption[] = [
+  'Dolly in zoom out',
+  'Dolly out zoom in',
+] as const
+
+const DEFAULT_SCENE_CAMERA_POSITION: SceneCameraPositionOption = 'Center'
+const DEFAULT_SCENE_CAMERA_MOTION: SceneCameraMotionOption = 'Dolly in'
+
+const SCENE_CAMERA_MOVEMENT_PROMPT_RULES = `- scenes[i].cameraMovement must start with: Position: <Camera Position> | Motion: <Camera Motion>.
+- Allowed Camera Position: ${SCENE_CAMERA_POSITION_OPTIONS.join(' | ')}.
+- Allowed Camera Motion: ${SCENE_CAMERA_MOTION_OPTIONS.join(' | ')}.
+- If needed, append one short sentence after the structured prefix for pacing/detail notes.`
 
 const CAMERA_MOTION_FAMILY_KEYWORDS: Record<string, readonly string[]> = {
   static: ['static', 'locked off', 'lock off', 'tripod', 'fixed frame'],
@@ -2619,9 +2658,91 @@ function containsMotionDiscontinuityKeyword(value: string): boolean {
   return MOTION_DISCONTINUITY_KEYWORDS.some((keyword) => normalized.includes(normalizeLocationKey(keyword)))
 }
 
+function isAllowedHybridCameraMotion(value: string): boolean {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return false
+
+  return SCENE_CAMERA_HYBRID_MOTION_OPTIONS.some((option) => normalized.includes(normalizeLocationKey(option)))
+}
+
+function resolveSceneCameraPositionOption(value: string): SceneCameraPositionOption | null {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return null
+
+  for (const option of SCENE_CAMERA_POSITION_OPTIONS) {
+    if (normalized === normalizeLocationKey(option)) return option
+  }
+
+  return null
+}
+
+function resolveSceneCameraMotionOption(value: string): SceneCameraMotionOption | null {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return null
+
+  for (const option of SCENE_CAMERA_MOTION_OPTIONS) {
+    if (normalized === normalizeLocationKey(option)) return option
+  }
+
+  for (const option of SCENE_CAMERA_MOTION_OPTIONS) {
+    if (normalized.includes(normalizeLocationKey(option))) return option
+  }
+
+  return null
+}
+
+function parseSceneCameraMovementSpec(value: string): {
+  position: SceneCameraPositionOption | null
+  motion: SceneCameraMotionOption | null
+} {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return { position: null, motion: null }
+  }
+
+  const structuredMatch = trimmed.match(/position\s*:\s*([^|;\n]+)\s*(?:\||;|,)\s*motion\s*:\s*([^\n]+)/i)
+  if (!structuredMatch) {
+    return { position: null, motion: null }
+  }
+
+  return {
+    position: resolveSceneCameraPositionOption(structuredMatch[1]?.trim() || ''),
+    motion: resolveSceneCameraMotionOption(structuredMatch[2]?.trim() || ''),
+  }
+}
+
+function stripSceneCameraMovementSpec(value: string): string {
+  return value
+    .replace(/^\s*position\s*:[^|;\n]+(?:\||;|,)\s*motion\s*:[^.\n]+[.\s]*/i, '')
+    .trim()
+}
+
+function normalizeSceneCameraMovementSpec(value: unknown, fallbackDetail: string = ''): string {
+  const rawValue = typeof value === 'string' ? value.trim() : ''
+  const parsed = parseSceneCameraMovementSpec(rawValue)
+
+  const position = parsed.position || DEFAULT_SCENE_CAMERA_POSITION
+  const motion = parsed.motion
+    || resolveSceneCameraMotionOption(rawValue)
+    || resolveSceneCameraMotionOption(fallbackDetail)
+    || DEFAULT_SCENE_CAMERA_MOTION
+
+  const detailSource = rawValue.length > 0 ? rawValue : fallbackDetail
+  const detail = stripSceneCameraMovementSpec(detailSource)
+  const normalizedDetail = normalizeLocationKey(detail)
+
+  const base = `Position: ${position} | Motion: ${motion}`
+  if (!normalizedDetail || normalizedDetail === normalizeLocationKey(motion)) return base
+  return `${base}. ${detail}`
+}
+
 function detectCameraMotionFamilies(value: string): string[] {
   const normalized = normalizeLocationKey(value)
   if (!normalized) return []
+
+  if (isAllowedHybridCameraMotion(value)) {
+    return ['dolly-zoom-hybrid']
+  }
 
   return Object.entries(CAMERA_MOTION_FAMILY_KEYWORDS)
     .filter(([, keywords]) => keywords.some((keyword) => normalized.includes(normalizeLocationKey(keyword))))
@@ -2634,6 +2755,8 @@ function extractMotionDirection(value: string): 'left' | 'right' | 'forward' | '
 
   if (normalized.includes('counterclockwise') || normalized.includes('anti clockwise')) return 'counterclockwise'
   if (normalized.includes('clockwise')) return 'clockwise'
+  if (normalized.includes('orbit up')) return 'up'
+  if (normalized.includes('orbit low') || normalized.includes('orbit down')) return 'down'
   if (normalized.includes('left') || normalized.includes('sang trai')) return 'left'
   if (normalized.includes('right') || normalized.includes('sang phai')) return 'right'
   if (normalized.includes('forward') || normalized.includes('toward') || normalized.includes('push in') || normalized.includes('dolly in')) return 'forward'
@@ -4123,7 +4246,8 @@ Output STRICT JSON only:
         }
 
         const families = detectCameraMotionFamilies(camera)
-        if (families.length > (strict ? 1 : 2)) {
+        const maxFamilyCount = strict && isAllowedHybridCameraMotion(camera) ? 2 : (strict ? 1 : 2)
+        if (families.length > maxFamilyCount) {
           return { ok: false, reason: `keyframe[${i}] camera family conflict ${families.join('/')}` }
         }
       }
@@ -4230,12 +4354,23 @@ Output STRICT JSON only:
         const narrative = toSafeText(scene.narrative, '')
         const cameraMovement = toSafeText(scene.cameraMovement, '')
 
+        if (strict) {
+          const parsedCameraSpec = parseSceneCameraMovementSpec(cameraMovement)
+          if (!parsedCameraSpec.position || !parsedCameraSpec.motion) {
+            return {
+              ok: false,
+              reason: `scene[${i}] cameraMovement must follow "Position: <...> | Motion: <...>" with allowed options`,
+            }
+          }
+        }
+
         if (containsMotionDiscontinuityKeyword(narrative) || containsMotionDiscontinuityKeyword(cameraMovement)) {
           return { ok: false, reason: `scene[${i}] contains discontinuity keyword` }
         }
 
         const families = detectCameraMotionFamilies(cameraMovement)
-        if (families.length > (strict ? 1 : 2)) {
+        const maxFamilyCount = strict && isAllowedHybridCameraMotion(cameraMovement) ? 2 : (strict ? 1 : 2)
+        if (families.length > maxFamilyCount) {
           return { ok: false, reason: `scene[${i}] camera family conflict ${families.join('/')}` }
         }
       }
@@ -4363,7 +4498,7 @@ Output STRICT JSON only:
           ...sceneSeed,
           index: scenes.length,
           narrative: toSafeText(sceneSeed.narrative, 'Continue smooth transition with product clarity and stable scene continuity.'),
-          cameraMovement: toSafeText(sceneSeed.cameraMovement, 'Controlled tracking with stable axis.'),
+          cameraMovement: normalizeSceneCameraMovementSpec(sceneSeed.cameraMovement, 'Controlled tracking with stable axis.'),
         })
       }
 
@@ -4459,6 +4594,9 @@ ${enforceSinglePrimaryLocation
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
 
+SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
+${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
+
 USER NOTES OVERRIDE CONTRACT (GLOBAL PRECEDENCE):
 - If USER NOTES conflict with any default creative/style/template/type instruction, USER NOTES win.
 - This override also applies to type-specific trend signals, fit-model defaults, and Rule 32 direction heuristics.
@@ -4483,7 +4621,7 @@ CRITICAL RULES [Rule 30 has strongest creative authority. Rules 3–29 and Rule 
 8. NEVER use background, location, props, or lighting from the FACE reference image. Face image is identity-only.
 9. Keep one primary location coherent across all keyframes/scenes; do not change location unless user explicitly requests a transition. [SUBORDINATE to Rule 30 — User Notes may specify multi-location or location changes]
 10. Prompt detail quality must follow Veo best practice: each keyframe/scenes should be specific on Subject, Action, Camera, Composition, Style, and Ambiance/Lighting.
-11. Camera grammar must stay coherent: one dominant camera move per 8s scene, no chaotic mixed camera instructions.
+11. Camera grammar must stay coherent: one dominant camera move per 8s scene. Use scenes[i].cameraMovement format "Position: <...> | Motion: <...>" and only use allowed hybrid motion "Dolly in zoom out" or "Dolly out zoom in" when needed.
 12. First-last-frame interpolation safety is mandatory: adjacent keyframes must use micro-progression (small pose delta, stable framing axis, no sudden body teleport).
 13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
 14. LOCATION MUST BE REAL-WORLD VENUES ONLY - Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments, and avoid flat/plain seamless backgrounds (example: "minimalist high-end white studio background").
@@ -4524,7 +4662,7 @@ Return STRICT COMPACT JSON only in this schema:
     {
       "index": 0,
       "narrative": "scene description with retention beat",
-      "cameraMovement": "camera movement description"
+      "cameraMovement": "Position: ${DEFAULT_SCENE_CAMERA_POSITION} | Motion: ${DEFAULT_SCENE_CAMERA_MOTION}"
     }
   ]
 }
@@ -4574,6 +4712,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
   - Non-negotiable constraints only: valid JSON schema, required scene/keyframe counts, Rules 1, 2, 12, 15, and 31.
   - Enforce product category lock: selected category must remain hero product focus whenever category lock is active.
   - Apply location continuity mode according to Rule 30 runtime decision (single-primary default or user-notes transition mode).
+  - Enforce scenes[i].cameraMovement taxonomy with exact Position/Motion option sets.
   - ${facingRuleForQaRepair}
   - ${fitModelRuleLockRepairHint}
   - Require explicit facingDirection token on each keyframe: front|back|left|right|three-quarter-left|three-quarter-right.
@@ -4592,6 +4731,9 @@ ${enforceSinglePrimaryLocation
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
+
+SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
+${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
 
 DRAFT PACKAGE JSON:
 ${safeJsonStringify(draftPackage)}
@@ -4724,7 +4866,7 @@ TASK:
 
 INTERPOLATION CONTINUITY REQUIREMENTS:
 - Adjacent keyframes must be micro-progression, not abrupt pose jumps.
-- Use one dominant camera movement per scene (no mixed camera grammar).
+- Use one dominant camera movement per scene; the only allowed hybrid motion is "Dolly in zoom out" or "Dolly out zoom in".
 - Avoid immediate opposite camera direction across adjacent scenes unless explicit turnaround beat is described.
 - Remove discontinuity terms such as teleport, jump cut, hard cut, instant morph, abrupt switch.
 - ${facingRuleForMotionRepair}
@@ -4735,6 +4877,9 @@ ${tiktokAnalysisReferenceLockRules}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
+
+SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
+${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
 
 USER NOTES OVERRIDE CONTRACT:
 - Keep USER NOTES choices whenever they do not violate non-negotiable constraints (Rules 1, 2, 12, 15, 31 and schema/count integrity).
@@ -5212,13 +5357,17 @@ Return STRICT JSON only, same schema:
         safeNarrative = enforceOotdMirrorSceneNarrative(safeNarrative)
       }
       safeNarrative = applyProductCategoryFocusToText(safeNarrative, 'narrative')
-      let cameraMovement = toSafeString(
+      let rawCameraMovement = toSafeString(
         sc.cameraMovement,
         SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].cameraHint
       )
       if (finalContentType === 'ootdmirror') {
-        cameraMovement = enforceOotdMirrorObserverCamera(cameraMovement)
+        rawCameraMovement = enforceOotdMirrorObserverCamera(rawCameraMovement)
       }
+      const cameraMovement = normalizeSceneCameraMovementSpec(
+        rawCameraMovement,
+        SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].cameraHint,
+      )
       const timeRange = toSafeString(sc.timeRange, `${startSec}s-${endSec}s`)
 
       const lighting = keyframes[i]?.lighting || ''
@@ -5777,6 +5926,55 @@ function buildTikTokScriptBeatReferences(script: string, sceneCount: number): st
   return beats.map((beat) => beat.replace(/\s+/g, ' ').trim())
 }
 
+function buildTikTokContextBeatReferences(sceneBeats: TikTokScriptBeat[], sceneCount: number): string[] {
+  if (sceneCount <= 0) return []
+
+  const contextUnits = sceneBeats
+    .map((beat) => [
+      beat.contextHint,
+      beat.description,
+      beat.beatName,
+    ].map((part) => part.trim()).filter((part) => part.length > 0).join(' | '))
+    .map((entry) => entry.replace(/\s+/g, ' ').trim())
+    .filter((entry) => entry.length > 0)
+
+  if (contextUnits.length === 0) return []
+
+  const mapped: string[] = []
+  for (let sceneIndex = 0; sceneIndex < sceneCount; sceneIndex += 1) {
+    const start = Math.floor((sceneIndex * contextUnits.length) / sceneCount)
+    mapped.push(contextUnits[Math.min(start, contextUnits.length - 1)])
+  }
+
+  return mapped
+}
+
+function buildTikTokContextRemixLocationFallback(contextHint: string): string {
+  const normalized = normalizeLocationKey(contextHint)
+
+  if (/mirror|fitting|changing|boutique|shop|store|retail|thu do|cua hang/.test(normalized)) {
+    return 'Boutique fitting room and mirror corner, District 1, Ho Chi Minh City, Vietnam'
+  }
+
+  if (/cafe|coffee/.test(normalized)) {
+    return 'Street-facing cafe frontage, Hoan Kiem, Hanoi, Vietnam'
+  }
+
+  if (/street|sidewalk|walking|outdoor|outside|ngoai troi|pho|road/.test(normalized)) {
+    return 'Street fashion corner near walking district, Hoan Kiem, Hanoi, Vietnam'
+  }
+
+  if (/studio|indoor|room|apartment|home|nha/.test(normalized)) {
+    return 'Lifestyle studio room with textured wall, Hai Ba Trung, Hanoi, Vietnam'
+  }
+
+  if (/mall|shopping|department/.test(normalized)) {
+    return 'Shopping district corridor, District 1, Ho Chi Minh City, Vietnam'
+  }
+
+  return 'Street fashion corner near shopping district, Hoan Kiem, Hanoi, Vietnam'
+}
+
 function getWorkHistoryTimestampMs(item: WorkHistoryItem): number {
   const msFromNumber = Number.isFinite(item.createdAtMs) ? Number(item.createdAtMs) : NaN
   const msFromString = item.createdAt ? Date.parse(item.createdAt) : NaN
@@ -6027,7 +6225,10 @@ function buildPromptResultFromHistoryItem(
       raw.narrative,
       `Retention beat ${index + 1}: smooth transition from keyframe ${index + 1} to keyframe ${index + 2}.`,
     )
-    const cameraMovement = toHistoryString(raw.cameraMovement, 'Stable cinematic move with clean social-native pacing')
+    const cameraMovement = normalizeSceneCameraMovementSpec(
+      toHistoryString(raw.cameraMovement, ''),
+      'Stable cinematic move with clean social-native pacing',
+    )
     const lighting = toHistoryString(raw.lighting, keyframes[index]?.lighting || '')
     const composition = toHistoryString(raw.composition, keyframes[index]?.camera || '')
     const subject = toHistoryString(raw.subject, masterDNA)
@@ -6471,6 +6672,7 @@ ANALYSIS TASKS:
    - timestamp (e.g. "0s-4s")
    - beatName (short descriptive label)
    - description (what is happening visually)
+  - contextHint (background/setting cues to remix later: indoor/outdoor, venue type, prop density, movement space)
    - cameraHint (camera movement / framing observed)
    - narrationHint (what would be said or implied in narration)
 9. Based on the analysis, generate a ready-to-use Vietnamese kịch bản (script) for creating a SIMILAR video for a new fashion/affiliate product. The script must:
@@ -6486,6 +6688,7 @@ STRICT OUTPUT CONSTRAINTS (MUST FOLLOW):
 - Do NOT preserve or copy analyzed-video garment specifics (exact outfit type, pattern, material, logo, colorway).
 - For generatedScript, keep wording product-agnostic with placeholders like [MODEL], [SAN PHAM], [BENEFIT 1], [CTA].
 - Focus only on reusable structure: hook logic, pacing, beat progression, camera rhythm, and CTA flow.
+- Preserve reusable context logic for later remix: background type, scene atmosphere, movement space, and transition style.
 
 Return this exact JSON schema (no extra keys, no markdown wrapping):
 {
@@ -6502,6 +6705,7 @@ Return this exact JSON schema (no extra keys, no markdown wrapping):
       "timestamp": "0s-4s",
       "beatName": "...",
       "description": "...",
+      "contextHint": "...",
       "cameraHint": "...",
       "narrationHint": "..."
     }
@@ -6539,6 +6743,7 @@ Return this exact JSON schema (no extra keys, no markdown wrapping):
       timestamp: toStr(beat?.timestamp, `${i * 5}s-${(i + 1) * 5}s`),
       beatName: toStr(beat?.beatName, `Beat ${i + 1}`),
       description: toStr(beat?.description, ''),
+      contextHint: toStr(beat?.contextHint, ''),
       cameraHint: toStr(beat?.cameraHint, ''),
       narrationHint: toStr(beat?.narrationHint, ''),
     }))
@@ -6583,14 +6788,20 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     : 'San pham can review duoc xac dinh tu input hien tai.'
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
+  const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
   const sceneBeatSummary = analysis.sceneBeats
     .slice(0, 8)
     .map((beat) => [
       `${beat.timestamp} ${beat.beatName}`.trim(),
       beat.description.trim(),
+      beat.contextHint.trim().length > 0 ? `Context: ${beat.contextHint.trim()}` : '',
       beat.cameraHint.trim().length > 0 ? `Camera: ${beat.cameraHint.trim()}` : '',
       beat.narrationHint.trim().length > 0 ? `Narration: ${beat.narrationHint.trim()}` : '',
     ].filter((part) => part.length > 0).join(' | '))
+    .join('\n')
+
+  const contextReferenceSummary = contextBeatReferences
+    .map((reference, index) => `Scene ${index + 1}: ${reference}`)
     .join('\n')
 
   const parts: GeminiContentPart[] = []
@@ -6621,6 +6832,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
 GOAL:
 - Build a complete prompt package from TikTok analysis result while staying detached from the default core rule stack.
 - Keep only video configuration logic (duration, aspect ratio, scene/keyframe counts).
+- Remix scene context/background similar to analyzed video while adapting to the new input product.
 
 VIDEO CONFIG:
 - Duration: ${duration}s
@@ -6647,6 +6859,9 @@ TIKTOK ANALYSIS (STRUCTURE-ONLY REFERENCE):
 SCENE BEATS:
 ${sceneBeatSummary || 'No explicit scene beats provided'}
 
+CONTEXT REMIX REFERENCES:
+${contextReferenceSummary || 'No explicit context references provided'}
+
 SCRIPT TEMPLATE TO FOLLOW:
 ${analysis.generatedScript || 'No script provided'}
 
@@ -6656,6 +6871,11 @@ HARD CONSTRAINTS:
 - Never copy product identity/outfit details from analyzed TikTok video.
 - Keep product review focus anchored to REVIEW NOTES and current PRODUCT input image.
 - Maintain believable social-native movement and camera continuity.
+- CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
+- Do not copy exact identifiable text/signage/persons from source video context.
+
+SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
+${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
 
 Return STRICT JSON only in this schema:
 {
@@ -6675,7 +6895,7 @@ Return STRICT JSON only in this schema:
     {
       "index": 0,
       "narrative": "...",
-      "cameraMovement": "..."
+      "cameraMovement": "Position: ${DEFAULT_SCENE_CAMERA_POSITION} | Motion: ${DEFAULT_SCENE_CAMERA_MOTION}"
     }
   ]
 }
@@ -6718,20 +6938,28 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         Math.floor((index * sceneCount) / Math.max(1, keyframeCount - 1)),
       )
       const fallbackScriptBeat = scriptBeatReferences[scriptBeatIndex]
+      const fallbackContextBeat = contextBeatReferences[scriptBeatIndex]
       const fallbackAction = fallbackScriptBeat
         ? `Product review movement follows script beat: ${fallbackScriptBeat}`
         : (analysis.sceneBeats[scriptBeatIndex]?.description || 'Natural product review motion with clear detail demonstration.')
 
-      const action = toSafeString(raw.action, fallbackAction)
+      const action = appendSentenceIfMissing(
+        toSafeString(raw.action, fallbackAction),
+        fallbackContextBeat ? `Context remix cue: ${fallbackContextBeat}` : '',
+      )
       const fallbackFacing = RULE32_FACING_SEQUENCE[index % RULE32_FACING_SEQUENCE.length]
       const facingDirection = resolveFacing(raw.facingDirection ?? raw.action, fallbackFacing)
-      const location = toSafeString(raw.location, 'Street fashion corner near shopping district, Hoan Kiem, Hanoi, Vietnam')
+      const fallbackLocation = buildTikTokContextRemixLocationFallback(fallbackContextBeat)
+      const location = toSafeString(raw.location, fallbackLocation)
       const camera = toSafeString(
         raw.camera,
         analysis.sceneBeats[scriptBeatIndex]?.cameraHint || 'Social-native camera framing with controlled movement and stable axis.',
       )
       const lighting = toSafeString(raw.lighting, `Natural soft lighting with ${analysis.colorGrade || 'balanced'} color mood and clear product details.`)
-      const style = toSafeString(raw.style, `TikTok social-native product review style; pacing ${analysis.pacing || 'mid-pace'}.`)
+      const style = toSafeString(
+        raw.style,
+        `TikTok social-native product review style; pacing ${analysis.pacing || 'mid-pace'}. Context remix from analyzed video environment.`,
+      )
       const timestamp = `${Math.round((index * duration) / Math.max(1, keyframeCount - 1))}s`
       const subject = buildDefaultFrameSubject(aspectRatio)
 
@@ -6766,6 +6994,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         '[PRODUCT LOCK]: Keep product details from current input image only (if provided).',
         `[REVIEW PRODUCT NOTES]: ${reviewProductBrief}`,
         '[ANALYSIS TRANSFER]: Use TikTok analysis as structure-only reference (hook/value/proof/close).',
+        '[CONTEXT REMIX LOCK]: Recreate similar background setting logic from analyzed video without copying identity/product specifics.',
       ].join('\n')
 
     const scenes: ScenePrompt[] = Array.from({ length: sceneCount }, (_, index) => {
@@ -6773,17 +7002,22 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const startSec = Math.round((index * duration) / sceneCount)
       const endSec = Math.round(((index + 1) * duration) / sceneCount)
       const scriptBeat = scriptBeatReferences[index] || analysis.sceneBeats[index]?.narrationHint || analysis.sceneBeats[index]?.description || ''
+      const contextBeat = contextBeatReferences[index] || analysis.sceneBeats[index]?.contextHint || analysis.sceneBeats[index]?.description || ''
       const fallbackNarrative = scriptBeat.length > 0
         ? `Follow script beat: ${scriptBeat}`
         : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
 
-      const narrative = appendSentenceIfMissing(
+      const narrativeWithScript = appendSentenceIfMissing(
         toSafeString(raw.narrative, fallbackNarrative),
         scriptBeat.length > 0 ? `Script beat reference: ${scriptBeat}` : '',
       )
+      const narrative = appendSentenceIfMissing(
+        narrativeWithScript,
+        contextBeat.length > 0 ? `Context remix reference: ${contextBeat}` : '',
+      )
 
-      const cameraMovement = toSafeString(
-        raw.cameraMovement,
+      const cameraMovement = normalizeSceneCameraMovementSpec(
+        toSafeString(raw.cameraMovement, ''),
         analysis.sceneBeats[index]?.cameraHint || 'Controlled camera movement with stable direction and social-native pacing.',
       )
 
@@ -8656,6 +8890,7 @@ export default function App() {
                 colorGrade: tiktokAnalysisResult.colorGrade,
                 pacing: tiktokAnalysisResult.pacing,
                 sceneBeatCount: tiktokAnalysisResult.sceneBeats.length,
+                contextHintCount: tiktokAnalysisResult.sceneBeats.filter((beat) => beat.contextHint.trim().length > 0).length,
               },
               promptPackage: promptPackageForHistory,
             },
@@ -10240,7 +10475,7 @@ export default function App() {
                       <div className="prompt-card" style={{ borderColor: 'rgba(14,165,233,0.35)', marginBottom: 14 }}>
                         <div className="prompt-card-body">
                           <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 10 }}>
-                            Dung ket qua phan tich de chuyen giao nhip cau truc video (hook/beat/script) trong detached mode. Luong nay khong ep core-rule stack; cau hinh video giu nguyen theo duration/aspect ratio, va san pham review uu tien theo "Ghi chu them (tuy chon)".
+                            Dung ket qua phan tich de chuyen giao nhip cau truc video (hook/beat/script) va phoi lai boi canh tuong tu video goc trong detached mode. Luong nay khong ep core-rule stack; cau hinh video giu nguyen theo duration/aspect ratio, va san pham review uu tien theo "Ghi chu them (tuy chon)".
                           </p>
                           <button
                             type="button"
@@ -10307,11 +10542,13 @@ export default function App() {
                             <CopyButton text={[
                               `[${beat.beatName}] ${beat.timestamp}`,
                               `Mô tả: ${beat.description}`,
+                              `Bối cảnh: ${beat.contextHint}`,
                               `Camera: ${beat.cameraHint}`,
                               `Narration: ${beat.narrationHint}`,
                             ].join('\n')} />
                             <div className="prompt-text">
                               {beat.description}
+                              {beat.contextHint ? <>{'\n'}<strong>Bối cảnh:</strong> {beat.contextHint}</> : null}
                               {beat.cameraHint ? <>{'\n'}<strong>Camera:</strong> {beat.cameraHint}</> : null}
                               {beat.narrationHint ? <>{'\n'}<strong>Narration:</strong> {beat.narrationHint}</> : null}
                             </div>
