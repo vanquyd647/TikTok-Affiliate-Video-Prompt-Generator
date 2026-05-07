@@ -517,31 +517,97 @@ const LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS: Array<{
 const LOOKBOOK_THEME_VALUES = LOOKBOOK_THEME_OPTIONS.map((item) => item.value) as LookbookTheme[]
 const LOOKBOOK_POSE_DIRECTION_LOCK_VALUES = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.map((item) => item.value) as LookbookPoseDirectionLock[]
 
+const LOCKED_LOCATION_LIBRARY = [
+  'Phong ngu toi gian tone trang/kem: giuong gon, rem sheer trang, guong dung, anh sang cua so tu nhien',
+  'Goc guong full body kieu Han: guong vien den/trang dat sat tuong, san go, decor it',
+  'Studio gia home cafe: ban nho, ghe go, ly ca phe, den vang nhe tao cam giac lifestyle',
+  'Walk-in closet: treo vai bo do phia sau, tone be/xam de outfit noi bat',
+  'Background cua so lon: anh sang hat ngang nguoi giup chat lieu vay bat sang dep',
+  'Goc sofa apartment: sofa kem + ban tra nho + sach/tap chi fashion',
+  'Tuong tron mau trung tinh: trang, xam nhat, be, ghi lanh de focus vao outfit',
+  'Hanh lang chung cu/khach san: tao cam giac sang, hop outfit nu tinh body',
+  'Guong thang may: vibe luxury, hop clip chuyen outfit nhanh',
+  'Cua ra vao apartment kieu Han: canh chuan bi di ra ngoai hop video tiep thi',
+  'Ban cong apartment: nang nhe + cay xanh tao cam giac chill nu tinh',
+  'Studio cyclorama trang: background sach hoan toan, hop brand local',
+  'Quan cafe toi gian: tone xi mang, go sang, anh sang tu nhien',
+  'Goc vanity makeup: ban makeup co den, nuoc hoa, tui xach cho daily girl routine',
+  'Phong thay do showroom: hop clip thu do, mix-match nhieu outfit',
+  'Cau thang toi gian: tao chuyen dong dep khi mac vay dai duoi ca',
+  'Background rem voan trang: pho bien voi vay satin/lua de outfit mem hon',
+  'Background den sunset projector: vibe sexy/chill buoi toi',
+  'Background ngoai troi gia casual: bai do xe sach, tuong xi mang, cua kinh cafe',
+  'Goc guong dat canh cay xanh: monstera/olive tree de khung hinh bot trong',
+  'Tone viral Clean girl: trang + be + anh sang tu nhien',
+  'Tone viral Korean apartment: go sang + rem trang + decor toi gian',
+  'Tone viral Luxury soft girl: marble + den vang + guong lon',
+  'Tone viral Casual influencer: phong hoi bua nhe co chu dich de tao cam giac that',
+  'Tone viral Pinterest aesthetic: anh sang film, grain nhe, decor vintage',
+] as const
+
+const LOCKED_LOCATION_MIRROR_POOL = [
+  LOCKED_LOCATION_LIBRARY[1],
+  LOCKED_LOCATION_LIBRARY[8],
+  LOCKED_LOCATION_LIBRARY[14],
+  LOCKED_LOCATION_LIBRARY[19],
+] as const
+
+const LOCKED_LOCATION_STUDIO_POOL = [
+  LOCKED_LOCATION_LIBRARY[0],
+  LOCKED_LOCATION_LIBRARY[2],
+  LOCKED_LOCATION_LIBRARY[3],
+  LOCKED_LOCATION_LIBRARY[4],
+  LOCKED_LOCATION_LIBRARY[5],
+  LOCKED_LOCATION_LIBRARY[6],
+  LOCKED_LOCATION_LIBRARY[11],
+  LOCKED_LOCATION_LIBRARY[13],
+  LOCKED_LOCATION_LIBRARY[16],
+  LOCKED_LOCATION_LIBRARY[17],
+  LOCKED_LOCATION_LIBRARY[20],
+  LOCKED_LOCATION_LIBRARY[21],
+  LOCKED_LOCATION_LIBRARY[22],
+  LOCKED_LOCATION_LIBRARY[23],
+  LOCKED_LOCATION_LIBRARY[24],
+] as const
+
+const LOCKED_LOCATION_FLEX_POOL = [
+  LOCKED_LOCATION_LIBRARY[7],
+  LOCKED_LOCATION_LIBRARY[9],
+  LOCKED_LOCATION_LIBRARY[10],
+  LOCKED_LOCATION_LIBRARY[12],
+  LOCKED_LOCATION_LIBRARY[15],
+  LOCKED_LOCATION_LIBRARY[18],
+] as const
+
+const LOCKED_LOCATION_LIBRARY_PROMPT_LIST = LOCKED_LOCATION_LIBRARY
+  .map((item, index) => `${index + 1}. ${item}`)
+  .join('\n')
+
 const LOOKBOOK_THEME_LOCATION_FALLBACKS: Record<Exclude<LookbookTheme, 'auto'>, readonly string[]> = {
   minimal_studio: [
-    'Textured fashion studio corner with clothing rack props, District 7, Ho Chi Minh City, Vietnam',
-    'Minimal editorial studio bay near Jing An, Shanghai, China',
-    'Soft daylight lookbook studio corner near Gangnam, Seoul, South Korea',
+    LOCKED_LOCATION_LIBRARY[0],
+    LOCKED_LOCATION_LIBRARY[6],
+    LOCKED_LOCATION_LIBRARY[11],
   ],
   street_casual: [
-    'Sidewalk cafe frontage in Thao Dien, Ho Chi Minh City, Vietnam',
-    'Pedestrian lane near Xintiandi district, Shanghai, China',
-    'Open plaza near Myeongdong shopping street, Seoul, South Korea',
+    LOCKED_LOCATION_LIBRARY[10],
+    LOCKED_LOCATION_LIBRARY[12],
+    LOCKED_LOCATION_LIBRARY[18],
   ],
   office_chic: [
-    'Modern office lobby in Thu Thiem business district, Ho Chi Minh City, Vietnam',
-    'Glass corridor in Lujiazui business area, Shanghai, China',
-    'Corporate atrium near Yeouido finance district, Seoul, South Korea',
+    LOCKED_LOCATION_LIBRARY[7],
+    LOCKED_LOCATION_LIBRARY[9],
+    LOCKED_LOCATION_LIBRARY[15],
   ],
   party_night: [
-    'Elegant hotel corridor in District 1, Ho Chi Minh City, Vietnam',
-    'Rooftop lounge entrance near The Bund, Shanghai, China',
-    'Evening cocktail venue corridor near Itaewon, Seoul, South Korea',
+    LOCKED_LOCATION_LIBRARY[8],
+    LOCKED_LOCATION_LIBRARY[17],
+    LOCKED_LOCATION_LIBRARY[22],
   ],
   vacation_resort: [
-    'Poolside resort walkway in Da Nang, Vietnam',
-    'Coastal resort terrace in Sanya, China',
-    'Ocean-view hotel promenade near Busan, South Korea',
+    LOCKED_LOCATION_LIBRARY[10],
+    LOCKED_LOCATION_LIBRARY[12],
+    LOCKED_LOCATION_LIBRARY[4],
   ],
 }
 
@@ -627,14 +693,9 @@ const LOOKBOOK_NANO_BANANA_PRO_RULES = `[NANO BANANA PRO IMAGE RULESET]
 10. If tone is sexy, keep it tasteful, classy, non-explicit, and policy-safe.`
 
 const LOOKBOOK_NATURAL_LOCATION_FALLBACKS = [
-  'Street fashion corner near Hoan Kiem Lake, Hanoi, Vietnam',
-  'Sidewalk cafe frontage in Thao Dien, Ho Chi Minh City, Vietnam',
-  'Tree-lined avenue near West Lake, Hanoi, Vietnam',
-  'Open plaza near Myeongdong shopping street, Seoul, South Korea',
-  'Riverside walk near Han River park, Seoul, South Korea',
-  'Pedestrian lane near Xintiandi district, Shanghai, China',
-  'Boutique storefront lane in Jing An district, Shanghai, China',
-  'Outdoor market lane in Ben Thanh area, Ho Chi Minh City, Vietnam',
+  ...LOCKED_LOCATION_FLEX_POOL,
+  ...LOCKED_LOCATION_STUDIO_POOL,
+  ...LOCKED_LOCATION_MIRROR_POOL,
 ] as const
 
 const FIXED_AFFILIATE_MODE: AffiliateMode = 'strict'
@@ -1023,16 +1084,6 @@ const LEGACY_PRODUCT_CATEGORY_ALIASES: Record<string, ProductCategory> = {
   set_phoi_do_hang_ngay: 'tops_tshirt',
   do_tap_athleisure: 'activewear_apparel',
 }
-
-const ALLOWED_LOCATION_KEYWORDS = [
-  'vietnam',
-  'viet nam',
-  'china',
-  'trung quoc',
-  'south korea',
-  'han quoc',
-  'korea',
-]
 
 const MIRROR_LOCATION_STYLE_KEYWORDS = [
   'mirror',
@@ -1879,7 +1930,7 @@ function appendKeyframeCopySafetyRule(prompt: string): string {
 }
 
 function buildLookbookPrimaryLocationFallback(_contentType: ResolvedContentType): string {
-  return LOOKBOOK_NATURAL_LOCATION_FALLBACKS[0]
+  return getLockedLocationFallback('flex')
 }
 
 function ensureLookbookNanoBananaPrompt(
@@ -2048,7 +2099,8 @@ function normalizeLookbookImagePromptList(
     const fallbackFacing = resolveLookbookPoseDirection(index, poseDirectionLock)
     const parsedFacingDirection = normalizeLookbookFacingDirection(item.facingDirection, fallbackFacing)
     const facingDirection = poseDirectionLock === 'auto' ? parsedFacingDirection : poseDirectionLock
-    const location = item.location?.trim() || getLookbookThemeLocationFallback(theme, index) || defaultFallback.location || ''
+    const fallbackLocation = getLookbookThemeLocationFallback(theme, index) || defaultFallback.location || getLockedLocationFallback('flex', index)
+    const location = resolveLockedLocationEntry(item.location?.trim() || '') || fallbackLocation
     const camera = item.camera?.trim() || defaultFallback.camera || ''
     const lighting = item.lighting?.trim() || defaultFallback.lighting || ''
     const styleBase = item.style?.trim() || defaultFallback.style || ''
@@ -2116,9 +2168,10 @@ function normalizeLookbookImagePromptList(
         fallbackItem.facingDirection || resolveLookbookPoseDirection(index, poseDirectionLock),
       )
       const facingDirection = poseDirectionLock === 'auto' ? parsedFacingDirection : poseDirectionLock
-      const location = typeof record.location === 'string' && record.location.trim().length > 0
+      const locationCandidate = typeof record.location === 'string' && record.location.trim().length > 0
         ? record.location.trim()
-        : (fallbackItem.location || getLookbookThemeLocationFallback(theme, index) || defaultFallback.location || '')
+        : (fallbackItem.location || getLookbookThemeLocationFallback(theme, index) || defaultFallback.location || getLockedLocationFallback('flex', index))
+      const location = resolveLockedLocationEntry(locationCandidate) || getLockedLocationFallback('flex', index)
       const camera = typeof record.camera === 'string' && record.camera.trim().length > 0
         ? record.camera.trim()
         : (fallbackItem.camera || defaultFallback.camera || '')
@@ -2181,6 +2234,45 @@ function normalizeLocationKey(value: string): string {
     .trim()
 }
 
+function resolveLockedLocationEntry(value: string): string | null {
+  const normalized = normalizeLocationKey(value)
+  if (!normalized) return null
+
+  let bestMatch: { value: string; score: number } | null = null
+
+  for (const candidate of LOCKED_LOCATION_LIBRARY) {
+    const normalizedCandidate = normalizeLocationKey(candidate)
+    if (!normalizedCandidate) continue
+
+    if (normalized === normalizedCandidate) {
+      return candidate
+    }
+
+    const intersects = normalized.includes(normalizedCandidate) || normalizedCandidate.includes(normalized)
+    if (!intersects) continue
+
+    const score = Math.min(normalized.length, normalizedCandidate.length)
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = { value: candidate, score }
+    }
+  }
+
+  return bestMatch?.value || null
+}
+
+function getLockedLocationPool(styleLock: 'mirror' | 'studio' | 'flex'): readonly string[] {
+  if (styleLock === 'mirror') return LOCKED_LOCATION_MIRROR_POOL
+  if (styleLock === 'studio') return LOCKED_LOCATION_STUDIO_POOL
+  return LOCKED_LOCATION_FLEX_POOL
+}
+
+function getLockedLocationFallback(styleLock: 'mirror' | 'studio' | 'flex' = 'flex', index = 0): string {
+  const preferredPool = getLockedLocationPool(styleLock)
+  const effectivePool = preferredPool.length > 0 ? preferredPool : LOCKED_LOCATION_LIBRARY
+  const safeIndex = Math.max(0, index)
+  return effectivePool[safeIndex % effectivePool.length]
+}
+
 function hasStyleKeyword(value: string, keywords: readonly string[]): boolean {
   const normalized = normalizeLocationKey(value)
   if (!normalized) return false
@@ -2189,6 +2281,10 @@ function hasStyleKeyword(value: string, keywords: readonly string[]): boolean {
 }
 
 function isTikTokRestrictedFlatBackgroundLocation(value: string): boolean {
+  if (resolveLockedLocationEntry(value)) {
+    return false
+  }
+
   const normalized = normalizeLocationKey(value)
   if (!normalized) return false
 
@@ -2477,6 +2573,16 @@ function matchesStyleLockForLocation(location: string, styleLock: ContentStyleLo
   if (styleLock === 'flex') return true
 
   const hasMirror = hasStyleKeyword(location, MIRROR_LOCATION_STYLE_KEYWORDS)
+
+  const resolvedLibraryLocation = resolveLockedLocationEntry(location)
+  if (resolvedLibraryLocation) {
+    if (styleLock === 'mirror') {
+      return hasMirror
+    }
+
+    return !hasMirror
+  }
+
   const hasStudio = hasStyleKeyword(location, STUDIO_LOCATION_STYLE_KEYWORDS)
 
   if (styleLock === 'mirror') {
@@ -2487,15 +2593,7 @@ function matchesStyleLockForLocation(location: string, styleLock: ContentStyleLo
 }
 
 function getStyleLockFallbackLocation(styleLock: ContentStyleLock): string {
-  if (styleLock === 'mirror') {
-    return 'Wardrobe mirror corner in a fashion fitting room, District 1, Ho Chi Minh City, Vietnam'
-  }
-
-  if (styleLock === 'studio') {
-    return 'Single-corner fashion studio with textured wall panels and clothing rack props, District 7, Ho Chi Minh City, Vietnam'
-  }
-
-  return 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam'
+  return getLockedLocationFallback(styleLock)
 }
 
 function buildTikTokNativeSignalRules(contentType: ResolvedContentType): string {
@@ -3144,13 +3242,6 @@ function removeTurnCuePhrases(value: string): string {
   return normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
 }
 
-function isAllowedLocationCountry(value: string): boolean {
-  const normalized = normalizeLocationKey(value)
-  if (!normalized) return false
-
-  return ALLOWED_LOCATION_KEYWORDS.some((keyword) => normalized.includes(keyword))
-}
-
 function createProductImageId(dataUrl: string): string {
   const normalized = dataUrl.trim()
   const sample = normalized.length > 12000
@@ -3367,6 +3458,21 @@ async function generateWithGemini(
   const productCategoryReviewFocusSentence = hasExplicitProductCategoryLock
     ? `Category review focus: ${productCategoryReviewFocusText}`
     : ''
+  const normalizedUserNotes = normalizePromptWhitespace(notes)
+  const hasUserNotesIntentLock = normalizedUserNotes.length > 0
+  const userNotesIntentAnchor = hasUserNotesIntentLock
+    ? normalizedUserNotes.slice(0, 320)
+    : ''
+  const userIntentPriorityStepRules = `USER INTENT PRIORITY STEP (MANDATORY ORDER):
+- Step 1: USER NOTES explicit requirements are primary intent.
+- Step 2: PRODUCT CATEGORY lock (when active) must remain hero-product focus while applying Step 1.
+- Step 3: Default creative/type/template/style rules apply only to dimensions not specified by Steps 1-2.
+- Step 4: Fallback heuristics apply only when Steps 1-3 are silent.
+- Conflict order: Step 1 > Step 2 > Step 3 > Step 4.
+- Non-negotiable constraints remain unchanged: schema integrity + Rules 1, 2, 12, 15, 31.`
+  const userIntentPriorityStepSummary = hasUserNotesIntentLock
+    ? `Priority anchor from USER NOTES: ${userNotesIntentAnchor}`
+    : 'Priority anchor from USER NOTES: none (use category lock/default rules).'
   const tiktokAnalysisReferenceLockRules = isTikTokAnalysisReferenceMode
     ? `TIKTOK SCRIPT TRANSFER LOCK (MANDATORY):
 - Use analyzed TikTok video only as script/beat/camera-rhythm reference.
@@ -3885,17 +3991,23 @@ ${VEO_INTERPOLATION_GUARDRAILS}
 CELEBRITY / REAL-PERSON SAFETY GUARDRAILS (MANDATORY):
 ${CELEBRITY_POLICY_GUARDRAILS}
 
+LOCKED LOCATION LIBRARY (MANDATORY - choose only from this list):
+${LOCKED_LOCATION_LIBRARY_PROMPT_LIST}
+
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
+
+${userIntentPriorityStepRules}
+${userIntentPriorityStepSummary}
 
 USER NOTES OVERRIDE CONTRACT (APPLIES TO THIS PLANNING STAGE):
 - If USER NOTES conflict with default style/template/trend/type guidance, USER NOTES win.
 - Above guidance blocks are defaults, not hard creative constraints, when USER NOTES explicitly specify alternatives.
-- Non-negotiable constraints only: valid JSON schema, interpolation continuity safety (Rules 1, 2, 12), location scope lock (Rule 15), and celebrity/public-figure safety (Rule 31).
+- Non-negotiable constraints only: valid JSON schema, interpolation continuity safety (Rules 1, 2, 12), location library lock (Rule 15), and celebrity/public-figure safety (Rule 31).
 
 RULES:
-- [COMMON] Location scope: Vietnam, China, South Korea only.
-- [COMMON] Use fresh real-world locations only; do not reuse any location in history lists above and do not use fixed/preset location pools.
+- [COMMON] LOCATION LIBRARY LOCK: choose locations only from LOCKED LOCATION LIBRARY above; do not invent new location strings.
+- [COMMON] Avoid reusing any location in history lists above.
 ${planningLocationContinuityRule}
 - [COMMON] Follow retention arc: Hook -> Value -> Proof -> Close.
 - [COMMON] Keep action/camera progression in small adjacent deltas to reduce first-last-frame interpolation artifacts.
@@ -4104,10 +4216,12 @@ Output STRICT JSON only:
       const candidate = location.trim()
       if (candidate.length === 0) return false
 
+      const resolvedCandidate = resolveLockedLocationEntry(candidate)
+      if (!resolvedCandidate) return false
+
       return (
-        isAllowedLocationCountry(candidate)
-        && !isTikTokRestrictedFlatBackgroundLocation(candidate)
-        && (relaxHardRulesByNotes || matchesStyleLockForLocation(candidate, finalStyleLock))
+        !isTikTokRestrictedFlatBackgroundLocation(resolvedCandidate)
+        && (relaxHardRulesByNotes || matchesStyleLockForLocation(resolvedCandidate, finalStyleLock))
       )
     }
 
@@ -4115,64 +4229,21 @@ Output STRICT JSON only:
       const candidate = location.trim()
       if (candidate.length === 0) return false
 
-      const candidateKey = normalizeLocationKey(candidate)
+      const resolvedCandidate = resolveLockedLocationEntry(candidate)
+      if (!resolvedCandidate) return false
+
+      const candidateKey = normalizeLocationKey(resolvedCandidate)
 
       return (
-        isLocationStructurallyValid(candidate)
+        isLocationStructurallyValid(resolvedCandidate)
         && !blockedLocationKeys.has(candidateKey)
       )
     }
 
     const EMERGENCY_PRIMARY_LOCATIONS_BY_STYLE: Record<ContentStyleLock, string[]> = {
-      studio: [
-        'Single-corner content studio with textured wall and styling rack, Thu Duc, Ho Chi Minh City, Vietnam',
-        'SALIN Studio fashion content corner with textured wall and styling rack, District 10, Ho Chi Minh City, Vietnam',
-        'Hyper Concept studio corner with decor shelf and softbox bounce, Binh Thanh, Ho Chi Minh City, Vietnam',
-        'Lookbook studio corner with decor shelf and softbox bounce, Xuan Wu, Nanjing, China',
-        'Fashion showroom studio corner with textured wall and stool prop, Mapo-gu, Seoul, South Korea',
-        'Editorial studio corner with concrete texture backdrop and rolling garment rack, District 3, Ho Chi Minh City, Vietnam',
-        'Boutique content studio with arched wall niche and warm floor lamp, Ba Dinh, Hanoi, Vietnam',
-        'Natural-light loft studio corner with wood flooring and styling rail, Hai Chau, Da Nang, Vietnam',
-        'Minimal decor lookbook studio corner with plaster wall and pedestal props, Chaoyang, Beijing, China',
-        'Sunlit fashion content studio with neutral canvas backdrop and seating bench, Tianhe, Guangzhou, China',
-        'Premium showroom studio corner with textured beige wall and mirror panel, Futian, Shenzhen, China',
-        'K-fashion lookbook studio with muted wall tones and hanger rail, Yongsan-gu, Seoul, South Korea',
-        'Editorial content studio corner with concrete pillar and stool props, Haeundae-gu, Busan, South Korea',
-        'Soft daylight studio loft with fabric backdrop and styling table, Songpa-gu, Seoul, South Korea',
-      ],
-      mirror: [
-        'Wardrobe mirror corner in a fashion fitting room, Hai Ba Trung, Hanoi, Vietnam',
-        'Full-length mirror fitting room inside women fashion boutique, Xuhui, Shanghai, China',
-        'Dressing-room mirror corner with neutral decor, Seongsu, Seoul, South Korea',
-        'Full-body mirror corner near wardrobe rail in creator fitting room, District 1, Ho Chi Minh City, Vietnam',
-        'Boutique changing-room mirror with soft ambient lamps and ottoman, District 5, Ho Chi Minh City, Vietnam',
-        'Apartment dressing nook with full-length mirror and neutral curtain, Tay Ho, Hanoi, Vietnam',
-        'Store fitting-room mirror aisle with warm ceiling lights, Hai Chau, Da Nang, Vietnam',
-        'Full-length mirror corner beside outfit rack in fashion boutique, Chaoyang, Beijing, China',
-        'Boutique fitting-room mirror with textured plaster wall and bench, Yuexiu, Guangzhou, China',
-        'Dressing-room mirror alcove with warm spotlights and clean floor, Pudong, Shanghai, China',
-        'Minimal mirror fitting space with wall hooks and soft overhead light, Minhang, Shanghai, China',
-        'Walk-in closet mirror corner with styling stool and garment rail, Seocho-gu, Seoul, South Korea',
-        'Boutique fitting-room mirror with curtain backdrop and warm side lamps, Jung-gu, Busan, South Korea',
-        'Dressing-room mirror wall in women fashion store, Suseong-gu, Daegu, South Korea',
-      ],
-      flex: [
-        'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
-        'Urban shopping street corner near designer storefronts, Jingan, Shanghai, China',
-        'Outdoor fashion plaza near cafe storefronts, Gangnam, Seoul, South Korea',
-        'Pedestrian street outside fashion concept stores, District 1, Ho Chi Minh City, Vietnam',
-        'Sidewalk outside cafe and local boutique row, Tay Ho, Hanoi, Vietnam',
-        'Riverside promenade near lifestyle cafes and retail pop-ups, Son Tra, Da Nang, Vietnam',
-        'Shopping arcade entrance near flagship fashion stores, Chaoyang, Beijing, China',
-        'Tree-lined avenue by boutique cafes and concept shops, Huangpu, Shanghai, China',
-        'Outdoor plaza near mall frontage and coffee kiosks, Tianhe, Guangzhou, China',
-        'Urban crosswalk corner near designer storefront block, Nanshan, Shenzhen, China',
-        'Alleyway fashion strip with mural wall and small cafes, Qingyang, Chengdu, China',
-        'Sidewalk near department-store facade and cafe terrace, Seocho-gu, Seoul, South Korea',
-        'Open-air shopping lane with boutique windows and signage, Jung-gu, Busan, South Korea',
-        'Neighborhood fashion street near brunch cafe fronts, Yeonsu-gu, Incheon, South Korea',
-        'Urban pedestrian square near lifestyle retail and flower kiosk, Nam-gu, Ulsan, South Korea',
-      ],
+      studio: [...LOCKED_LOCATION_STUDIO_POOL],
+      mirror: [...LOCKED_LOCATION_MIRROR_POOL],
+      flex: [...LOCKED_LOCATION_FLEX_POOL],
     }
 
     const aiPlannedLocationPool = planningResult.locationCandidates
@@ -4196,7 +4267,12 @@ Output STRICT JSON only:
           return { ok: false, reason: `keyframe[${i}] missing location` }
         }
 
-        if (isTikTokRestrictedFlatBackgroundLocation(location)) {
+        const resolvedLocation = resolveLockedLocationEntry(location)
+        if (!resolvedLocation) {
+          return { ok: false, reason: `keyframe[${i}] location is not in locked location library` }
+        }
+
+        if (isTikTokRestrictedFlatBackgroundLocation(resolvedLocation)) {
           return { ok: false, reason: `keyframe[${i}] location uses restricted flat/plain background` }
         }
 
@@ -4222,19 +4298,20 @@ Output STRICT JSON only:
           return { ok: false, reason: `keyframe[${i}] missing location` }
         }
 
-        if (isTikTokRestrictedFlatBackgroundLocation(location)) {
+        const resolvedLocation = resolveLockedLocationEntry(location)
+        if (!resolvedLocation) {
+          return { ok: false, reason: `keyframe[${i}] location is not in locked location library` }
+        }
+
+        if (isTikTokRestrictedFlatBackgroundLocation(resolvedLocation)) {
           return { ok: false, reason: `keyframe[${i}] location uses restricted flat/plain background` }
         }
 
-        if (!isAllowedLocationCountry(location)) {
-          return { ok: false, reason: `keyframe[${i}] location out of VN/CN/KR scope` }
-        }
-
-        if (!isLocationCandidateAllowed(location)) {
+        if (!isLocationCandidateAllowed(resolvedLocation)) {
           return { ok: false, reason: `keyframe[${i}] location blocked by history constraints` }
         }
 
-        if (!relaxHardRulesByNotes && !matchesStyleLockForLocation(location, finalStyleLock)) {
+        if (!relaxHardRulesByNotes && !matchesStyleLockForLocation(resolvedLocation, finalStyleLock)) {
           return { ok: false, reason: `keyframe[${i}] location violates style lock ${finalStyleLock}` }
         }
       }
@@ -4643,17 +4720,23 @@ ${usedLocationsProductPrompt}
 LOCATIONS ALREADY USED FOR SAME OUTFIT TYPE (MUST AVOID REUSE):
 ${usedLocationsOutfitTypePrompt}
 
+LOCKED LOCATION LIBRARY (MANDATORY - choose only from this list):
+${LOCKED_LOCATION_LIBRARY_PROMPT_LIST}
+
 ${enforceSinglePrimaryLocation ? 'PRIMARY LOCATION LOCK (DEFAULT; SUBORDINATE TO RULE 30):' : 'LOCATION CONTINUITY MODE (USER NOTES OVERRIDE ACTIVE):'}
 ${enforceSinglePrimaryLocation
   ? (
     primaryPlannedLocation.length > 0
       ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
-      : 'Select one valid real-world location in Vietnam/China/South Korea and keep it identical across all keyframes/scenes.'
+      : 'Select one valid location from LOCKED LOCATION LIBRARY and keep it identical across all keyframes/scenes.'
   )
-  : 'User notes request location transitions: allow controlled multi-location progression across scenes while preserving interpolation continuity and keeping all locations within Vietnam/China/South Korea.'}
+  : 'User notes request location transitions: allow controlled multi-location progression across scenes while preserving interpolation continuity and keeping all locations within LOCKED LOCATION LIBRARY.'}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
+
+${userIntentPriorityStepRules}
+${userIntentPriorityStepSummary}
 
 SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
 ${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
@@ -4661,13 +4744,13 @@ ${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
 USER NOTES OVERRIDE CONTRACT (GLOBAL PRECEDENCE):
 - If USER NOTES conflict with any default creative/style/template/type instruction, USER NOTES win.
 - This override also applies to type-specific trend signals, fit-model defaults, and Rule 32 direction heuristics.
-- Non-negotiable constraints only: valid output schema, required scene/keyframe counts, interpolation continuity safety (Rules 1, 2, 12), location scope lock (Rule 15), and celebrity/public-figure safety (Rule 31).
+- Non-negotiable constraints only: valid output schema, required scene/keyframe counts, interpolation continuity safety (Rules 1, 2, 12), location library lock (Rule 15), and celebrity/public-figure safety (Rule 31).
 
 ${notes ? `⚡ USER NOTES PRIORITY MODE — ACTIVE
 Rule 30 is the PRIMARY creative directive for this run.
 Rules 3–29 and Rule 32 defaults are SUBORDINATE to User Notes wherever user intent conflicts with defaults.
 Apply User Notes first; only fall back to defaults when User Notes are silent on a dimension.
-Truly non-negotiable: Rule 31 (celebrity safety), Rule 15 (location scope), output schema structure,
+Truly non-negotiable: Rule 31 (celebrity safety), Rule 15 (location library lock), output schema structure,
 scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12).` : ''}
 
 CRITICAL RULES [Rule 30 has strongest creative authority. Rules 3–29 and Rule 32 defaults yield on conflict. Non-negotiable: Rules 1, 2, 12, 15, 31 plus schema/count integrity]:
@@ -4685,8 +4768,8 @@ CRITICAL RULES [Rule 30 has strongest creative authority. Rules 3–29 and Rule 
 11. Camera grammar must stay coherent: one dominant camera move per 8s scene. Use scenes[i].cameraMovement format "Position: <...> | Motion: <...>" and only use allowed hybrid motion "Dolly in zoom out" or "Dolly out zoom in" when needed.
 12. First-last-frame interpolation safety is mandatory: adjacent keyframes must use micro-progression (small pose delta, stable framing axis, no sudden body teleport).
 13. Lighting and color tone continuity must be maintained across adjacent scenes unless a deliberate story transition is stated.
-14. LOCATION MUST BE REAL-WORLD VENUES ONLY - Use authentic, recognizable physical places (cafes, streets, parks, shopping districts, studios), never CGI/digital/fantasy environments, and avoid flat/plain seamless backgrounds (example: "minimalist high-end white studio background").
-15. LOCATION SCOPE = VIETNAM, CHINA, SOUTH KOREA ONLY - Every location must be in Vietnam, China, or South Korea, and must include concrete city/area + venue details.
+14. LOCATION MUST COME FROM LOCKED LOCATION LIBRARY ONLY - Never invent or paraphrase new location names outside the provided locked list.
+15. LOCATION LIBRARY LOCK - Every keyframe location must exactly map to one entry in LOCKED LOCATION LIBRARY; keep location continuity according to Rule 30 decision.
 16. AVOID PREVIOUS LOCATIONS FOR SAME PRODUCT IMAGE ID + SAME OUTFIT TYPE - Never reuse locations listed in either location-history section above.
 17. ANTI-DUPLICATE + RANDOMIZATION REQUIREMENT - Use the Diversity seed to generate fresh concepts; do not duplicate ACTION, LOCATION, CAMERA, NARRATIVE in one output.
 18. PRODUCT-FIRST COMPOSITION - Product/garment is the hero in every keyframe; avoid clutter and occlusion that hides purchase-relevant details.
@@ -4701,7 +4784,7 @@ CRITICAL RULES [Rule 30 has strongest creative authority. Rules 3–29 and Rule 
 27. SINGLE-CORNER STUDIO SPEC - Keep one fixed studio corner with contextual depth (textured/decorated wall, practical props like rack/stool/shelf), soft controlled lighting, and consistent camera axis for all scenes; avoid plain seamless white/solid-color backdrops. [SUBORDINATE to Rule 30 — User Notes may modify studio spec]
 28. STYLE CONSISTENCY LOCK - OOTDMIRROR must stay mirror-only, OOTD must stay studio-only, and OutfitIdeas must stay mix-and-match styling-first with non-mirror framing by default. If User Notes explicitly request mirror/fitcheck, keep that mirror setup consistent across scenes. [SUBORDINATE to Rule 30 — User Notes may override style lock]
 29. INTERPOLATION ANTI-GLITCH RULE - Avoid terms/instructions implying abrupt transitions (teleport, jump cut, hard cut, instant morph, abrupt switch), and avoid immediate opposite camera direction between adjacent scenes unless an explicit turnaround beat is included.
-30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default creative/style/template/type instructions in Rules 3–29 and Rule 32 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Non-negotiable constraints are limited to Rule 31 (celebrity safety), Rule 15 (location scope), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12).
+30. USER NOTES PRIORITY LOCK (HIGHEST CREATIVE AUTHORITY) — User Notes OVERRIDE all default creative/style/template/type instructions in Rules 3–29 and Rule 32 for any dimension they explicitly address. Only fall back to rule defaults for dimensions User Notes are silent on. Non-negotiable constraints are limited to Rule 31 (celebrity safety), Rule 15 (location library lock), output schema structure, scene/keyframe counts, and VEO interpolation continuity (Rules 1, 2, 12).
 31. CELEBRITY / PUBLIC-FIGURE SAFETY LOCK - Never depict/imitate/reference real celebrities/public figures/identifiable persons, never generate deepfake-style impersonation or fake endorsement/dialogue; if user asks for real person, convert to fictional archetype while preserving only general mood/style.
 ${facingRuleForGenerationPrompt}
 
@@ -4713,7 +4796,7 @@ Return STRICT COMPACT JSON only in this schema:
       "index": 0,
       "action": "pose/movement description",
       "facingDirection": "front|back|left|right|three-quarter-left|three-quarter-right",
-      "location": "real location (city/area + venue details in Vietnam/China/South Korea)",
+      "location": "one exact location string from LOCKED LOCATION LIBRARY",
       "camera": "lens, shot type, angle",
       "lighting": "lighting setup",
       "style": "photography style"
@@ -4765,7 +4848,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
 
   Validate and repair the draft package to satisfy all constraints below:
   - Enforce CRITICAL RULES with Rule 30 precedence exactly as defined in package generation stage.
-  - Keep location scope strictly in Vietnam/China/South Korea and real-world venues only.
+  - Keep every location strictly inside LOCKED LOCATION LIBRARY only.
   - Keep scene/keyframe continuity aligned with rules 2, 9, 12, and 13.
   - Conflict resolution order is strict: USER NOTES > default creative/type/template guardrails > fallback heuristics.
   - Preserve character identity and garment fidelity with zero drift.
@@ -4782,6 +4865,9 @@ ${productCategoryFocusRules}
 ${tiktokAnalysisReferenceLockRules}
 ${backgroundLocationReferenceRules}
 
+LOCKED LOCATION LIBRARY (MANDATORY - choose only from this list):
+${LOCKED_LOCATION_LIBRARY_PROMPT_LIST}
+
 ${enforceSinglePrimaryLocation ? 'PRIMARY LOCATION LOCK (DEFAULT; SUBORDINATE TO RULE 30):' : 'LOCATION CONTINUITY MODE (USER NOTES OVERRIDE ACTIVE):'}
 ${enforceSinglePrimaryLocation
     ? (
@@ -4789,10 +4875,13 @@ ${enforceSinglePrimaryLocation
         ? primaryPlannedLocation
         : 'No pre-selected lock available. Keep one location consistent across all keyframes/scenes.'
     )
-    : 'User notes request location transitions: allow controlled multi-location progression while preserving continuity and VN/CN/KR scope.'}
+    : 'User notes request location transitions: allow controlled multi-location progression while preserving continuity within LOCKED LOCATION LIBRARY.'}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
+
+${userIntentPriorityStepRules}
+${userIntentPriorityStepSummary}
 
 SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
 ${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
@@ -4864,11 +4953,14 @@ TASK:
 - Preserve celebrity/public-figure safety guardrails (no real-person likeness or impersonation cues).
 
 LOCATION CONSTRAINTS:
-- Scope strictly Vietnam/China/South Korea.
+- Scope strictly to LOCKED LOCATION LIBRARY only.
 - Avoid all locations in history lists below.
 - Keep real-world venues only.
 - Reject flat/plain seamless backgrounds (example: "minimalist high-end white studio background"). If studio is used, include contextual set cues (textured wall/props/depth).
 - ${backgroundLocationReferenceRules}
+
+LOCKED LOCATION LIBRARY (MANDATORY - choose only from this list):
+${LOCKED_LOCATION_LIBRARY_PROMPT_LIST}
 
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsProductPrompt}
@@ -4886,7 +4978,10 @@ ${enforceSinglePrimaryLocation
       ? `Use this exact location string in all keyframes/scenes: ${primaryPlannedLocation}`
       : 'If unavailable, keep one valid location consistent across all keyframes/scenes.'
   )
-  : 'User notes request location transitions: keep VN/CN/KR scope and continuity, but allow controlled multi-location progression across keyframes/scenes.'}
+  : 'User notes request location transitions: keep continuity inside LOCKED LOCATION LIBRARY, but allow controlled multi-location progression across keyframes/scenes.'}
+
+${userIntentPriorityStepRules}
+${userIntentPriorityStepSummary}
 
 FAILED VALIDATION REASON:
 ${strictLocationValidation.reason || 'unknown'}
@@ -4941,6 +5036,9 @@ ${backgroundLocationReferenceRules}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
+
+${userIntentPriorityStepRules}
+${userIntentPriorityStepSummary}
 
 SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
 ${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
@@ -5009,6 +5107,16 @@ Return STRICT JSON only, same schema:
 
     const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
     const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : []
+
+    if (hasUserNotesIntentLock || hasExplicitProductCategoryLock) {
+      stageMetrics.push({
+        stage: 'intent_priority_enforcement',
+        attempt: 0,
+        durationMs: 0,
+        ok: true,
+        note: `notes=${hasUserNotesIntentLock ? 'on' : 'off'}, category=${hasExplicitProductCategoryLock ? normalizedProductCategory : 'auto'}`,
+      })
+    }
 
     if (preNormalizeKeyframeCount !== keyframeCount || preNormalizeSceneCount !== sceneCount) {
       stageMetrics.push({
@@ -5112,6 +5220,34 @@ Return STRICT JSON only, same schema:
       return next
     }
 
+    const applyUserIntentPriorityStepToText = (
+      value: string,
+      mode: 'dna' | 'action' | 'narrative' = 'narrative',
+    ): string => {
+      let next = applyProductCategoryFocusToText(value, mode)
+
+      if (!hasUserNotesIntentLock) {
+        return next
+      }
+
+      if (mode === 'dna') {
+        if (userNotesIntentAnchor.length > 0) {
+          next = appendSentenceIfMissing(next, `User-notes priority anchor: ${userNotesIntentAnchor}`)
+        }
+      } else if (mode === 'narrative') {
+        next = appendSentenceIfMissing(
+          next,
+          'Keep explicit user-note intent as the primary decision signal for styling tone, pacing, and scene mood before defaults',
+        )
+      }
+
+      if (hasExplicitProductCategoryLock && mode !== 'action') {
+        next = appendSentenceIfMissing(next, `Maintain selected category hero focus: ${productCategoryLabel}`)
+      }
+
+      return next
+    }
+
     const pickAiPlannedLocationFallback = (): string => {
       if (aiPlannedLocationPool.length === 0) {
         return ''
@@ -5140,17 +5276,17 @@ Return STRICT JSON only, same schema:
       const preferPrimaryLock = options.preferPrimaryLock ?? true
 
       if (preferPrimaryLock && primaryPlannedLocation.length > 0 && isLocationCandidateAllowed(primaryPlannedLocation)) {
-        return primaryPlannedLocation
+        return resolveLockedLocationEntry(primaryPlannedLocation) || primaryPlannedLocation
       }
 
       const candidate = toSafeString(value, '')
       if (isLocationCandidateAllowed(candidate)) {
-        return candidate
+        return resolveLockedLocationEntry(candidate) || candidate
       }
 
       const fallbackFromAiPlan = pickAiPlannedLocationFallback()
       if (fallbackFromAiPlan.length > 0) {
-        return fallbackFromAiPlan
+        return resolveLockedLocationEntry(fallbackFromAiPlan) || fallbackFromAiPlan
       }
 
       const emergencyPrimaryLocation = pickEmergencyPrimaryLocation()
@@ -5352,7 +5488,7 @@ Return STRICT JSON only, same schema:
         camera = enforceOotdMirrorObserverCamera(camera)
       }
 
-      action = applyProductCategoryFocusToText(action, 'action')
+      action = applyUserIntentPriorityStepToText(action, 'action')
 
       normalizedKeyframesForRule32.push({
         action,
@@ -5431,7 +5567,7 @@ Return STRICT JSON only, same schema:
       if (finalContentType === 'ootdmirror') {
         safeNarrative = enforceOotdMirrorSceneNarrative(safeNarrative)
       }
-      safeNarrative = applyProductCategoryFocusToText(safeNarrative, 'narrative')
+      safeNarrative = applyUserIntentPriorityStepToText(safeNarrative, 'narrative')
       let rawCameraMovement = toSafeString(
         sc.cameraMovement,
         SCENE_BEATS_MAP[finalContentType as Exclude<ContentType, 'auto'>][beatIndex].cameraHint
@@ -5486,7 +5622,7 @@ Return STRICT JSON only, same schema:
       : buildCharacterDNA(notes, finalContentType as Exclude<ContentType, 'auto'>)
 
     return {
-      masterDNA: applyProductCategoryFocusToText(rawMasterDNA, 'dna'),
+      masterDNA: applyUserIntentPriorityStepToText(rawMasterDNA, 'dna'),
       keyframes,
       scenes,
       resolvedContentType: finalContentType as ResolvedContentType,
@@ -6042,26 +6178,26 @@ function buildTikTokContextRemixLocationFallback(contextHint: string): string {
   const normalized = normalizeLocationKey(contextHint)
 
   if (/mirror|fitting|changing|boutique|shop|store|retail|thu do|cua hang/.test(normalized)) {
-    return 'Boutique fitting room and mirror corner, District 1, Ho Chi Minh City, Vietnam'
+    return LOCKED_LOCATION_LIBRARY[1]
   }
 
   if (/cafe|coffee/.test(normalized)) {
-    return 'Street-facing cafe frontage, Hoan Kiem, Hanoi, Vietnam'
+    return LOCKED_LOCATION_LIBRARY[12]
   }
 
   if (/street|sidewalk|walking|outdoor|outside|ngoai troi|pho|road/.test(normalized)) {
-    return 'Street fashion corner near walking district, Hoan Kiem, Hanoi, Vietnam'
+    return LOCKED_LOCATION_LIBRARY[18]
   }
 
   if (/studio|indoor|room|apartment|home|nha/.test(normalized)) {
-    return 'Lifestyle studio room with textured wall, Hai Ba Trung, Hanoi, Vietnam'
+    return LOCKED_LOCATION_LIBRARY[0]
   }
 
   if (/mall|shopping|department/.test(normalized)) {
-    return 'Shopping district corridor, District 1, Ho Chi Minh City, Vietnam'
+    return LOCKED_LOCATION_LIBRARY[7]
   }
 
-  return 'Street fashion corner near shopping district, Hoan Kiem, Hanoi, Vietnam'
+  return getLockedLocationFallback('flex')
 }
 
 function getWorkHistoryTimestampMs(item: WorkHistoryItem): number {
@@ -6208,7 +6344,7 @@ function buildPromptResultFromHistoryItem(
           subject: lookbookPromptFallback[0].subject || buildDefaultFrameSubject(aspectRatio),
           action: lookbookPromptFallback[0].action || 'Front-facing hero pose with clear outfit readability and realistic posture.',
           facingDirection: lookbookPromptFallback[0].facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[0],
-          location: lookbookPromptFallback[0].location || 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
+          location: lookbookPromptFallback[0].location || getLockedLocationFallback('flex'),
           camera: lookbookPromptFallback[0].camera || 'Fashion editorial camera framing, stable axis, realistic proportions.',
           lighting: lookbookPromptFallback[0].lighting || 'Clean editorial soft lighting with texture clarity.',
           style: lookbookPromptFallback[0].style || 'Social-native lookbook editorial style, trust-first realism.',
@@ -6244,9 +6380,13 @@ function buildPromptResultFromHistoryItem(
 
   const fallbackLocation = (index: number) => {
     if (generatedLocations.length > 0) {
-      return generatedLocations[index % generatedLocations.length]
+      const fromHistory = generatedLocations[index % generatedLocations.length]
+      const resolvedFromHistory = resolveLockedLocationEntry(fromHistory)
+      if (resolvedFromHistory) {
+        return resolvedFromHistory
+      }
     }
-    return 'Mirror fitcheck corner, Hoan Kiem, Hanoi, Vietnam'
+    return getLockedLocationFallback('mirror', index)
   }
 
   const defaultHistoryFacingSequence = duration >= 32
@@ -6261,7 +6401,8 @@ function buildPromptResultFromHistoryItem(
       buildDefaultFrameSubject(aspectRatio),
     )
     const action = toHistoryString(raw.action, `Fashion showcase movement beat ${index + 1}`)
-    const location = toHistoryString(raw.location, fallbackLocation(index))
+    const rawLocation = toHistoryString(raw.location, '')
+    const location = resolveLockedLocationEntry(rawLocation) || fallbackLocation(index)
     const camera = toHistoryString(raw.camera, 'AI-selected framing and lens optimized for TikTok fashion storytelling')
     const lighting = toHistoryString(raw.lighting, 'Soft cinematic lighting prioritizing product readability')
     const style = toHistoryString(raw.style, 'TikTok fashion editorial aesthetic with social-native realism')
@@ -6304,7 +6445,7 @@ function buildPromptResultFromHistoryItem(
     const endSec = Math.round(((index + 1) * duration) / normalizedSceneCount)
     const startPose = toHistoryString(raw.startPose, keyframes[index]?.action || '')
     const endPose = toHistoryString(raw.endPose, keyframes[index + 1]?.action || '')
-      const startLocation = keyframes[index]?.location || 'Mirror fitcheck corner, Hoan Kiem, Hanoi, Vietnam'
+      const startLocation = keyframes[index]?.location || getLockedLocationFallback('mirror', index)
       const endLocation = keyframes[index + 1]?.location || startLocation
       const derivedLocationFlow = normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
         ? `Hold location: ${startLocation}`
@@ -8169,7 +8310,8 @@ export default function App() {
           item.facingDirection ?? item.action ?? item.prompt,
           fallbackFacing,
         )
-        const location = item.location?.trim() || fallback?.location || 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam'
+        const locationCandidate = item.location?.trim() || fallback?.location || getLockedLocationFallback('flex')
+        const location = resolveLockedLocationEntry(locationCandidate) || getLockedLocationFallback('flex', index)
         const camera = item.camera?.trim() || fallback?.camera || 'Fashion editorial camera framing with stable axis, full outfit readability, and realistic proportions.'
         const lighting = item.lighting?.trim() || fallback?.lighting || 'Clean editorial soft lighting prioritizing texture clarity and product detail readability.'
         const style = item.style?.trim() || fallback?.style || 'Classic social-native lookbook editorial with practical styling clarity and trust-first realism.'
@@ -8219,7 +8361,7 @@ export default function App() {
               subject: fallbackSet[0].subject || buildDefaultFrameSubject(aspectRatio),
               action: fallbackSet[0].action || 'Front-facing hero pose with clear outfit readability and realistic posture.',
               facingDirection: fallbackSet[0].facingDirection || LOOKBOOK_NANO_BANANA_FACING_SEQUENCE[0],
-              location: fallbackSet[0].location || 'Street fashion corner near a shopping district, Hoan Kiem, Hanoi, Vietnam',
+              location: fallbackSet[0].location || getLockedLocationFallback('flex'),
               camera: fallbackSet[0].camera || 'Fashion editorial camera framing, stable axis, realistic proportions.',
               lighting: fallbackSet[0].lighting || 'Clean editorial soft lighting with texture clarity.',
               style: fallbackSet[0].style || 'Social-native lookbook editorial style, trust-first realism.',
