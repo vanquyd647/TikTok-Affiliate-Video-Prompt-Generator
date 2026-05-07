@@ -3287,6 +3287,7 @@ async function generateWithGemini(
   model: string,
   faceImage: string | null,
   productImage: string | null,
+  backgroundImage: string | null,
   duration: number,
   aspectRatio: string,
   notes: string,
@@ -3375,6 +3376,14 @@ async function generateWithGemini(
   const tiktokAnalysisReferenceLockSentence = isTikTokAnalysisReferenceMode
     ? 'TikTok analysis is structure-only reference; product review must stay anchored to the current input product image.'
     : ''
+  const hasBackgroundLocationReference = Boolean(backgroundImage)
+  const backgroundLocationReferenceRules = hasBackgroundLocationReference
+    ? `BACKGROUND LOCATION REFERENCE LOCK (OPTIONAL WHEN PROVIDED):
+- A background reference image is provided and should be used as location/environment guidance only.
+- Prioritize venue cues, spatial depth, and lighting mood from the background reference when selecting LOCATION.
+- Never copy people, garments, logos, or product identity from background reference; hero product still comes from PRODUCT reference image.
+- If background reference conflicts with USER NOTES, USER NOTES take priority.`
+    : 'BACKGROUND LOCATION REFERENCE LOCK: inactive (no background reference image provided).'
   const hasVideoPoseDirectionLock = poseDirectionLock !== 'auto'
   const videoPoseDirectionLockText = hasVideoPoseDirectionLock
     ? poseDirectionLock.toUpperCase()
@@ -3469,6 +3478,7 @@ ${buildFitModelRuleLockMatrix()}`
   const validResolvedTypes: ResolvedContentType[] = ['ootd', 'ootdmirror', 'grwm', 'outfitideas', 'fyp', 'review', 'tiktokshop', 'boutiquefeed', 'athleisure', 'haul', 'styling', 'luxury', 'streetstyle', 'sunnyaura', 'partyoutfit']
   const faceImageId = faceImage ? createProductImageId(faceImage) : 'none'
   const productImageId = productImage ? createProductImageId(productImage) : 'none'
+  const backgroundImageId = backgroundImage ? createProductImageId(backgroundImage) : 'none'
   const notesFingerprint = createTextFingerprint(notes)
 
   const asRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
@@ -3734,11 +3744,24 @@ ${buildFitModelRuleLockMatrix()}`
     })
   }
 
+  if (backgroundImage) {
+    const base64 = backgroundImage.split(',')[1] || backgroundImage
+    referenceParts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64,
+      },
+    })
+    referenceParts.push({
+      text: 'BACKGROUND LOCATION REFERENCE: use this image for environment/location cues only. Do not copy people/garments/logos from this image as product identity.',
+    })
+  }
+
   try {
     // STAGE 1 — VISUAL EXTRACT
     const visualExtractPrompt = `You are a senior fashion vision analyst.
 
-Analyze the provided face + garment references and return STRICT JSON only:
+Analyze the provided face + garment + optional background-location references and return STRICT JSON only:
 {
   "faceIdentity": "short identity lock summary",
   "bodyProfile": "short body proportion and posture lock summary",
@@ -3759,6 +3782,7 @@ Rules:
 - Be concrete and concise.
 - Do not invent unavailable details.
 - Focus on preserving identity and garment fidelity.
+- ${backgroundLocationReferenceRules}
 - ${hasExplicitProductCategoryLock
   ? `Category lock is ACTIVE: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()}). If references contain multiple garments, set garmentFacts for this selected category as hero product and treat other pieces as supporting context only.`
   : 'Category lock is AUTO: infer primary garment category from references.'}
@@ -3769,6 +3793,7 @@ ${notes ? `USER NOTES: ${notes}` : ''}`
       model,
       faceImageId,
       productImageId,
+      backgroundImageId,
       notesFingerprint,
       visualExtractPrompt,
     })
@@ -3813,10 +3838,12 @@ INPUT CONTEXT:
 - Sales template: ${salesTemplateLabel}
 - Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
 - Product category lock state: ${hasExplicitProductCategoryLock ? 'LOCKED' : 'AUTO'}
+- Background location reference: ${hasBackgroundLocationReference ? 'PROVIDED (environment/location guidance only)' : 'NOT PROVIDED'}
 - Diversity seed: ${diversitySeed}
 
 ${productCategoryFocusRules}
 ${tiktokAnalysisReferenceLockRules}
+${backgroundLocationReferenceRules}
 
 VISUAL ANALYSIS JSON:
 ${safeJsonStringify(visualAnalysis)}
@@ -3906,6 +3933,7 @@ Output STRICT JSON only:
       salesTemplate,
       faceImageId,
       productImageId,
+      backgroundImageId,
       notesFingerprint,
       planningPrompt,
       usedLocationsForProduct: normalizedUsedLocationsForProduct,
@@ -4552,6 +4580,7 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - Video pose-direction lock: ${videoPoseDirectionLockText}
 - Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
 - Product category lock state: ${hasExplicitProductCategoryLock ? 'LOCKED' : 'AUTO'}
+- Background location reference: ${hasBackgroundLocationReference ? 'PROVIDED (environment/location guidance only)' : 'NOT PROVIDED'}
 - Fit-model lock mode: ${fitModelRuleLockModeLabel}
 - Detail-sensitive facing mode: ${detailSensitiveFacingModeLabel}
 - Long-duration direction mode: ${longDurationDirectionalModeLabel}
@@ -4561,6 +4590,7 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 
 ${productCategoryFocusRules}
 ${tiktokAnalysisReferenceLockRules}
+${backgroundLocationReferenceRules}
 
 AFFILIATE OBJECTIVE:
 ${affiliateObjectiveForFinal}
@@ -4750,6 +4780,7 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
 
 ${productCategoryFocusRules}
 ${tiktokAnalysisReferenceLockRules}
+${backgroundLocationReferenceRules}
 
 ${enforceSinglePrimaryLocation ? 'PRIMARY LOCATION LOCK (DEFAULT; SUBORDINATE TO RULE 30):' : 'LOCATION CONTINUITY MODE (USER NOTES OVERRIDE ACTIVE):'}
 ${enforceSinglePrimaryLocation
@@ -4837,6 +4868,7 @@ LOCATION CONSTRAINTS:
 - Avoid all locations in history lists below.
 - Keep real-world venues only.
 - Reject flat/plain seamless backgrounds (example: "minimalist high-end white studio background"). If studio is used, include contextual set cues (textured wall/props/depth).
+- ${backgroundLocationReferenceRules}
 
 LOCATIONS ALREADY USED FOR THIS PRODUCT IMAGE ID (MUST AVOID REUSE):
 ${usedLocationsProductPrompt}
@@ -4905,6 +4937,7 @@ INTERPOLATION CONTINUITY REQUIREMENTS:
 
 ${productCategoryFocusRules}
 ${tiktokAnalysisReferenceLockRules}
+${backgroundLocationReferenceRules}
 
 USER NOTES (HIGHEST PRIORITY WHEN PROVIDED):
 ${notes ? notes : 'None'}
@@ -5480,6 +5513,7 @@ async function generateLookbookImagePromptWithGemini(
   model: string,
   faceImage: string | null,
   productImage: string | null,
+  backgroundImage: string | null,
   aspectRatio: '9:16' | '16:9',
   notes: string,
   imageCount: LookbookImageCount,
@@ -5528,6 +5562,17 @@ async function generateLookbookImagePromptWithGemini(
     parts.push({ text: 'GARMENT REFERENCE: preserve exact product details, colors, material, and silhouette.' })
   }
 
+  if (backgroundImage) {
+    const base64 = backgroundImage.split(',')[1] || backgroundImage
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: base64,
+      },
+    })
+    parts.push({ text: 'BACKGROUND LOCATION REFERENCE: use environment/location cues only; do not copy people/garments/logos as identity.' })
+  }
+
   const prompt = `You are an expert fashion creative director for affiliate lookbook imagery.
 
 TASK:
@@ -5541,6 +5586,7 @@ INPUT:
 - Lookbook style tone: ${styleTone.toUpperCase()}
 - Lookbook theme: ${theme.toUpperCase()} (${themeOption.label})
 - Pose direction lock: ${poseDirectionLock.toUpperCase()}
+- Background location reference: ${backgroundImage ? 'provided (use as environment guidance only)' : 'not provided'}
 ${notes ? `- User notes: ${notes}` : '- User notes: none'}
 
 TIKTOK SIGNAL REFERENCE:
@@ -5548,6 +5594,7 @@ ${LOOKBOOK_TIKTOK_SIGNAL_HINT}
 
 REQUIREMENTS:
 - Keep exact face identity and exact garment fidelity from references.
+- If background location reference is provided: prioritize location/environment cues from it, but keep identity and garment lock from face/product references.
 - Keep prompt practical and social-native for lookbook usage.
 - Do NOT include timeline language, keyframes, scenes, transitions, interpolation, or motion continuity instructions.
 - Do NOT mention real celebrities/public figures.
@@ -6812,6 +6859,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   model: string,
   faceImage: string | null,
   productImage: string | null,
+  backgroundImage: string | null,
   duration: number,
   aspectRatio: '9:16' | '16:9',
   analysis: TikTokAnalysisResult,
@@ -6828,6 +6876,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const reviewProductBrief = reviewNotes.trim().length > 0
     ? reviewNotes.trim()
     : 'San pham can review duoc xac dinh tu input hien tai.'
+  const hasBackgroundLocationReference = Boolean(backgroundImage)
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
   const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
@@ -6869,6 +6918,17 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     parts.push({ text: 'PRODUCT INPUT LOCK: this input image is the product to review and is the only source of product details.' })
   }
 
+  if (backgroundImage) {
+    const backgroundBase64 = backgroundImage.split(',')[1] || backgroundImage
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: backgroundBase64,
+      },
+    })
+    parts.push({ text: 'BACKGROUND LOCATION INPUT LOCK: use this image for context/location cues only; do not copy people/garments/logos from it as product identity.' })
+  }
+
   const prompt = `You are a TikTok prompt-packaging specialist in DETACHED ANALYSIS MODE.
 
 GOAL:
@@ -6881,6 +6941,7 @@ VIDEO CONFIG:
 - Aspect ratio: ${aspectRatio}
 - Required scenes: ${sceneCount}
 - Required keyframes: ${keyframeCount}
+- Background location reference: ${hasBackgroundLocationReference ? 'provided (environment/location guidance only)' : 'not provided'}
 
 REVIEW PRODUCT SOURCE (MANDATORY):
 - Review product context must come from REVIEW NOTES below.
@@ -6912,6 +6973,9 @@ HARD CONSTRAINTS:
 - Use analyzed TikTok video only as structure and rhythm reference.
 - Never copy product identity/outfit details from analyzed TikTok video.
 - Keep product review focus anchored to REVIEW NOTES and current PRODUCT input image.
+- ${hasBackgroundLocationReference
+  ? 'BACKGROUND LOCATION LOCK: prioritize location/environment cues from current BACKGROUND input image when choosing venue and ambiance; treat it as context-only guidance.'
+  : 'BACKGROUND LOCATION LOCK: no background input image provided.'}
 - Maintain believable social-native movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
 - Do not copy exact identifiable text/signage/persons from source video context.
@@ -7735,7 +7799,8 @@ export default function App() {
   const [model, setModel] = useState(() => localStorage.getItem('aff_model') || 'gemini-2.5-flash')
   const [faceImage, setFaceImage] = useState<string | null>(null)
   const [productImage, setProductImage] = useState<string | null>(null)
-  const [pasteTarget, setPasteTarget] = useState<'face' | 'product'>('face')
+  const [backgroundImage, setBackgroundImage] = useState<string | null>(null)
+  const [pasteTarget, setPasteTarget] = useState<'face' | 'product' | 'background'>('face')
   const [duration, setDuration] = useState(32)
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16')
   const [generationMode, setGenerationMode] = useState<GenerationMode>(() => {
@@ -8296,6 +8361,7 @@ export default function App() {
           model,
           faceImage,
           productImage,
+          backgroundImage,
           aspectRatio,
           notes,
           lookbookImageCount,
@@ -8368,6 +8434,7 @@ export default function App() {
             generatedLocations: [],
             hasFaceImage: Boolean(faceImage),
             hasProductImage: Boolean(productImage),
+            hasBackgroundImage: Boolean(backgroundImage),
             promptPackage: promptPackageForHistory,
           },
         })
@@ -8407,6 +8474,7 @@ export default function App() {
             model,
             faceImage,
             productImage,
+            backgroundImage,
             duration,
             aspectRatio,
             notes,
@@ -8515,6 +8583,7 @@ export default function App() {
               generatedLocations: generatedLocations.slice(0, 10),
               hasFaceImage: Boolean(faceImage),
               hasProductImage: Boolean(productImage),
+              hasBackgroundImage: Boolean(backgroundImage),
               promptPackage: promptPackageForHistory,
             },
           })
@@ -8816,6 +8885,7 @@ export default function App() {
             model,
             faceImage,
             productImage,
+            backgroundImage,
             analysisDuration,
             aspectRatio,
             tiktokAnalysisResult,
@@ -8923,6 +8993,7 @@ export default function App() {
               generatedLocations: generatedLocations.slice(0, 10),
               hasFaceImage: Boolean(faceImage),
               hasProductImage: Boolean(productImage),
+              hasBackgroundImage: Boolean(backgroundImage),
               tiktokAnalysis: {
                 detectedContentType: tiktokAnalysisResult.detectedContentType,
                 detectedDurationSec: tiktokAnalysisResult.detectedDurationSec,
@@ -9255,6 +9326,16 @@ export default function App() {
                 recentLocalStorageKey="aff_recent_local_images_product"
                 onLoadError={setError}
                 icon={Upload}
+              />
+              <ImageUploader
+                label="Ảnh Background (Location tham chiếu - tùy chọn)"
+                image={backgroundImage}
+                onImageChange={setBackgroundImage}
+                isPasteTarget={pasteTarget === 'background'}
+                onActivatePasteTarget={() => setPasteTarget('background')}
+                recentLocalStorageKey="aff_recent_local_images_background"
+                onLoadError={setError}
+                icon={Layers}
               />
             </div>
 
