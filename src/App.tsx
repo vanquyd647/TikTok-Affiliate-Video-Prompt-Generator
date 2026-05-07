@@ -2213,6 +2213,12 @@ function getFitModelRuleLock(contentType: ResolvedContentType): FitModelRuleLock
   return FIT_MODEL_RULE_LOCK_BY_CONTENT_TYPE[contentType]
 }
 
+function softenFitModelRuleLockForUserNotes(lock: FitModelRuleLock): FitModelRuleLock {
+  if (lock === 'strict_full_body') return 'majority_full_body'
+  if (lock === 'majority_full_body') return 'balanced_full_body_proof'
+  return lock
+}
+
 function buildFitModelRuleLockMatrix(): string {
   return `- strict_full_body: ootdmirror, partyoutfit.
 - majority_full_body: ootd, outfitideas, boutiquefeed, athleisure, styling, luxury, streetstyle, sunnyaura.
@@ -3950,13 +3956,25 @@ Output STRICT JSON only:
     }
 
     const finalResolvedType = finalContentType as ResolvedContentType
+    const hasUserNotesPriority = notes.trim().length > 0
+    const relaxHardRulesByNotes = hasUserNotesPriority && !hasVideoPoseDirectionLock
     const styleLockResolution = resolveStyleLockWithUserNotes(finalResolvedType, notes)
     const finalStyleLock = styleLockResolution.styleLock
     const isStyleLockOverriddenByNotes = styleLockResolution.overriddenByNotes
-    const enforceSinglePrimaryLocation = !allowLocationTransitionsByNotes
+    const enforceSinglePrimaryLocation = !allowLocationTransitionsByNotes && !relaxHardRulesByNotes
     const fitModelRuleLock = getFitModelRuleLock(finalResolvedType)
-    const fitModelRuleLockInstructions = buildFitModelRuleLockInstructions(finalResolvedType, fitModelRuleLock)
-    const fitModelRuleLockRepairHint = buildFitModelRuleLockRepairHint(finalResolvedType, fitModelRuleLock)
+    const effectiveFitModelRuleLock = relaxHardRulesByNotes
+      ? softenFitModelRuleLockForUserNotes(fitModelRuleLock)
+      : fitModelRuleLock
+    const fitModelRuleRelaxationNote = relaxHardRulesByNotes && effectiveFitModelRuleLock !== fitModelRuleLock
+      ? `USER NOTES RELAXATION ACTIVE: downgrade fit-model lock from ${fitModelRuleLock} to ${effectiveFitModelRuleLock}; preserve silhouette readability but allow user-requested action flexibility.`
+      : ''
+    const fitModelRuleLockInstructions = buildFitModelRuleLockInstructions(finalResolvedType, effectiveFitModelRuleLock)
+      + (fitModelRuleRelaxationNote ? `\n- ${fitModelRuleRelaxationNote}` : '')
+    const fitModelRuleLockRepairHint = buildFitModelRuleLockRepairHint(finalResolvedType, effectiveFitModelRuleLock)
+    const fitModelRuleLockModeLabel = relaxHardRulesByNotes
+      ? `${fitModelRuleLock} -> ${effectiveFitModelRuleLock} (USER NOTES RELAXED)`
+      : `${effectiveFitModelRuleLock} (DEFAULT)`
     const contentTypeNativeSignalRules = buildTikTokNativeSignalRules(finalResolvedType)
     const finalTypeTrendAlignmentRules = buildTikTokTrendAlignmentRules(finalResolvedType)
     const boutiqueFeedChannelBenchmarkForFinal = finalResolvedType === 'boutiquefeed'
@@ -3985,7 +4003,7 @@ Output STRICT JSON only:
     const detailSensitiveFacingModeLabel = usesDetailSensitiveFacingMode
       ? `ACTIVE (${detailSensitiveFacingReason})`
       : 'INACTIVE'
-    const hasLongDurationDirectionalMode = duration >= 32 && !hasVideoPoseDirectionLock && !usesDetailSensitiveFacingMode
+    const hasLongDurationDirectionalMode = duration >= 32 && !hasVideoPoseDirectionLock && !usesDetailSensitiveFacingMode && !relaxHardRulesByNotes
     const longDurationDirectionalModeLabel = hasLongDurationDirectionalMode
       ? `ACTIVE (duration=${duration}s)`
       : 'INACTIVE'
@@ -4006,6 +4024,12 @@ Output STRICT JSON only:
   - Direction changes must be small controlled pivots; avoid abrupt opposite flips in consecutive keyframes.
   - ACTION text and facingDirection token must stay consistent on every keyframe.
   [AUTO ENFORCED FOR DETAIL-SENSITIVE GARMENTS]`
+      : relaxHardRulesByNotes
+        ? `32. USER-NOTES RELAXED FACING MODE — When user notes are present, prioritize user-described movement flow over rigid direction cycling.
+  - Keep facingDirection explicit when available, but allow short same-facing holds if they support user-requested choreography.
+  - Do not inject forced turn/pivot language unless continuity would break without it.
+  - Keep transitions physically plausible and avoid abrupt opposite flips.
+  [AUTO ENFORCED WHEN USER NOTES ARE PROVIDED]`
       : hasLongDurationDirectionalMode
         ? `32. LONG-DURATION DIRECTION CLARITY LOCK (>=32s) — For timeline stability, every keyframe must have explicit and readable body-facing direction.
   - ACTION text and facingDirection token must align exactly on every keyframe.
@@ -4026,6 +4050,8 @@ Output STRICT JSON only:
       ? `Enforce video pose-direction lock: all keyframes must keep facingDirection "${poseDirectionLock}" and ACTION text must stay direction-consistent with that lock.`
       : usesDetailSensitiveFacingMode
         ? 'Enforce detail-sensitive facing mode: keep a stable facing anchor for complex-garment fidelity, avoid forced full-direction cycling, and use only controlled micro-pivots when direction changes are required.'
+      : relaxHardRulesByNotes
+        ? 'Enforce user-notes relaxed facing mode: preserve user-intended movement flow, allow short same-facing holds, and only fix transitions that are physically implausible.'
         : hasLongDurationDirectionalMode
           ? 'Enforce long-duration direction clarity (>=32s): every keyframe must carry explicit matching ACTION/FACING direction, include at least two left-family beats (three-quarter-left or left), and follow stable front/3-4 progression without abrupt opposite flips.'
         : 'Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.'
@@ -4033,6 +4059,8 @@ Output STRICT JSON only:
       ? `Enforce video pose-direction lock: keep all keyframes facing "${poseDirectionLock}" and remove any conflicting direction phrases from ACTION text.`
       : usesDetailSensitiveFacingMode
         ? 'Enforce detail-sensitive continuity: allow stable same-facing holds for fidelity, avoid abrupt opposite direction jumps, and keep direction changes as small controlled pivots with explicit facingDirection tags.'
+      : relaxHardRulesByNotes
+        ? 'Enforce user-notes relaxed facing continuity: keep user-requested flow and only correct abrupt or physically implausible direction jumps.'
         : hasLongDurationDirectionalMode
           ? 'Enforce long-duration continuity (>=32s): preserve explicit matching facing tags per keyframe, keep controlled pivots, maintain at least two left-family beats, and avoid opposite-direction jumps that break facial/garment consistency.'
         : 'Enforce facing continuity lock: consecutive keyframes must not repeat the same body-facing direction; include explicit turn/pivot cues and facingDirection token per keyframe.'
@@ -4051,7 +4079,7 @@ Output STRICT JSON only:
       return (
         isAllowedLocationCountry(candidate)
         && !isTikTokRestrictedFlatBackgroundLocation(candidate)
-        && matchesStyleLockForLocation(candidate, finalStyleLock)
+        && (relaxHardRulesByNotes || matchesStyleLockForLocation(candidate, finalStyleLock))
       )
     }
 
@@ -4178,7 +4206,7 @@ Output STRICT JSON only:
           return { ok: false, reason: `keyframe[${i}] location blocked by history constraints` }
         }
 
-        if (!matchesStyleLockForLocation(location, finalStyleLock)) {
+        if (!relaxHardRulesByNotes && !matchesStyleLockForLocation(location, finalStyleLock)) {
           return { ok: false, reason: `keyframe[${i}] location violates style lock ${finalStyleLock}` }
         }
       }
@@ -4225,12 +4253,13 @@ Output STRICT JSON only:
         const explicitFacingToken = normalizeFacingDirectionToken(keyframe.facingDirection)
         const actionFacingToken = normalizeFacingDirectionToken(action)
 
-        if (strict && explicitFacingToken === 'unknown') {
+        if (strict && !relaxHardRulesByNotes && explicitFacingToken === 'unknown') {
           return { ok: false, reason: `keyframe[${i}] missing explicit facingDirection token for Rule 32` }
         }
 
         if (
           strict
+          && !relaxHardRulesByNotes
           && explicitFacingToken !== 'unknown'
           && actionFacingToken !== 'unknown'
           && explicitFacingToken !== actionFacingToken
@@ -4281,7 +4310,7 @@ Output STRICT JSON only:
         const currentConcreteFacing = isConcreteFacingDirection(currentFacingDirection)
           ? currentFacingDirection
           : null
-        const enforceAlternatingFacing = !hasVideoPoseDirectionLock && !usesDetailSensitiveFacingMode
+        const enforceAlternatingFacing = !hasVideoPoseDirectionLock && !usesDetailSensitiveFacingMode && !relaxHardRulesByNotes
 
         if (
           enforceAlternatingFacing
@@ -4396,7 +4425,7 @@ Output STRICT JSON only:
       if (strict) {
         const fitModelCoverage = validateFitModelCoverage(
           keyframes.filter((item): item is Record<string, unknown> => asRecord(item)),
-          fitModelRuleLock,
+          effectiveFitModelRuleLock,
         )
         if (!fitModelCoverage.ok) {
           return fitModelCoverage
@@ -4523,8 +4552,10 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - Video pose-direction lock: ${videoPoseDirectionLockText}
 - Product category hint: ${productCategoryLabel} (${normalizedProductCategory.toUpperCase()})
 - Product category lock state: ${hasExplicitProductCategoryLock ? 'LOCKED' : 'AUTO'}
+- Fit-model lock mode: ${fitModelRuleLockModeLabel}
 - Detail-sensitive facing mode: ${detailSensitiveFacingModeLabel}
 - Long-duration direction mode: ${longDurationDirectionalModeLabel}
+- User-notes hard-rule relaxation: ${relaxHardRulesByNotes ? 'ACTIVE' : 'INACTIVE'}
 - Style lock mode: ${finalStyleLock.toUpperCase()}${isStyleLockOverriddenByNotes ? ' (USER-NOTES OVERRIDE)' : ' (DEFAULT)'}
 - Location continuity mode: ${enforceSinglePrimaryLocation ? 'SINGLE PRIMARY LOCATION' : 'USER-NOTES MULTI-LOCATION'}
 
@@ -5197,13 +5228,16 @@ Return STRICT JSON only, same schema:
       const inferredFacing = extractKeyframeFacingDirection(actionBase, camera, record.facingDirection)
       const previous = i > 0 ? normalizedKeyframesForRule32[i - 1] : null
       const previousFacing = previous?.facingDirection || null
+      const relaxedFacingFromNotes = isConcreteFacingDirection(inferredFacing) ? inferredFacing : null
       const resolvedFacing: ConcreteFacingDirection = hasVideoPoseDirectionLock
         ? poseDirectionLock as ConcreteFacingDirection
         : usesDetailSensitiveFacingMode
           ? pickDetailSensitiveFacingDirection(i, previousFacing, inferredFacing)
           : hasLongDurationDirectionalMode
             ? pickLongDurationFacingDirection(i, previousFacing)
-          : pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
+            : relaxHardRulesByNotes
+              ? (relaxedFacingFromNotes || previousFacing || 'front')
+              : pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
 
       const actionHasFacingSignal = normalizeFacingDirectionToken(actionBase) !== 'unknown'
       const hasTurnSignal = i > 0
@@ -5239,7 +5273,15 @@ Return STRICT JSON only, same schema:
           }
         }
       } else {
-        if (hasLongDurationDirectionalMode) {
+        if (relaxHardRulesByNotes) {
+          if (!actionHasFacingSignal) {
+            action = appendSentenceIfMissing(action, `Body facing ${toFacingDirectionLabel(resolvedFacing)}`)
+          }
+
+          if (i > 0 && previousFacing && previousFacing === resolvedFacing) {
+            action = removeTurnCuePhrases(action)
+          }
+        } else if (hasLongDurationDirectionalMode) {
           action = enforceActionFacingDirection(action, resolvedFacing)
 
           if (i > 0) {
@@ -5263,7 +5305,7 @@ Return STRICT JSON only, same schema:
       const fitModelEnforced = enforceFitModelRuleOnKeyframe(
         action,
         camera,
-        fitModelRuleLock,
+        effectiveFitModelRuleLock,
         finalResolvedType,
         i,
         rawKeyframes.length,
