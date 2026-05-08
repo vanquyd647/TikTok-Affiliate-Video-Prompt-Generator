@@ -179,6 +179,7 @@ interface FetchWorkHistoryResult {
 const GEMINI_MODELS = [
   { value: 'gemini-2.5-flash', label: '2.5 Flash', tag: 'Stable' },
   { value: 'gemini-3-flash-preview', label: '3.0 Preview', tag: 'Experimental' },
+  { value: 'gemini-3.1-flash-lite-preview', label: '3.1 Flash Lite Preview', tag: 'Preview' },
   { value: 'gemma-4-31b-it', label: 'Gemma 4 31B', tag: 'Gemini API' },
   { value: 'gemma-4-26b-a4b-it', label: 'Gemma 4 26B A4B', tag: 'Gemini API' },
 ] as const
