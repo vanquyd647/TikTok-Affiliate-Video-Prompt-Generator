@@ -7262,8 +7262,8 @@ ${sceneBeatSummary || 'No explicit scene beats provided'}
 CONTEXT REMIX REFERENCES:
 ${contextReferenceSummary || 'No explicit context references provided'}
 
-SCRIPT TEMPLATE TO FOLLOW:
-${analysis.generatedScript || 'No script provided'}
+VISUAL BEAT FLOW TEMPLATE TO FOLLOW:
+${analysis.generatedScript || 'No visual beat flow template provided'}
 
 HARD CONSTRAINTS:
 - Do not apply any external/core template enforcement.
@@ -7277,6 +7277,7 @@ HARD CONSTRAINTS:
   ? 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera/mirror on every keyframe; body direction is only front or gentle three-quarter-left or three-quarter-right; never use back-facing body orientation.'
   : 'FRONT-FACE / QUARTER-BODY LOCK: inactive.'}
 - NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual fit-check actions and optional on-screen text only.
+- TERMINOLOGY LOCK: avoid script-oriented wording and express pacing cues as visual beat flow only.
 - Maintain believable social-native movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
 - Do not copy exact identifiable text/signage/persons from source video context.
@@ -7347,7 +7348,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const fallbackScriptBeat = scriptBeatReferences[scriptBeatIndex]
       const fallbackContextBeat = contextBeatReferences[scriptBeatIndex]
       const fallbackAction = fallbackScriptBeat
-        ? `Product review movement follows script beat: ${fallbackScriptBeat}`
+        ? `Product review movement follows visual beat flow: ${fallbackScriptBeat}`
         : (analysis.sceneBeats[scriptBeatIndex]?.description || 'Natural product review motion with clear detail demonstration.')
 
       const action = appendSentenceIfMissing(
@@ -7488,12 +7489,12 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const scriptBeat = scriptBeatReferences[index] || analysis.sceneBeats[index]?.narrationHint || analysis.sceneBeats[index]?.description || ''
       const contextBeat = contextBeatReferences[index] || analysis.sceneBeats[index]?.contextHint || analysis.sceneBeats[index]?.description || ''
       const fallbackNarrative = scriptBeat.length > 0
-        ? `Follow script beat: ${scriptBeat}`
+        ? `Follow visual beat flow: ${scriptBeat}`
         : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
 
       const narrativeWithScript = appendSentenceIfMissing(
         toSafeString(raw.narrative, fallbackNarrative),
-        scriptBeat.length > 0 ? `Script beat reference: ${scriptBeat}` : '',
+        scriptBeat.length > 0 ? `Visual beat flow reference: ${scriptBeat}` : '',
       )
       let narrative = appendSentenceIfMissing(
         narrativeWithScript,
@@ -9569,7 +9570,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     setLoadingStageIndex(0)
     setPromptToast({
       kind: 'loading',
-      message: 'Dang tao Prompt OOTD Template tu script lock cua video mau...',
+      message: 'Dang tao Prompt OOTD Template tu beat-flow lock cua video mau...',
     })
     setError('')
     setResult(null)
@@ -9909,7 +9910,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
               <h1 className="header-title">AFF Video Prompt</h1>
               <p className="header-subtitle">
                 {isOotdTemplatePage
-                  ? `OOTD Template Page (Script lock theo video ${OOTD_TEMPLATE_REFERENCE_VIDEO_FILE_NAME})`
+                  ? `OOTD Template Page (Beat-flow lock theo video ${OOTD_TEMPLATE_REFERENCE_VIDEO_FILE_NAME})`
                   : 'TikTok Affiliate Video Prompt Generator'}
               </p>
             </div>
