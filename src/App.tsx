@@ -718,7 +718,8 @@ const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the same mirror fit-check storytelling
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat.
-- Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.`
+- Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.
+- Voice rule: visual-only fit-check, no voiceover or spoken dialogue required.`
 const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootdmirror',
   detectedDurationSec: OOTD_TEMPLATE_SOURCE_DURATION_SEC,
@@ -735,7 +736,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       description: 'Open directly in front of mirror with phone visible to establish authentic mirror fit-check POV.',
       contextHint: 'Indoor mirror zone, practical room background, minimal clutter.',
       cameraHint: 'Phone-held steady start at closer mirror distance, tight full-body framing with minimal empty margins.',
-      narrationHint: 'Very short hook phrase tied to first look impression.',
+      narrationHint: 'No spoken line; use visual hook and optional on-screen text only.',
     },
     {
       index: 1,
@@ -744,7 +745,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       description: 'Hold full-body front fit long enough for viewers to read silhouette, length, and proportion.',
       contextHint: 'Do not change room; keep continuity and trust-first realism.',
       cameraHint: 'Stable mirror frame, subject occupies around 70-85% of frame while preserving head-to-toe readability.',
-      narrationHint: 'One practical line about fit and wearability.',
+      narrationHint: 'No spoken line; let framing show fit and wearability.',
     },
     {
       index: 2,
@@ -753,7 +754,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       description: 'Move closer to mirror for fabric/waistline/finishing detail proof without losing outfit context.',
       contextHint: 'Keep same mirror ambience; avoid dramatic location transitions.',
       cameraHint: 'Phone-held mid-close detail pass with slow vertical scan.',
-      narrationHint: 'Mention one concrete quality cue users can verify quickly.',
+      narrationHint: 'No spoken line; emphasize details through close visual proof.',
     },
     {
       index: 3,
@@ -762,7 +763,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       description: 'Do one short turn or 3/4 angle change to prove side/back fit and movement behavior.',
       contextHint: 'Small movement inside mirror frame, keep spatial continuity.',
       cameraHint: 'Quick half-turn with controlled phone follow and no abrupt shake.',
-      narrationHint: 'Brief confidence line about look from multiple angles.',
+      narrationHint: 'No spoken line; confidence is shown via movement and posture.',
     },
     {
       index: 4,
@@ -771,7 +772,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       description: 'Return to hero mirror pose and finish with concise recommendation-style closing.',
       contextHint: 'Center frame again for clear visual end-point.',
       cameraHint: 'Short hold on closer hero full-body pose with tiny push-in for clearer outfit readability.',
-      narrationHint: 'Soft CTA to save/follow/check product details.',
+      narrationHint: 'Optional on-screen CTA text only; no spoken CTA.',
     },
   ],
   generatedScript: `Beat 1: Start with phone-in-hand mirror hook and instant full-fit frame.
@@ -7205,6 +7206,7 @@ HARD CONSTRAINTS:
 - ${hasBackgroundLocationReference
   ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).'
   : 'BACKGROUND LOCATION LOCK: no background input image provided.'}
+- NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual fit-check actions and optional on-screen text only.
 - Maintain believable social-native movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
 - Do not copy exact identifiable text/signage/persons from source video context.
@@ -7332,6 +7334,10 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         keyframe.action,
         'Model stands closer to mirror and performs fit-check in the provided background scene with stable stance.',
       )
+      const visualOnlyAction = appendSentenceIfMissing(
+        anchoredAction,
+        'Visual-only storytelling: no spoken dialogue or voiceover cues.',
+      )
       const anchoredCamera = appendSentenceIfMissing(
         keyframe.camera,
         'Closer mirror framing: model occupies around 70-85% frame while still keeping full-body head-to-toe visibility and key background anchors readable.',
@@ -7343,13 +7349,13 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
       return {
         ...keyframe,
-        action: anchoredAction,
+        action: visualOnlyAction,
         location: anchoredTemplateLocation,
         camera: anchoredCamera,
         style: anchoredStyle,
         fullPrompt: buildNanoBananaProFramePrompt({
           subject: keyframe.subject,
-          action: anchoredAction,
+          action: visualOnlyAction,
           facingDirection: keyframe.facingDirection,
           location: anchoredTemplateLocation,
           camera: anchoredCamera,
@@ -7396,6 +7402,10 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           'Keep model standing closer to mirror for clearer outfit visibility, preserve key background composition anchors, and avoid venue changes.',
         )
       }
+      narrative = appendSentenceIfMissing(
+        narrative,
+        'Visual-only scene: no voiceover, spoken dialogue, or lip-sync actions.',
+      )
 
       const cameraMovement = normalizeSceneCameraMovementSpec(
         toSafeString(raw.cameraMovement, ''),
@@ -9426,6 +9436,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       'Ignore all non-product visual identity from the reference video. Keep only pacing and scene progression.',
       'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
       `Target output duration: ${lockedDuration}s (reference source ${OOTD_TEMPLATE_SOURCE_DURATION_SEC}s). Expand/compress beat timing proportionally without changing beat order.`,
+      'Voice rule: no voiceover/dialogue. Keep visual-only fit-check storytelling with optional on-screen text.',
       backgroundImage
         ? 'Background anchor lock: model must stand closer to mirror and fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
         : 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.',
@@ -9921,6 +9932,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {OOTD_TEMPLATE_SOURCE_DURATION_SEC}s, chi de tham khao nhip){'\n'}
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
+                  Voice track: OFF (visual-only fit-check){'\n'}
                   Background fit-check lock: {backgroundImage ? 'ON (closer mirror framing + full-body + anchor continuity)' : 'OFF (them background image de khoa)'}{"\n"}
                   Narrative: {OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure}
                 </div>
