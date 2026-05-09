@@ -719,7 +719,7 @@ const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the same mirror fit-check storytelling
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat.
 - Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.
-- Direction lock: face stays FRONT; body angle only gentle 3/4 LEFT or 3/4 RIGHT; never back-facing.
+- Direction lock: face stays FRONT; body angle only FRONT, 3/4 LEFT, or 3/4 RIGHT; never back-facing.
 - Voice rule: visual-only fit-check, no voiceover or spoken dialogue required.`
 const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootdmirror',
@@ -7274,7 +7274,7 @@ HARD CONSTRAINTS:
   ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).'
   : 'BACKGROUND LOCATION LOCK: no background input image provided.'}
 - ${shouldApplyFrontFaceQuarterBodyLock
-  ? 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera/mirror on every keyframe; body direction is only gentle three-quarter-left or three-quarter-right; never use back-facing body orientation.'
+  ? 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera/mirror on every keyframe; body direction is only front or gentle three-quarter-left or three-quarter-right; never use back-facing body orientation.'
   : 'FRONT-FACE / QUARTER-BODY LOCK: inactive.'}
 - NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual fit-check actions and optional on-screen text only.
 - Maintain believable social-native movement and camera continuity.
@@ -7398,11 +7398,19 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       : ''
 
     const keyframes: KeyframePrompt[] = keyframesDraft.map((keyframe, index) => {
-      const lockedQuarterFacing: OotdMirrorFacingDirection | null = shouldApplyFrontFaceQuarterBodyLock
-        ? (index % 2 === 0 ? 'three-quarter-left' : 'three-quarter-right')
+      const lockedFrontQuarterFacing: ConcreteFacingDirection | null = shouldApplyFrontFaceQuarterBodyLock
+        ? (
+          index % 4 === 0
+            ? 'front'
+            : index % 4 === 1
+              ? 'three-quarter-left'
+              : index % 4 === 2
+                ? 'front'
+                : 'three-quarter-right'
+        )
         : null
-      const finalFacingDirection: ConcreteFacingDirection = lockedQuarterFacing
-        || (isConcreteFacingDirection(keyframe.facingDirection) ? keyframe.facingDirection : 'three-quarter-left')
+      const finalFacingDirection: ConcreteFacingDirection = lockedFrontQuarterFacing
+        || (isConcreteFacingDirection(keyframe.facingDirection) ? keyframe.facingDirection : 'front')
 
       let finalAction = keyframe.action
       let finalLocation = keyframe.location
@@ -7430,8 +7438,16 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         'Visual-only storytelling: no spoken dialogue or voiceover cues.',
       )
 
-      if (lockedQuarterFacing) {
-        finalAction = enforceOotdMirrorFrontFaceQuarterBodyLock(finalAction, lockedQuarterFacing)
+      if (lockedFrontQuarterFacing) {
+        finalAction = enforceActionFacingDirection(finalAction, lockedFrontQuarterFacing)
+        finalAction = appendSentenceIfMissing(
+          finalAction,
+          'Face remains front-oriented toward camera with clear eyes and jawline visibility.',
+        )
+        finalAction = appendSentenceIfMissing(
+          finalAction,
+          'Body orientation must stay within front, three-quarter-left, or three-quarter-right only; avoid full back turns.',
+        )
       }
 
       return {
@@ -7493,7 +7509,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       if (shouldApplyFrontFaceQuarterBodyLock) {
         narrative = appendSentenceIfMissing(
           narrative,
-          'Direction lock: face remains front-oriented; body uses only gentle three-quarter-left/right angles; no back-facing body poses.',
+          'Direction lock: face remains front-oriented; body uses only front or gentle three-quarter-left/right angles; no back-facing body poses.',
         )
       }
       narrative = appendSentenceIfMissing(
@@ -9530,7 +9546,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       'Ignore all non-product visual identity from the reference video. Keep only pacing and scene progression.',
       'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
       `Target output duration: ${lockedDuration}s (reference source ${OOTD_TEMPLATE_SOURCE_DURATION_SEC}s). Expand/compress beat timing proportionally without changing beat order.`,
-      'Direction rule: face must stay FRONT in mirror; body only 3/4 LEFT or 3/4 RIGHT; no BACK body orientation.',
+      'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.',
       'Voice rule: no voiceover/dialogue. Keep visual-only fit-check storytelling with optional on-screen text.',
       backgroundImage
         ? 'Background anchor lock: model must stand closer to mirror and fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
@@ -10030,7 +10046,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {OOTD_TEMPLATE_SOURCE_DURATION_SEC}s, chi de tham khao nhip){'\n'}
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
-                  Direction lock: Face FRONT + Body 3/4 LEFT/RIGHT only (no BACK){'\n'}
+                  Direction lock: Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK){'\n'}
                   Voice track: OFF (visual-only fit-check){'\n'}
                   Background fit-check lock: {backgroundImage ? 'ON (closer mirror framing + full-body + anchor continuity)' : 'OFF (them background image de khoa)'}{"\n"}
                   Narrative: {OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure}
