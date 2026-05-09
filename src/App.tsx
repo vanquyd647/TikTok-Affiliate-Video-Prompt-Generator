@@ -719,6 +719,7 @@ const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the same mirror fit-check storytelling
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat.
 - Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.
+- Direction lock: face stays FRONT; body angle only gentle 3/4 LEFT or 3/4 RIGHT; never back-facing.
 - Voice rule: visual-only fit-check, no voiceover or spoken dialogue required.`
 const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootdmirror',
@@ -7156,6 +7157,9 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   aspectRatio: '9:16' | '16:9',
   analysis: TikTokAnalysisResult,
   reviewNotes: string,
+  options?: {
+    enforceFrontFaceQuarterBodyLock?: boolean
+  },
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
   const sceneCount = durationInfo.scenes
@@ -7169,6 +7173,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     ? reviewNotes.trim()
     : 'San pham can review duoc xac dinh tu input hien tai.'
   const hasBackgroundLocationReference = Boolean(backgroundImage)
+  const shouldApplyFrontFaceQuarterBodyLock = options?.enforceFrontFaceQuarterBodyLock === true
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
   const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
@@ -7268,6 +7273,9 @@ HARD CONSTRAINTS:
 - ${hasBackgroundLocationReference
   ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).'
   : 'BACKGROUND LOCATION LOCK: no background input image provided.'}
+- ${shouldApplyFrontFaceQuarterBodyLock
+  ? 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera/mirror on every keyframe; body direction is only gentle three-quarter-left or three-quarter-right; never use back-facing body orientation.'
+  : 'FRONT-FACE / QUARTER-BODY LOCK: inactive.'}
 - NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual fit-check actions and optional on-screen text only.
 - Maintain believable social-native movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
@@ -7389,40 +7397,58 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       ? 'provided background mirror fit-check zone (exact uploaded background scene)'
       : ''
 
-    const keyframes: KeyframePrompt[] = keyframesDraft.map((keyframe) => {
-      if (!anchoredTemplateLocation) return keyframe
+    const keyframes: KeyframePrompt[] = keyframesDraft.map((keyframe, index) => {
+      const lockedQuarterFacing: OotdMirrorFacingDirection | null = shouldApplyFrontFaceQuarterBodyLock
+        ? (index % 2 === 0 ? 'three-quarter-left' : 'three-quarter-right')
+        : null
+      const finalFacingDirection: ConcreteFacingDirection = lockedQuarterFacing
+        || (isConcreteFacingDirection(keyframe.facingDirection) ? keyframe.facingDirection : 'three-quarter-left')
 
-      const anchoredAction = appendSentenceIfMissing(
-        keyframe.action,
-        'Model stands closer to mirror and performs fit-check in the provided background scene with stable stance.',
-      )
-      const visualOnlyAction = appendSentenceIfMissing(
-        anchoredAction,
+      let finalAction = keyframe.action
+      let finalLocation = keyframe.location
+      let finalCamera = keyframe.camera
+      let finalStyle = keyframe.style
+
+      if (anchoredTemplateLocation) {
+        finalAction = appendSentenceIfMissing(
+          finalAction,
+          'Model stands closer to mirror and performs fit-check in the provided background scene with stable stance.',
+        )
+        finalLocation = anchoredTemplateLocation
+        finalCamera = appendSentenceIfMissing(
+          finalCamera,
+          'Closer mirror framing: model occupies around 70-85% frame while still keeping full-body head-to-toe visibility and key background anchors readable.',
+        )
+        finalStyle = appendSentenceIfMissing(
+          finalStyle,
+          'Maintain background continuity via key anchors (mirror edges, floor line, decor placement) with no venue drift.',
+        )
+      }
+
+      finalAction = appendSentenceIfMissing(
+        finalAction,
         'Visual-only storytelling: no spoken dialogue or voiceover cues.',
       )
-      const anchoredCamera = appendSentenceIfMissing(
-        keyframe.camera,
-        'Closer mirror framing: model occupies around 70-85% frame while still keeping full-body head-to-toe visibility and key background anchors readable.',
-      )
-      const anchoredStyle = appendSentenceIfMissing(
-        keyframe.style,
-        'Maintain background continuity via key anchors (mirror edges, floor line, decor placement) with no venue drift.',
-      )
+
+      if (lockedQuarterFacing) {
+        finalAction = enforceOotdMirrorFrontFaceQuarterBodyLock(finalAction, lockedQuarterFacing)
+      }
 
       return {
         ...keyframe,
-        action: visualOnlyAction,
-        location: anchoredTemplateLocation,
-        camera: anchoredCamera,
-        style: anchoredStyle,
+        action: finalAction,
+        facingDirection: finalFacingDirection,
+        location: finalLocation,
+        camera: finalCamera,
+        style: finalStyle,
         fullPrompt: buildNanoBananaProFramePrompt({
           subject: keyframe.subject,
-          action: visualOnlyAction,
-          facingDirection: keyframe.facingDirection,
-          location: anchoredTemplateLocation,
-          camera: anchoredCamera,
+          action: finalAction,
+          facingDirection: finalFacingDirection,
+          location: finalLocation,
+          camera: finalCamera,
           lighting: keyframe.lighting,
-          style: anchoredStyle,
+          style: finalStyle,
           aspectRatio,
         }),
       }
@@ -7462,6 +7488,12 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         narrative = appendSentenceIfMissing(
           narrative,
           'Keep model standing closer to mirror for clearer outfit visibility, preserve key background composition anchors, and avoid venue changes.',
+        )
+      }
+      if (shouldApplyFrontFaceQuarterBodyLock) {
+        narrative = appendSentenceIfMissing(
+          narrative,
+          'Direction lock: face remains front-oriented; body uses only gentle three-quarter-left/right angles; no back-facing body poses.',
         )
       }
       narrative = appendSentenceIfMissing(
@@ -9498,6 +9530,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       'Ignore all non-product visual identity from the reference video. Keep only pacing and scene progression.',
       'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
       `Target output duration: ${lockedDuration}s (reference source ${OOTD_TEMPLATE_SOURCE_DURATION_SEC}s). Expand/compress beat timing proportionally without changing beat order.`,
+      'Direction rule: face must stay FRONT in mirror; body only 3/4 LEFT or 3/4 RIGHT; no BACK body orientation.',
       'Voice rule: no voiceover/dialogue. Keep visual-only fit-check storytelling with optional on-screen text.',
       backgroundImage
         ? 'Background anchor lock: model must stand closer to mirror and fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
@@ -9542,6 +9575,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         lockedAspectRatio,
         OOTD_TEMPLATE_LOCKED_ANALYSIS,
         reviewProductNotes,
+        {
+          enforceFrontFaceQuarterBodyLock: true,
+        },
       )
 
       pushLog(`[OK] Template generation succeeded — keyframes=${res.keyframes.length} scenes=${res.scenes.length}`)
@@ -9994,6 +10030,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {OOTD_TEMPLATE_SOURCE_DURATION_SEC}s, chi de tham khao nhip){'\n'}
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
+                  Direction lock: Face FRONT + Body 3/4 LEFT/RIGHT only (no BACK){'\n'}
                   Voice track: OFF (visual-only fit-check){'\n'}
                   Background fit-check lock: {backgroundImage ? 'ON (closer mirror framing + full-body + anchor continuity)' : 'OFF (them background image de khoa)'}{"\n"}
                   Narrative: {OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure}
