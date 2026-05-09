@@ -842,6 +842,15 @@ const PRODUCT_CATEGORY_OPTIONS: Array<{
   },
   {
     group: 'tops',
+    value: 'tops_corset',
+    label: 'Corset / Ao corset',
+    desc: 'Corset top, bustier, ao bo chat, ao go gong',
+    detailHint: 'Corset top om waist, bustier, ao bo chat go gong (boned corset), ao corset moc sau lung.',
+    suggestedTypes: ['ootd', 'ootdmirror', 'partyoutfit'],
+    benchmarkHint: 'Waist-cinching proof + back-lacing detail + silhouette reveal la cong thuc an toan cho corset.',
+  },
+  {
+    group: 'tops',
     value: 'tops_cami_tank_halter',
     label: 'Hai day / ba lo / halter',
     desc: 'Camisole, tank top, ao co yem',
