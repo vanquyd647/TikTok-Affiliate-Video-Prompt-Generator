@@ -7202,7 +7202,7 @@ HARD CONSTRAINTS:
 - Never copy product identity/outfit details from analyzed TikTok video.
 - Keep product review focus anchored to REVIEW NOTES and current PRODUCT input image.
 - ${hasBackgroundLocationReference
-  ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing fit-check in this same background across all keyframes/scenes, avoid venue switching, and treat this image as environment anchor only (not identity/product source).'
+  ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce full-body framing (head-to-toe), preserve full background readability (floor/wall/decor), and treat this image as environment anchor only (not identity/product source).'
   : 'BACKGROUND LOCATION LOCK: no background input image provided.'}
 - Maintain believable social-native movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
@@ -7321,10 +7321,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
     })
 
     const anchoredTemplateLocation = hasBackgroundLocationReference
-      ? (() => {
-        const fromModel = keyframesDraft.find((keyframe) => keyframe.location.trim().length > 0)?.location.trim()
-        return fromModel || 'provided background mirror fit-check zone'
-      })()
+      ? 'provided background mirror fit-check zone (exact uploaded background scene)'
       : ''
 
     const keyframes: KeyframePrompt[] = keyframesDraft.map((keyframe) => {
@@ -7332,21 +7329,31 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
       const anchoredAction = appendSentenceIfMissing(
         keyframe.action,
-        'Model stands and performs fit-check in the provided background scene.',
+        'Model stands and performs fit-check in the provided background scene with stable stance.',
+      )
+      const anchoredCamera = appendSentenceIfMissing(
+        keyframe.camera,
+        'Full-body head-to-toe framing, keep enough distance so the provided background stays fully visible and logical.',
+      )
+      const anchoredStyle = appendSentenceIfMissing(
+        keyframe.style,
+        'Maintain full-background continuity (floor line, wall geometry, decor placement) with no venue drift.',
       )
 
       return {
         ...keyframe,
         action: anchoredAction,
         location: anchoredTemplateLocation,
+        camera: anchoredCamera,
+        style: anchoredStyle,
         fullPrompt: buildNanoBananaProFramePrompt({
           subject: keyframe.subject,
           action: anchoredAction,
           facingDirection: keyframe.facingDirection,
           location: anchoredTemplateLocation,
-          camera: keyframe.camera,
+          camera: anchoredCamera,
           lighting: keyframe.lighting,
-          style: keyframe.style,
+          style: anchoredStyle,
           aspectRatio,
         }),
       }
@@ -7385,7 +7392,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       if (anchoredTemplateLocation) {
         narrative = appendSentenceIfMissing(
           narrative,
-          'Keep model standing fit-check in the provided background without changing venue.',
+          'Keep model standing full-body fit-check in the provided background, preserve full room composition, and avoid venue changes.',
         )
       }
 
@@ -7403,7 +7410,12 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         : normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
           ? `Hold location: ${startLocation}`
           : `${startLocation} -> ${endLocation}`
-      const composition = keyframes[index]?.camera || ''
+      const composition = anchoredTemplateLocation
+        ? appendSentenceIfMissing(
+          keyframes[index]?.camera || '',
+          'Composition lock: full-body standing fit-check with complete readable background context.',
+        )
+        : keyframes[index]?.camera || ''
       const lighting = keyframes[index]?.lighting || ''
       const timeRange = `${startSec}s-${endSec}s`
 
@@ -9414,7 +9426,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
       `Target output duration: ${lockedDuration}s (reference source ${OOTD_TEMPLATE_SOURCE_DURATION_SEC}s). Expand/compress beat timing proportionally without changing beat order.`,
       backgroundImage
-        ? 'Background anchor lock: model must stand and fit-check inside the provided background image, with the same venue held across beats.'
+        ? 'Background anchor lock: model must stand and fit-check inside the provided background image, keep full-body head-to-toe framing, keep background fully readable, and hold the same venue across beats.'
         : 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.',
     ].join('\n')
 
@@ -9908,6 +9920,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {OOTD_TEMPLATE_SOURCE_DURATION_SEC}s, chi de tham khao nhip){'\n'}
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
+                  Background fit-check lock: {backgroundImage ? 'ON (full-body + full background continuity)' : 'OFF (them background image de khoa)'}{"\n"}
                   Narrative: {OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure}
                 </div>
 
