@@ -3374,6 +3374,50 @@ function removeTurnCuePhrases(value: string): string {
   return normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
 }
 
+function sanitizeVisualOnlyConciseAction(value: string): string {
+  const fallback = 'Natural fit-check movement with clear outfit visibility.'
+  if (!value.trim()) return fallback
+
+  let next = value
+  const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /\b(?:script|visual)\s+beat(?:\s+flow)?(?:\s+reference)?\b/gi, replacement: ' ' },
+    { pattern: /\b(?:follow|follows|following)\s+(?:the\s+)?(?:visual\s+)?beat(?:\s+flow)?\b/gi, replacement: ' ' },
+    { pattern: /\bbeat\s*\d+\b/gi, replacement: ' ' },
+    { pattern: /\bbeat(?:\s+flow)?\b/gi, replacement: ' ' },
+    { pattern: /\b(?:voiceover|dialogue|spoken|speaking|talking|narration|narrate)\b/gi, replacement: ' ' },
+    { pattern: /\blip(?:-|\s)?sync(?:ing)?\b/gi, replacement: ' ' },
+  ]
+
+  for (const { pattern, replacement } of replacements) {
+    next = next.replace(pattern, replacement)
+  }
+
+  next = normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
+  return next.length > 0 ? next : fallback
+}
+
+function sanitizeVisualOnlyConciseSceneNarrative(value: string): string {
+  const fallback = 'Concise visual fit-check progression with clear product visibility.'
+  if (!value.trim()) return fallback
+
+  let next = value
+  const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /\b(?:script|visual)\s+beat(?:\s+flow)?(?:\s+reference)?\b/gi, replacement: ' ' },
+    { pattern: /\b(?:follow|follows|following)\s+(?:the\s+)?(?:visual\s+)?beat(?:\s+flow)?\b/gi, replacement: ' ' },
+    { pattern: /\bbeat\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/gi, replacement: ' ' },
+    { pattern: /\bbeat(?:\s+flow)?\b/gi, replacement: ' ' },
+    { pattern: /\b(?:voiceover|dialogue|spoken|speaking|talking|narration|narrate)\b/gi, replacement: ' ' },
+    { pattern: /\blip(?:-|\s)?sync(?:ing)?\b/gi, replacement: ' ' },
+  ]
+
+  for (const { pattern, replacement } of replacements) {
+    next = next.replace(pattern, replacement)
+  }
+
+  next = normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
+  return next.length > 0 ? next : fallback
+}
+
 function createProductImageId(dataUrl: string): string {
   const normalized = dataUrl.trim()
   const sample = normalized.length > 12000
@@ -7159,6 +7203,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   reviewNotes: string,
   options?: {
     enforceFrontFaceQuarterBodyLock?: boolean
+    enforceConciseVisualOnlyAction?: boolean
   },
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
@@ -7174,6 +7219,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     : 'San pham can review duoc xac dinh tu input hien tai.'
   const hasBackgroundLocationReference = Boolean(backgroundImage)
   const shouldApplyFrontFaceQuarterBodyLock = options?.enforceFrontFaceQuarterBodyLock === true
+  const shouldEnforceConciseVisualOnlyAction = options?.enforceConciseVisualOnlyAction === true
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
   const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
@@ -7278,6 +7324,9 @@ HARD CONSTRAINTS:
   : 'FRONT-FACE / QUARTER-BODY LOCK: inactive.'}
 - NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual fit-check actions and optional on-screen text only.
 - TERMINOLOGY LOCK: avoid script-oriented wording and express pacing cues as visual beat flow only.
+- ${shouldEnforceConciseVisualOnlyAction
+  ? 'ACTION WRITING LOCK: keep ACTION concise and physical, do not mention beat labels/references, and block speaking/voiceover/lip-sync wording.'
+  : 'ACTION WRITING LOCK: keep ACTION clear, product-first, and visual.'}
 - Maintain believable social-native movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
 - Do not copy exact identifiable text/signage/persons from source video context.
@@ -7347,13 +7396,22 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       )
       const fallbackScriptBeat = scriptBeatReferences[scriptBeatIndex]
       const fallbackContextBeat = contextBeatReferences[scriptBeatIndex]
-      const fallbackAction = fallbackScriptBeat
-        ? `Product review movement follows visual beat flow: ${fallbackScriptBeat}`
-        : (analysis.sceneBeats[scriptBeatIndex]?.description || 'Natural product review motion with clear detail demonstration.')
+      const fallbackAction = shouldEnforceConciseVisualOnlyAction
+        ? 'Natural fit-check movement with clear outfit visibility.'
+        : fallbackScriptBeat
+          ? `Product review movement follows visual beat flow: ${fallbackScriptBeat}`
+          : (analysis.sceneBeats[scriptBeatIndex]?.description || 'Natural product review motion with clear detail demonstration.')
+
+      const rawAction = toSafeString(raw.action, fallbackAction)
+      const normalizedAction = shouldEnforceConciseVisualOnlyAction
+        ? sanitizeVisualOnlyConciseAction(rawAction)
+        : rawAction
 
       const action = appendSentenceIfMissing(
-        toSafeString(raw.action, fallbackAction),
-        fallbackContextBeat ? `Context remix cue: ${fallbackContextBeat}` : '',
+        normalizedAction,
+        shouldEnforceConciseVisualOnlyAction
+          ? ''
+          : fallbackContextBeat ? `Context remix cue: ${fallbackContextBeat}` : '',
       )
       const fallbackFacing = RULE32_FACING_SEQUENCE[index % RULE32_FACING_SEQUENCE.length]
       const facingDirection = resolveFacing(raw.facingDirection ?? raw.action, fallbackFacing)
@@ -7434,20 +7492,24 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         )
       }
 
+      if (shouldEnforceConciseVisualOnlyAction) {
+        finalAction = sanitizeVisualOnlyConciseAction(finalAction)
+      }
+
       finalAction = appendSentenceIfMissing(
         finalAction,
-        'Visual-only storytelling: no spoken dialogue or voiceover cues.',
+        shouldEnforceConciseVisualOnlyAction
+          ? 'Silent visual motion only; communicate via pose and movement.'
+          : 'Visual-only storytelling: no spoken dialogue or voiceover cues.',
       )
 
       if (lockedFrontQuarterFacing) {
         finalAction = enforceActionFacingDirection(finalAction, lockedFrontQuarterFacing)
         finalAction = appendSentenceIfMissing(
           finalAction,
-          'Face remains front-oriented toward camera with clear eyes and jawline visibility.',
-        )
-        finalAction = appendSentenceIfMissing(
-          finalAction,
-          'Body orientation must stay within front, three-quarter-left, or three-quarter-right only; avoid full back turns.',
+          shouldEnforceConciseVisualOnlyAction
+            ? 'Face front; body only front or three-quarter-left/right, never back.'
+            : 'Face remains front-oriented toward camera with clear eyes and jawline visibility. Body orientation must stay within front, three-quarter-left, or three-quarter-right only; avoid full back turns.',
         )
       }
 
@@ -7488,18 +7550,32 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const endSec = Math.round(((index + 1) * duration) / sceneCount)
       const scriptBeat = scriptBeatReferences[index] || analysis.sceneBeats[index]?.narrationHint || analysis.sceneBeats[index]?.description || ''
       const contextBeat = contextBeatReferences[index] || analysis.sceneBeats[index]?.contextHint || analysis.sceneBeats[index]?.description || ''
-      const fallbackNarrative = scriptBeat.length > 0
-        ? `Follow visual beat flow: ${scriptBeat}`
-        : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
+      const fallbackNarrative = shouldEnforceConciseVisualOnlyAction
+        ? 'Concise visual fit-check progression with clear product visibility.'
+        : scriptBeat.length > 0
+          ? `Follow visual beat flow: ${scriptBeat}`
+          : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
 
-      const narrativeWithScript = appendSentenceIfMissing(
-        toSafeString(raw.narrative, fallbackNarrative),
-        scriptBeat.length > 0 ? `Visual beat flow reference: ${scriptBeat}` : '',
-      )
+      const baseNarrative = toSafeString(raw.narrative, fallbackNarrative)
+      const narrativeWithScript = shouldEnforceConciseVisualOnlyAction
+        ? sanitizeVisualOnlyConciseSceneNarrative(baseNarrative)
+        : appendSentenceIfMissing(
+          baseNarrative,
+          scriptBeat.length > 0 ? `Visual beat flow reference: ${scriptBeat}` : '',
+        )
       let narrative = appendSentenceIfMissing(
         narrativeWithScript,
-        contextBeat.length > 0 ? `Context remix reference: ${contextBeat}` : '',
+        shouldEnforceConciseVisualOnlyAction
+          ? ''
+          : contextBeat.length > 0 ? `Context remix reference: ${contextBeat}` : '',
       )
+
+      if (shouldEnforceConciseVisualOnlyAction && contextBeat.length > 0) {
+        narrative = appendSentenceIfMissing(
+          narrative,
+          `Context continuity: ${sanitizeVisualOnlyConciseSceneNarrative(contextBeat)}`,
+        )
+      }
 
       if (anchoredTemplateLocation) {
         narrative = appendSentenceIfMissing(
@@ -7515,7 +7591,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       }
       narrative = appendSentenceIfMissing(
         narrative,
-        'Visual-only scene: no voiceover, spoken dialogue, or lip-sync actions.',
+        shouldEnforceConciseVisualOnlyAction
+          ? 'Silent visual scene only; communicate via pose, framing, and on-screen text.'
+          : 'Visual-only scene: no voiceover, spoken dialogue, or lip-sync actions.',
       )
 
       const cameraMovement = normalizeSceneCameraMovementSpec(
@@ -9548,6 +9626,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
       `Target output duration: ${lockedDuration}s (reference source ${OOTD_TEMPLATE_SOURCE_DURATION_SEC}s). Expand/compress beat timing proportionally without changing beat order.`,
       'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.',
+      'Action + scene writing rule: concise visual description only, no beat labels, no speaking/lip cues.',
       'Voice rule: no voiceover/dialogue. Keep visual-only fit-check storytelling with optional on-screen text.',
       backgroundImage
         ? 'Background anchor lock: model must stand closer to mirror and fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
@@ -9594,6 +9673,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         reviewProductNotes,
         {
           enforceFrontFaceQuarterBodyLock: true,
+          enforceConciseVisualOnlyAction: true,
         },
       )
 
