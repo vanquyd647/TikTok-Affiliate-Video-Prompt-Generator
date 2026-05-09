@@ -760,7 +760,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       index: 3,
       timestamp: 'Beat 4',
       beatName: 'ANGLE SWITCH',
-      description: 'Do one short turn or 3/4 angle change to prove side/back fit and movement behavior.',
+      description: 'Do one short 3/4 angle switch to prove side-fit and movement behavior without turning full back.',
       contextHint: 'Small movement inside mirror frame, keep spatial continuity.',
       cameraHint: 'Quick half-turn with controlled phone follow and no abrupt shake.',
       narrationHint: 'No spoken line; confidence is shown via movement and posture.',
@@ -778,7 +778,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   generatedScript: `Beat 1: Start with phone-in-hand mirror hook and instant full-fit frame.
 Beat 2: Hold front full-body fit proof for silhouette readability.
 Beat 3: Move into detail check (fabric, waistline, finishing).
-Beat 4: Add short 3/4 turn for side/back fit confirmation.
+Beat 4: Add short 3/4 angle switch for side-fit confirmation (no full back turn).
 Beat 5: Return to hero mirror pose and close with soft CTA.`,
   generatedAt: 0,
 }
@@ -1288,13 +1288,16 @@ const NATURALITY_PROMPT_GUARDRAILS = `- Prefer creator-native language and belie
 
 const HAND_ANATOMY_GUARDRAILS = `- Hand anatomy consistency is mandatory: exactly two hands, five fingers per hand, natural finger spacing.
 - Avoid hand artifacts: no fused fingers, missing fingers, extra fingers, duplicated palms, broken wrists, or impossible hand orientation.
-- For mirror fitcheck turns (especially back-facing to three-quarter look-back), keep arm trajectories continuous and physically plausible.
+- For mirror fitcheck turns (especially three-quarter-left <-> three-quarter-right pivots), keep arm trajectories continuous and physically plausible.
 - Keep hands visible and slightly separated from torso/skirt edges to reduce reflection occlusion artifacts.
 - If one hand interacts with footwear or hemline, keep the other hand relaxed and anatomically clear.`
 
 const OOTDMIRROR_REAR_MIRROR_GUARDRAILS = `- Applies only when resolved content type is OOTDMIRROR.
 - Use an observer camera placed in front of the model (camera-facing model), not a selfie POV.
 - The mirror must be behind the model and used to capture full-body outfit reflection.
+- Face orientation lock: keep the face oriented front toward camera in every beat.
+- Body orientation lock: allow only gentle three-quarter-left or three-quarter-right body angles.
+- Never use full back-facing body orientation.
 - The model must not hold any phone/camera/recording device; both hands stay free for natural posing.
 - Never show camera, tripod, operator, or recording gear in the mirror reflection.`
 
@@ -1410,6 +1413,7 @@ type KeyframeFacingDirection =
   | 'unknown'
 
 type ConcreteFacingDirection = Exclude<KeyframeFacingDirection, 'unknown'>
+type OotdMirrorFacingDirection = Extract<ConcreteFacingDirection, 'three-quarter-left' | 'three-quarter-right'>
 
 const RULE32_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
   'front',
@@ -3147,6 +3151,40 @@ function pickDetailSensitiveFacingDirection(
   return softenFacingTransitionForDetailSensitive(previous, candidate, index)
 }
 
+function enforceOotdMirrorQuarterFacingDirection(
+  index: number,
+  candidate: ConcreteFacingDirection,
+  previous: ConcreteFacingDirection | null,
+): OotdMirrorFacingDirection {
+  if (candidate === 'three-quarter-left' || candidate === 'left') {
+    return 'three-quarter-left'
+  }
+
+  if (candidate === 'three-quarter-right' || candidate === 'right') {
+    return 'three-quarter-right'
+  }
+
+  if (previous === 'three-quarter-left') {
+    return 'three-quarter-right'
+  }
+
+  if (previous === 'three-quarter-right') {
+    return 'three-quarter-left'
+  }
+
+  return index % 2 === 0 ? 'three-quarter-left' : 'three-quarter-right'
+}
+
+function enforceOotdMirrorFrontFaceQuarterBodyLock(
+  action: string,
+  facingDirection: OotdMirrorFacingDirection,
+): string {
+  let nextAction = enforceActionFacingDirection(action, facingDirection)
+  nextAction = appendSentenceIfMissing(nextAction, 'Face remains front-oriented toward camera with clear eyes and jawline visibility.')
+  nextAction = appendSentenceIfMissing(nextAction, 'Keep only a gentle three-quarter body angle and avoid full back turns.')
+  return nextAction
+}
+
 function appendSentenceIfMissing(base: string, sentence: string): string {
   const trimmedBase = base.trim()
   const trimmedSentence = sentence.trim()
@@ -3289,6 +3327,8 @@ function enforceOotdMirrorObserverCamera(camera: string): string {
   let next = removeOotdMirrorHandheldDevicePhrases(camera)
   next = appendSentenceIfMissing(next, 'Observer camera is front-facing the model at chest-to-eye height')
   next = appendSentenceIfMissing(next, 'Use the rear mirror behind the model for full-body outfit reflection')
+  next = appendSentenceIfMissing(next, 'Keep face front to camera while body stays at a gentle three-quarter-left or three-quarter-right angle only')
+  next = appendSentenceIfMissing(next, 'Never frame or direct a full back-facing body orientation')
   next = appendSentenceIfMissing(next, 'No camera, tripod, operator, or recording gear visible in mirror reflection')
   return next
 }
@@ -3296,6 +3336,8 @@ function enforceOotdMirrorObserverCamera(camera: string): string {
 function enforceOotdMirrorSceneNarrative(narrative: string): string {
   let next = removeOotdMirrorHandheldDevicePhrases(narrative)
   next = appendSentenceIfMissing(next, 'Use observer-camera coverage with the mirror behind the model for reflection proof')
+  next = appendSentenceIfMissing(next, 'Keep face orientation front to camera while body angle stays gentle three-quarter left or right')
+  next = appendSentenceIfMissing(next, 'Do not use full back-facing turns in the mirror sequence')
   next = appendSentenceIfMissing(next, 'Model remains hands-free with no handheld recording device')
   return next
 }
@@ -4236,8 +4278,17 @@ Output STRICT JSON only:
     const longDurationDirectionalModeLabel = hasLongDurationDirectionalMode
       ? `ACTIVE (duration=${duration}s)`
       : 'INACTIVE'
+    const enforcesOotdMirrorFrontFaceQuarterLock = finalResolvedType === 'ootdmirror'
 
-    const facingRuleForGenerationPrompt = hasVideoPoseDirectionLock
+    const facingRuleForGenerationPrompt = enforcesOotdMirrorFrontFaceQuarterLock
+      ? `32. OOTDMIRROR FACE-FRONT + 3/4 BODY LOCK (HIGHEST PRIORITY) — Apply this lock to every keyframe.
+  - Face orientation is locked front toward camera on all beats.
+  - Body-facing is restricted to only "three-quarter-left" or "three-quarter-right".
+  - Do NOT use "back", "left", or "right" as final facingDirection outputs for OOTDMIRROR.
+  - ACTION text must stay consistent with 3/4 body orientation and must explicitly forbid full back turns.
+  - If any upstream step suggests full back-facing, remap to the nearest gentle 3/4 angle.
+  [ALWAYS ENFORCED FOR OOTDMIRROR]`
+      : hasVideoPoseDirectionLock
       ? `32. VIDEO POSE-DIRECTION USER LOCK (OVERRIDE) — Apply the user lock across the full video.
   - Every keyframe MUST set facingDirection to "${poseDirectionLock}".
   - ACTION text must be consistent with facingDirection and must not contain conflicting direction phrases (for example: "back-facing" while FACING is "front").
@@ -4275,7 +4326,9 @@ Output STRICT JSON only:
   - Hand anatomy lock for mirror turns: preserve exactly two hands and five fingers per hand across adjacent keyframes; no fused/missing/extra fingers, no duplicated palms, and no hand-through-skirt artifacts.
   - If the narrative requires a held direction, break it with a slight 3/4 pivot before continuing.
   [DEFAULT ENFORCEMENT — subordinate to Rule 30 when user notes explicitly require a different safe direction pattern]`
-    const facingRuleForQaRepair = hasVideoPoseDirectionLock
+    const facingRuleForQaRepair = enforcesOotdMirrorFrontFaceQuarterLock
+      ? 'Enforce OOTDMIRROR lock: face must stay front-facing, body must stay gentle three-quarter-left/right only, and no keyframe may use full back-facing direction.'
+      : hasVideoPoseDirectionLock
       ? `Enforce video pose-direction lock: all keyframes must keep facingDirection "${poseDirectionLock}" and ACTION text must stay direction-consistent with that lock.`
       : usesDetailSensitiveFacingMode
         ? 'Enforce detail-sensitive facing mode: keep a stable facing anchor for complex-garment fidelity, avoid forced full-direction cycling, and use only controlled micro-pivots when direction changes are required.'
@@ -4284,7 +4337,9 @@ Output STRICT JSON only:
         : hasLongDurationDirectionalMode
           ? 'Enforce long-duration direction clarity (>=32s): every keyframe must carry explicit matching ACTION/FACING direction, include at least two left-family beats (three-quarter-left or left), and follow stable front/3-4 progression without abrupt opposite flips.'
         : 'Enforce Rule 32: adjacent keyframes must show different body-facing directions (turn/pivot required between every consecutive KF pair); never repeat same facing to avoid Veo 3.1 garment-back hallucination.'
-    const facingRuleForMotionRepair = hasVideoPoseDirectionLock
+    const facingRuleForMotionRepair = enforcesOotdMirrorFrontFaceQuarterLock
+      ? 'Enforce OOTDMIRROR motion lock: maintain front-facing face readability with only gentle three-quarter-left/right body pivots and block any full back-facing turn language.'
+      : hasVideoPoseDirectionLock
       ? `Enforce video pose-direction lock: keep all keyframes facing "${poseDirectionLock}" and remove any conflicting direction phrases from ACTION text.`
       : usesDetailSensitiveFacingMode
         ? 'Enforce detail-sensitive continuity: allow stable same-facing holds for fidelity, avoid abrupt opposite direction jumps, and keep direction changes as small controlled pivots with explicit facingDirection tags.'
@@ -5487,7 +5542,7 @@ Return STRICT JSON only, same schema:
       const previous = i > 0 ? normalizedKeyframesForRule32[i - 1] : null
       const previousFacing = previous?.facingDirection || null
       const relaxedFacingFromNotes = isConcreteFacingDirection(inferredFacing) ? inferredFacing : null
-      const resolvedFacing: ConcreteFacingDirection = hasVideoPoseDirectionLock
+      const resolvedFacingBase: ConcreteFacingDirection = hasVideoPoseDirectionLock
         ? poseDirectionLock as ConcreteFacingDirection
         : usesDetailSensitiveFacingMode
           ? pickDetailSensitiveFacingDirection(i, previousFacing, inferredFacing)
@@ -5496,6 +5551,9 @@ Return STRICT JSON only, same schema:
             : relaxHardRulesByNotes
               ? (relaxedFacingFromNotes || previousFacing || 'front')
               : pickAlternatingFacingDirection(i, previousFacing, inferredFacing)
+      const resolvedFacing: ConcreteFacingDirection = finalContentType === 'ootdmirror'
+        ? enforceOotdMirrorQuarterFacingDirection(i, resolvedFacingBase, previousFacing)
+        : resolvedFacingBase
 
       const actionHasFacingSignal = normalizeFacingDirectionToken(actionBase) !== 'unknown'
       const hasTurnSignal = i > 0
@@ -5572,6 +5630,10 @@ Return STRICT JSON only, same schema:
       camera = fitModelEnforced.camera
 
       if (finalContentType === 'ootdmirror') {
+        const mirrorFacing: OotdMirrorFacingDirection = resolvedFacing === 'three-quarter-right'
+          ? 'three-quarter-right'
+          : 'three-quarter-left'
+        action = enforceOotdMirrorFrontFaceQuarterBodyLock(action, mirrorFacing)
         action = enforceOotdMirrorHandsFreeAction(action)
         action = applyMirrorHandSafetyToAction(action, resolvedFacing, i === rawKeyframes.length - 1)
         camera = enforceOotdMirrorObserverCamera(camera)
