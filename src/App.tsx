@@ -717,11 +717,12 @@ const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the same mirror fit-check storytelling
 - Keep progression: mirror hook -> full-fit proof -> detail proof -> soft confidence close.
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
-- Maintain full-body readability while keeping product details visible in every beat.`
+- Maintain full-body readability while keeping product details visible in every beat.
+- Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.`
 const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootdmirror',
   detectedDurationSec: OOTD_TEMPLATE_SOURCE_DURATION_SEC,
-  hookStyle: 'Minimal mirror hook text with immediate full-fit visibility in phone-held framing.',
+  hookStyle: 'Minimal mirror hook text with immediate full-fit visibility in closer mirror framing.',
   narrativeStructure: 'Phone-held mirror hook -> full-fit proof -> detail check -> angle switch -> concise close (beat-order lock, timeline-flex).',
   ctaStyle: 'Soft recommendation close, no hard sell, creator-native tone.',
   colorGrade: 'clean indoor mirror lighting, neutral skin tone, practical contrast',
@@ -733,7 +734,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       beatName: 'MIRROR HOOK FRAME',
       description: 'Open directly in front of mirror with phone visible to establish authentic mirror fit-check POV.',
       contextHint: 'Indoor mirror zone, practical room background, minimal clutter.',
-      cameraHint: 'Phone-held steady start, slight micro-tilt to lock full-body framing.',
+      cameraHint: 'Phone-held steady start at closer mirror distance, tight full-body framing with minimal empty margins.',
       narrationHint: 'Very short hook phrase tied to first look impression.',
     },
     {
@@ -742,7 +743,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       beatName: 'FULL FIT PROOF',
       description: 'Hold full-body front fit long enough for viewers to read silhouette, length, and proportion.',
       contextHint: 'Do not change room; keep continuity and trust-first realism.',
-      cameraHint: 'Stable mirror frame from knee-to-head then full-body hold.',
+      cameraHint: 'Stable mirror frame, subject occupies around 70-85% of frame while preserving head-to-toe readability.',
       narrationHint: 'One practical line about fit and wearability.',
     },
     {
@@ -769,7 +770,7 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       beatName: 'SOFT CLOSE',
       description: 'Return to hero mirror pose and finish with concise recommendation-style closing.',
       contextHint: 'Center frame again for clear visual end-point.',
-      cameraHint: 'Short hold on full-body pose with tiny push-in.',
+      cameraHint: 'Short hold on closer hero full-body pose with tiny push-in for clearer outfit readability.',
       narrationHint: 'Soft CTA to save/follow/check product details.',
     },
   ],
@@ -7202,7 +7203,7 @@ HARD CONSTRAINTS:
 - Never copy product identity/outfit details from analyzed TikTok video.
 - Keep product review focus anchored to REVIEW NOTES and current PRODUCT input image.
 - ${hasBackgroundLocationReference
-  ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce full-body framing (head-to-toe), preserve full background readability (floor/wall/decor), and treat this image as environment anchor only (not identity/product source).'
+  ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).'
   : 'BACKGROUND LOCATION LOCK: no background input image provided.'}
 - Maintain believable social-native movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
@@ -7329,15 +7330,15 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
       const anchoredAction = appendSentenceIfMissing(
         keyframe.action,
-        'Model stands and performs fit-check in the provided background scene with stable stance.',
+        'Model stands closer to mirror and performs fit-check in the provided background scene with stable stance.',
       )
       const anchoredCamera = appendSentenceIfMissing(
         keyframe.camera,
-        'Full-body head-to-toe framing, keep enough distance so the provided background stays fully visible and logical.',
+        'Closer mirror framing: model occupies around 70-85% frame while still keeping full-body head-to-toe visibility and key background anchors readable.',
       )
       const anchoredStyle = appendSentenceIfMissing(
         keyframe.style,
-        'Maintain full-background continuity (floor line, wall geometry, decor placement) with no venue drift.',
+        'Maintain background continuity via key anchors (mirror edges, floor line, decor placement) with no venue drift.',
       )
 
       return {
@@ -7392,7 +7393,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       if (anchoredTemplateLocation) {
         narrative = appendSentenceIfMissing(
           narrative,
-          'Keep model standing full-body fit-check in the provided background, preserve full room composition, and avoid venue changes.',
+          'Keep model standing closer to mirror for clearer outfit visibility, preserve key background composition anchors, and avoid venue changes.',
         )
       }
 
@@ -7413,7 +7414,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const composition = anchoredTemplateLocation
         ? appendSentenceIfMissing(
           keyframes[index]?.camera || '',
-          'Composition lock: full-body standing fit-check with complete readable background context.',
+          'Composition lock: closer mirror fit-check with subject-dominant framing and stable background anchors.',
         )
         : keyframes[index]?.camera || ''
       const lighting = keyframes[index]?.lighting || ''
@@ -9426,7 +9427,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
       `Target output duration: ${lockedDuration}s (reference source ${OOTD_TEMPLATE_SOURCE_DURATION_SEC}s). Expand/compress beat timing proportionally without changing beat order.`,
       backgroundImage
-        ? 'Background anchor lock: model must stand and fit-check inside the provided background image, keep full-body head-to-toe framing, keep background fully readable, and hold the same venue across beats.'
+        ? 'Background anchor lock: model must stand closer to mirror and fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
         : 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.',
     ].join('\n')
 
@@ -9920,7 +9921,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {OOTD_TEMPLATE_SOURCE_DURATION_SEC}s, chi de tham khao nhip){'\n'}
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
-                  Background fit-check lock: {backgroundImage ? 'ON (full-body + full background continuity)' : 'OFF (them background image de khoa)'}{"\n"}
+                  Background fit-check lock: {backgroundImage ? 'ON (closer mirror framing + full-body + anchor continuity)' : 'OFF (them background image de khoa)'}{"\n"}
                   Narrative: {OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure}
                 </div>
 
