@@ -327,6 +327,7 @@ type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image'
+type AppPageMode = 'core' | 'ootd_template'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
 type LookbookTheme = 'auto' | 'minimal_studio' | 'street_casual' | 'office_chic' | 'party_night' | 'vacation_resort'
@@ -703,6 +704,79 @@ const FIXED_AFFILIATE_MODE: AffiliateMode = 'strict'
 const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
 const FIXED_STRATEGY_LABEL = 'TikTok Shop Core (Strict AUTO + Soft Sell)'
 const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-first de ban ben vung.'
+const OOTD_TEMPLATE_ROUTE_PATH = '/ootd-template'
+const OOTD_TEMPLATE_REFERENCE_VIDEO_URL = new URL('../7807408001411.mp4', import.meta.url).href
+const OOTD_TEMPLATE_LOCKED_DURATION = 24
+const OOTD_TEMPLATE_SOURCE_DURATION_SEC = 17.05
+const OOTD_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
+const OOTD_TEMPLATE_LOCKED_CONTENT_TYPE: ResolvedContentType = 'ootd'
+const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the OOTD script structure identical to the reference.
+- Preserve the same hook -> fit proof -> detail proof -> confidence close progression.
+- The only variable is the outfit/product from current PRODUCT input image.
+- Keep creator tone natural, social-native, non-overacted, and purchase-friendly.
+- Keep full-body readability and product details visible in every beat.`
+const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
+  detectedContentType: 'ootd',
+  detectedDurationSec: OOTD_TEMPLATE_SOURCE_DURATION_SEC,
+  hookStyle: 'Quick visual hook with immediate silhouette reveal in the first seconds.',
+  narrativeStructure: 'Hook reveal -> fit proof -> detail proof -> movement confidence -> soft close.',
+  ctaStyle: 'Soft CTA focused on save/follow and natural purchase intent.',
+  colorGrade: 'clean indoor daylight, soft contrast, neutral skin tone',
+  pacing: 'medium-fast social-native with short beat transitions',
+  sceneBeats: [
+    {
+      index: 0,
+      timestamp: '0-2s',
+      beatName: 'HOOK OUTFIT REVEAL',
+      description: 'Open with instant full-look reveal so viewers understand silhouette and vibe immediately.',
+      contextHint: 'Mirror or clean room corner with minimal clutter and enough space for full-body framing.',
+      cameraHint: 'Quick push-in or slight tilt, then stabilize on full-body frame.',
+      narrationHint: 'One short hook line about first-impression style and fit.',
+    },
+    {
+      index: 1,
+      timestamp: '2-6s',
+      beatName: 'FIT PROOF FRONT VIEW',
+      description: 'Show front fit, waistline, and body proportion with clear garment readability.',
+      contextHint: 'Stay in same location to keep continuity and social-native realism.',
+      cameraHint: 'Stable medium-full to full-body framing, no extreme lens distortion.',
+      narrationHint: 'Highlight fit benefits and daily wearability in short phrases.',
+    },
+    {
+      index: 2,
+      timestamp: '6-10s',
+      beatName: 'DETAIL PROOF CLOSE SHOT',
+      description: 'Move into texture/detail zone to verify material, stitching, and finishing quality.',
+      contextHint: 'Use the same ambience; focus on practical product proof rather than dramatic cinematic changes.',
+      cameraHint: 'Controlled close-up and short tilt movement on key garment details.',
+      narrationHint: 'Mention one to two concrete product details users care about.',
+    },
+    {
+      index: 3,
+      timestamp: '10-14s',
+      beatName: 'MOVEMENT WEARABILITY',
+      description: 'Add natural walking/turning movement to prove comfort and drape in motion.',
+      contextHint: 'Short movement path in the same room or nearby corridor-like space.',
+      cameraHint: 'Smooth lateral track or follow shot with stable axis.',
+      narrationHint: 'Emphasize comfort and practical movement confidence.',
+    },
+    {
+      index: 4,
+      timestamp: '14-17s',
+      beatName: 'SOFT CLOSE CTA',
+      description: 'Finish with confident pose and concise recommendation-style close.',
+      contextHint: 'Return to clean hero position for visual closure.',
+      cameraHint: 'Slow hold or micro push-in on final full-body pose.',
+      narrationHint: 'Soft recommendation CTA, avoid hard-sell language.',
+    },
+  ],
+  generatedScript: `0-2s: Hook reveal the outfit silhouette immediately.
+2-6s: Show front fit and overall proportion clearly.
+6-10s: Prove fabric and stitching details in close shot.
+10-14s: Show movement comfort with natural walk/turn.
+14-17s: End with confident full-body close and soft CTA.`,
+  generatedAt: 0,
+}
 
 const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'ootd',
@@ -7943,8 +8017,13 @@ function Timeline({
 // ═══════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════
-export default function App() {
+type AppProps = {
+  initialPageMode?: AppPageMode
+}
+
+export default function App({ initialPageMode = 'core' }: AppProps) {
   // State
+  const [pageMode, setPageMode] = useState<AppPageMode>(initialPageMode)
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('aff_api_key') || '')
   const [showApiKey, setShowApiKey] = useState(false)
   const [model, setModel] = useState(() => localStorage.getItem('aff_model') || 'gemini-2.5-flash')
@@ -8028,6 +8107,7 @@ export default function App() {
   const [historySearchQuery, setHistorySearchQuery] = useState('')
   const [productLocationHistory, setProductLocationHistory] = useState<ProductLocationHistoryMap>(() => loadProductLocationHistory())
   const [outfitTypeLocationHistory, setOutfitTypeLocationHistory] = useState<OutfitTypeLocationHistoryMap>(() => loadOutfitTypeLocationHistory())
+  const isOotdTemplatePage = pageMode === 'ootd_template'
 
   // TikTok Video Analysis
   const [tiktokVideoFile, setTiktokVideoFile] = useState<File | null>(null)
@@ -8055,6 +8135,48 @@ export default function App() {
   useEffect(() => { localStorage.setItem('aff_auto_apply_product_category_type', autoApplyCategoryType ? '1' : '0') }, [autoApplyCategoryType])
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
+    const targetPath = pageMode === 'ootd_template' ? OOTD_TEMPLATE_ROUTE_PATH : '/'
+
+    if (currentPath !== targetPath) {
+      window.history.replaceState(null, '', `${targetPath}${window.location.search}${window.location.hash}`)
+    }
+  }, [pageMode])
+
+  useEffect(() => {
+    if (!isOotdTemplatePage) return
+
+    if (generationMode !== 'video_prompt') {
+      setGenerationMode('video_prompt')
+    }
+    if (duration !== OOTD_TEMPLATE_LOCKED_DURATION) {
+      setDuration(OOTD_TEMPLATE_LOCKED_DURATION)
+    }
+    if (aspectRatio !== OOTD_TEMPLATE_LOCKED_ASPECT_RATIO) {
+      setAspectRatio(OOTD_TEMPLATE_LOCKED_ASPECT_RATIO)
+    }
+    if (contentType !== OOTD_TEMPLATE_LOCKED_CONTENT_TYPE) {
+      setContentType(OOTD_TEMPLATE_LOCKED_CONTENT_TYPE)
+    }
+    if (!isContentTypeManuallyLocked) {
+      setIsContentTypeManuallyLocked(true)
+    }
+    if (videoPoseDirectionLock !== 'auto') {
+      setVideoPoseDirectionLock('auto')
+    }
+  }, [
+    aspectRatio,
+    contentType,
+    duration,
+    generationMode,
+    isContentTypeManuallyLocked,
+    isOotdTemplatePage,
+    videoPoseDirectionLock,
+  ])
 
   useEffect(() => {
     if (!loading) {
@@ -8446,24 +8568,40 @@ export default function App() {
   const lookbookStyleToneLabel = lookbookStyleTone === 'sexy' ? 'Sexy' : 'Classic'
   const lookbookThemeLabel = getLookbookThemeOption(lookbookTheme).label
   const videoPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === videoPoseDirectionLock)?.label || 'Auto'
-  const promptPrimaryLabel = generationMode === 'lookbook_image' ? 'Anh Lookbook' : 'Prompt Package'
-  const loadingStages = generationMode === 'lookbook_image' ? LOOKBOOK_LOADING_STAGES : PROMPT_LOADING_STAGES
+  const promptPrimaryLabel = isOotdTemplatePage
+    ? 'Prompt OOTD Template'
+    : generationMode === 'lookbook_image'
+      ? 'Anh Lookbook'
+      : 'Prompt Package'
+  const loadingStages = !isOotdTemplatePage && generationMode === 'lookbook_image'
+    ? LOOKBOOK_LOADING_STAGES
+    : PROMPT_LOADING_STAGES
   const promptStatusKind = loading ? 'loading' : error ? 'error' : hasPromptResult ? 'success' : 'idle'
   const promptLoadingStep = loadingStages[Math.min(loadingStageIndex, loadingStages.length - 1)]
   const promptLoadingProgress = loading ? Math.min(90, 24 + loadingStageIndex * 22) : 100
-  const promptFloatingStatus = loading
-    ? promptLoadingStep
-    : error
-      ? 'Có lỗi khi tạo prompt. Kiểm tra thông báo để thử lại.'
-      : hasPromptResult
-        ? hasVideoPromptResult
-          ? `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL} • pose ${videoPoseDirectionLockLabel}).`
-            : `Prompt anh lookbook da san sang (${currentLookbookPrompts.length} pics • ${lookbookStyleToneLabel} • ${lookbookThemeLabel}).`
-        : canGenerate
-          ? generationMode === 'lookbook_image'
-              ? `San sang tao ${lookbookImageCount} prompt anh lookbook (${lookbookStyleToneLabel} • ${lookbookThemeLabel}, khong video).`
-            : `San sang tao Prompt Package (${FIXED_STRATEGY_DESC}).`
-          : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
+  const promptFloatingStatus = isOotdTemplatePage
+    ? loading
+      ? promptLoadingStep
+      : error
+        ? 'Co loi khi tao prompt OOTD template. Kiem tra thong bao de thu lai.'
+        : hasPromptResult
+          ? `Prompt OOTD template da san sang (${selectedContentType.toUpperCase()} • script lock tu video mau 7807408001411).`
+          : canGenerate
+            ? 'Page nay khoa script OOTD theo video mau. Ban chi can doi anh san pham roi bam Tao Prompt OOTD Template.'
+            : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
+    : loading
+      ? promptLoadingStep
+      : error
+        ? 'Có lỗi khi tạo prompt. Kiểm tra thông báo để thử lại.'
+        : hasPromptResult
+          ? hasVideoPromptResult
+            ? `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL} • pose ${videoPoseDirectionLockLabel}).`
+              : `Prompt anh lookbook da san sang (${currentLookbookPrompts.length} pics • ${lookbookStyleToneLabel} • ${lookbookThemeLabel}).`
+          : canGenerate
+            ? generationMode === 'lookbook_image'
+                ? `San sang tao ${lookbookImageCount} prompt anh lookbook (${lookbookStyleToneLabel} • ${lookbookThemeLabel}, khong video).`
+              : `San sang tao Prompt Package (${FIXED_STRATEGY_DESC}).`
+            : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
   const selectedSeoVariant = seoResult
     ? seoResult.seoVariants[Math.min(selectedSeoVariantIndex, seoResult.seoVariants.length - 1)]
     : null
@@ -8471,6 +8609,8 @@ export default function App() {
     ? 'Lich su da luu (MongoDB)'
     : activeTab === 'tiktokanalysis'
       ? 'Phan tich Video TikTok'
+    : isOotdTemplatePage
+      ? `OOTD Template Output — ${OOTD_TEMPLATE_LOCKED_DURATION}s / ${OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}`
     : result
       ? hasVideoPromptResult
         ? `Prompt Package — ${duration}s / ${aspectRatio}`
@@ -9209,6 +9349,182 @@ export default function App() {
     }
   }
 
+  const handleGenerateOotdTemplate = async () => {
+    if (!apiKey.trim()) {
+      setError('Vui long nhap Gemini API Key de tao prompt OOTD template')
+      setPromptToast({
+        kind: 'error',
+        message: 'Thieu Gemini API Key.',
+      })
+      return
+    }
+
+    const reviewProductNotes = [
+      OOTD_TEMPLATE_PRODUCT_BRIEF,
+      `Product category hint: ${activeProductCategoryOption.label}.`,
+      `Detail hint: ${activeProductCategoryOption.detailHint}`,
+      'Ignore all non-product visual identity from the reference video. Keep only pacing and scene progression.',
+    ].join('\n')
+
+    const lockedDuration = OOTD_TEMPLATE_LOCKED_DURATION
+    const lockedAspectRatio = OOTD_TEMPLATE_LOCKED_ASPECT_RATIO
+    const lockedContentType = OOTD_TEMPLATE_LOCKED_CONTENT_TYPE
+    const currentProductImageId = productImage ? createProductImageId(productImage) : null
+
+    setGenerationMode('video_prompt')
+    setDuration(lockedDuration)
+    setAspectRatio(lockedAspectRatio)
+    setContentType(lockedContentType)
+    setIsContentTypeManuallyLocked(true)
+    setVideoPoseDirectionLock('auto')
+
+    setLoading(true)
+    setSelectedHistoryId(null)
+    setLoadingStageIndex(0)
+    setPromptToast({
+      kind: 'loading',
+      message: 'Dang tao Prompt OOTD Template tu script lock cua video mau...',
+    })
+    setError('')
+    setResult(null)
+    setErrorLogLines([])
+
+    const logLines: string[] = []
+    const pushLog = (line: string) => { logLines.push(line) }
+
+    pushLog(`[START] ${new Date().toISOString()} — source=ootd-template-lock model=${model} duration=${lockedDuration}s ratio=${lockedAspectRatio} type=${lockedContentType}`)
+
+    try {
+      const res = await generatePromptPackageFromTikTokAnalysisWithGemini(
+        apiKey,
+        model,
+        faceImage,
+        productImage,
+        backgroundImage,
+        lockedDuration,
+        lockedAspectRatio,
+        OOTD_TEMPLATE_LOCKED_ANALYSIS,
+        reviewProductNotes,
+      )
+
+      pushLog(`[OK] Template generation succeeded — keyframes=${res.keyframes.length} scenes=${res.scenes.length}`)
+      setErrorLogLines([...logLines])
+
+      const resolvedType: ResolvedContentType = res.resolvedContentType || lockedContentType
+      res.createImagePrompt = buildCreateImagePrompt(resolvedType, reviewProductNotes)
+
+      setResult(res)
+      setSelectedContentType(resolvedType)
+      setActiveTab('keyframes')
+      setPromptToast({
+        kind: 'success',
+        message: 'Da tao xong Prompt OOTD Template. Ban chi can doi outfit va tao lai khi can.',
+      })
+
+      const generatedLocations = Array.from(
+        new Set(
+          res.keyframes
+            .map((keyframe) => keyframe.location.trim())
+            .filter((location) => location.length > 0)
+        )
+      )
+
+      if (generatedLocations.length > 0) {
+        if (currentProductImageId) {
+          setProductLocationHistory((prev) => {
+            const existing = prev[currentProductImageId] || []
+            const merged = Array.from(new Set([...generatedLocations, ...existing]))
+            return {
+              ...prev,
+              [currentProductImageId]: merged.slice(0, MAX_LOCATION_HISTORY_PER_PRODUCT),
+            }
+          })
+        }
+
+        setOutfitTypeLocationHistory((prev) => {
+          const existing = prev[resolvedType] || []
+          const merged = Array.from(new Set([...generatedLocations, ...existing]))
+          return {
+            ...prev,
+            [resolvedType]: merged.slice(0, MAX_LOCATION_HISTORY_PER_OUTFIT_TYPE),
+          }
+        })
+      }
+
+      const promptPackageForHistory = {
+        masterDNA: res.masterDNA,
+        createImagePrompt: res.createImagePrompt || '',
+        keyframes: res.keyframes.map((keyframe) => ({
+          index: keyframe.index,
+          timestamp: keyframe.timestamp,
+          subject: keyframe.subject,
+          action: keyframe.action,
+          facingDirection: keyframe.facingDirection || '',
+          location: keyframe.location,
+          camera: keyframe.camera,
+          lighting: keyframe.lighting,
+          style: keyframe.style,
+          fullPrompt: keyframe.fullPrompt,
+        })),
+        scenes: res.scenes.map((scene) => ({
+          index: scene.index,
+          timeRange: scene.timeRange,
+          narrative: scene.narrative,
+          startPose: scene.startPose,
+          endPose: scene.endPose,
+          cameraMovement: scene.cameraMovement,
+          locationFlow: scene.locationFlow || '',
+          fullPrompt: scene.fullPrompt,
+        })),
+      }
+
+      void persistWorkHistory({
+        action: 'prompt',
+        model,
+        contentType: resolvedType,
+        notes: reviewProductNotes,
+        generatedAt: Date.now(),
+        metadata: {
+          generationMode: 'video_prompt',
+          generationSource: 'ootd_template_7807408001411',
+          inputContentType: lockedContentType,
+          resolvedContentType: resolvedType,
+          duration: lockedDuration,
+          sourceDurationSec: OOTD_TEMPLATE_SOURCE_DURATION_SEC,
+          aspectRatio: lockedAspectRatio,
+          keyframeCount: res.keyframes.length,
+          sceneCount: res.scenes.length,
+          generatedLocations: generatedLocations.slice(0, 10),
+          hasFaceImage: Boolean(faceImage),
+          hasProductImage: Boolean(productImage),
+          hasBackgroundImage: Boolean(backgroundImage),
+          templateReferenceVideo: '7807408001411.mp4',
+          templateNarrativeStructure: OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure,
+          promptPackage: promptPackageForHistory,
+        },
+      })
+        .then(() => loadWorkHistory({ silent: true }))
+        .catch((saveError) => {
+          console.warn(
+            'Could not save prompt work history:',
+            saveError instanceof Error ? saveError.message : saveError
+          )
+        })
+    } catch (err: any) {
+      const message = err?.message || 'Failed to generate OOTD template prompt package'
+      pushLog(`[ERROR] Fatal: ${message}`)
+      setErrorLogLines([...logLines])
+      setError(message)
+      setPromptToast({
+        kind: 'error',
+        message,
+      })
+    } finally {
+      setLoading(false)
+      setPromptToast((prev) => (prev?.kind === 'loading' ? null : prev))
+    }
+  }
+
   // Export All
   const handleExportAll = () => {
     if (!hasAnyResult) return
@@ -9402,10 +9718,37 @@ export default function App() {
             </div>
             <div>
               <h1 className="header-title">AFF Video Prompt</h1>
-              <p className="header-subtitle">TikTok Affiliate Video Prompt Generator</p>
+              <p className="header-subtitle">
+                {isOotdTemplatePage
+                  ? 'OOTD Template Page (Script lock theo video 7807408001411.mp4)'
+                  : 'TikTok Affiliate Video Prompt Generator'}
+              </p>
             </div>
           </div>
           <div className="header-config">
+            <div className="chip-group" style={{ marginBottom: 0 }}>
+              <button
+                type="button"
+                className={`chip ${pageMode === 'core' ? 'active' : ''}`}
+                onClick={() => setPageMode('core')}
+                id="switch-page-core"
+              >
+                Core Page
+              </button>
+              <button
+                type="button"
+                className={`chip ${pageMode === 'ootd_template' ? 'active' : ''}`}
+                onClick={() => setPageMode('ootd_template')}
+                id="switch-page-ootd-template"
+                style={pageMode === 'ootd_template' ? {
+                  borderColor: '#0ea5e9',
+                  color: '#0ea5e9',
+                  background: 'color-mix(in srgb, #0ea5e9 14%, transparent)',
+                } : {}}
+              >
+                OOTD Template Page
+              </button>
+            </div>
             <select
               className="select-field"
               value={model}
@@ -9454,6 +9797,56 @@ export default function App() {
               </div>
             </div>
 
+            {isOotdTemplatePage && (
+              <div
+                className="card"
+                style={{
+                  marginBottom: 16,
+                  borderColor: 'rgba(14, 165, 233, 0.35)',
+                  background: 'linear-gradient(180deg, rgba(14, 165, 233, 0.08), rgba(2, 132, 199, 0.04))',
+                }}
+              >
+                <div className="card-title" style={{ color: '#38bdf8' }}>
+                  <Film /> OOTD Template Lock (7807408001411.mp4)
+                </div>
+
+                <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 10 }}>
+                  Page nay tach rieng khoi core. Kich ban duoc khoa theo video mau, ban chi can thay doi anh san pham (trang phuc)
+                  va tao lai prompt. Face image va background image la tuy chon.
+                </p>
+
+                <video
+                  src={OOTD_TEMPLATE_REFERENCE_VIDEO_URL}
+                  controls
+                  preload="metadata"
+                  playsInline
+                  muted
+                  style={{
+                    width: '100%',
+                    borderRadius: 10,
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    marginBottom: 12,
+                    background: '#020617',
+                  }}
+                />
+
+                <div className="prompt-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 10 }}>
+                  <strong>Lock config:</strong>{'\n'}
+                  Duration: {OOTD_TEMPLATE_LOCKED_DURATION}s (nguon tham chieu {OOTD_TEMPLATE_SOURCE_DURATION_SEC}s){'\n'}
+                  Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
+                  Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
+                  Narrative: {OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure}
+                </div>
+
+                <div className="prompt-text" style={{ whiteSpace: 'pre-wrap' }}>
+                  <strong>Beat flow (giu nguyen):</strong>{'\n'}
+                  {OOTD_TEMPLATE_LOCKED_ANALYSIS.sceneBeats
+                    .map((beat) => `${beat.timestamp}: ${beat.beatName}`)
+                    .join('\n')}
+                </div>
+              </div>
+            )}
+
             {/* Images */}
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title">
@@ -9491,6 +9884,8 @@ export default function App() {
               />
             </div>
 
+            {!isOotdTemplatePage && (
+              <>
             {/* Generation Mode */}
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title">
@@ -9868,6 +10263,11 @@ export default function App() {
               </p>
             </div>
 
+              </>
+            )}
+
+            {!isOotdTemplatePage && (
+              <>
             {/* Notes */}
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title">
@@ -10133,6 +10533,8 @@ export default function App() {
                 </div>
               )}
             </div>
+              </>
+            )}
 
             {/* Algorithm Info */}
             {generationMode === 'video_prompt' && (
@@ -10868,10 +11270,24 @@ export default function App() {
           </div>
         </div>
 
-        <div className="prompt-floating-bar-wrap" role="region" aria-label={generationMode === 'lookbook_image' ? 'Tao Anh Lookbook' : 'Tao Prompt Package'}>
+        <div
+          className="prompt-floating-bar-wrap"
+          role="region"
+          aria-label={isOotdTemplatePage
+            ? 'Tao Prompt OOTD Template'
+            : generationMode === 'lookbook_image'
+              ? 'Tao Anh Lookbook'
+              : 'Tao Prompt Package'}
+        >
           <div className={`prompt-floating-bar ${loading ? 'is-loading' : ''}`}>
             <div className="prompt-floating-meta">
-              <p className="prompt-floating-title">{generationMode === 'lookbook_image' ? 'Tao Anh Lookbook' : 'Tao Prompt Package'}</p>
+              <p className="prompt-floating-title">
+                {isOotdTemplatePage
+                  ? 'Tao Prompt OOTD Template'
+                  : generationMode === 'lookbook_image'
+                    ? 'Tao Anh Lookbook'
+                    : 'Tao Prompt Package'}
+              </p>
               <p className={`prompt-floating-subtitle ${promptStatusKind}`}>
                 {promptFloatingStatus}
               </p>
@@ -10880,18 +11296,26 @@ export default function App() {
             <button
               id="generate-btn"
               className={`btn-generate prompt-floating-btn ${loading ? 'loading' : ''}`}
-              onClick={handleGenerate}
+              onClick={isOotdTemplatePage ? handleGenerateOotdTemplate : handleGenerate}
               disabled={loading || !canGenerate}
             >
               {loading ? (
                 <>
                   <div className="spinner" />
-                  {generationMode === 'lookbook_image' ? 'Dang tao anh lookbook...' : 'Dang tao prompt...'}
+                  {isOotdTemplatePage
+                    ? 'Dang tao prompt OOTD template...'
+                    : generationMode === 'lookbook_image'
+                      ? 'Dang tao anh lookbook...'
+                      : 'Dang tao prompt...'}
                 </>
               ) : (
                 <>
                   <Wand2 size={18} />
-                  {generationMode === 'lookbook_image' ? 'Tao Anh Lookbook' : 'Tao Prompt Package'}
+                  {isOotdTemplatePage
+                    ? 'Tao Prompt OOTD Template'
+                    : generationMode === 'lookbook_image'
+                      ? 'Tao Anh Lookbook'
+                      : 'Tao Prompt Package'}
                   <ArrowRight size={16} />
                 </>
               )}
