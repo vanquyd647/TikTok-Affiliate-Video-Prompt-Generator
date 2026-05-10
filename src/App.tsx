@@ -712,36 +712,36 @@ const OOTD_TEMPLATE_LOCKED_DURATION = 24
 const OOTD_TEMPLATE_SOURCE_DURATION_SEC = 13.838
 const OOTD_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
 const OOTD_TEMPLATE_LOCKED_CONTENT_TYPE: ResolvedContentType = 'ootdmirror'
-const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the same mirror fit-check storytelling from the reference video.
-- Preserve phone-in-hand mirror framing and social-native handheld energy.
+const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the same mirror outfit-proof progression from the reference video.
+- Preserve stable observer-camera mirror framing with neutral expression and closed-mouth behavior.
 - Keep progression: mirror hook -> full-fit proof -> detail proof -> soft confidence close.
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat.
 - Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.
 - Direction lock: face stays FRONT; body angle only FRONT, 3/4 LEFT, or 3/4 RIGHT; never back-facing.
-- Voice rule: visual-only fit-check, no voiceover or spoken dialogue required.`
+- Voice rule: visual-only outfit proof, no voiceover/spoken dialogue, no lip-sync behavior.`
 const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootdmirror',
   detectedDurationSec: OOTD_TEMPLATE_SOURCE_DURATION_SEC,
-  hookStyle: 'Minimal mirror hook text with immediate full-fit visibility in closer mirror framing.',
-  narrativeStructure: 'Phone-held mirror hook -> full-fit proof -> detail check -> angle switch -> concise close (beat-order lock, timeline-flex).',
-  ctaStyle: 'Soft recommendation close, no hard sell, creator-native tone.',
+  hookStyle: 'Minimal mirror opening text with immediate full-fit visibility in closer mirror framing.',
+  narrativeStructure: 'Mirror opening frame -> full-fit proof -> detail check -> angle switch -> concise close (order lock, timeline-flex).',
+  ctaStyle: 'Soft recommendation close, no hard sell, text-only suggestion.',
   colorGrade: 'clean indoor mirror lighting, neutral skin tone, practical contrast',
-  pacing: 'fast micro-beat mirror pacing with compact cuts and adaptive beat length by target duration',
+  pacing: 'fast compact mirror pacing with adaptive cut length by target duration',
   sceneBeats: [
     {
       index: 0,
-      timestamp: 'Beat 1',
+      timestamp: 'Step 1',
       beatName: 'MIRROR HOOK FRAME',
-      description: 'Open directly in front of mirror with phone visible to establish authentic mirror fit-check POV.',
+      description: 'Open directly in front of mirror with stable front pose to establish clear outfit proof framing.',
       contextHint: 'Indoor mirror zone, practical room background, minimal clutter.',
-      cameraHint: 'Phone-held steady start at closer mirror distance, tight full-body framing with minimal empty margins.',
+      cameraHint: 'Locked eye-level start at closer mirror distance, tight full-body framing with minimal empty margins.',
       narrationHint: 'No spoken line; use visual hook and optional on-screen text only.',
     },
     {
       index: 1,
-      timestamp: 'Beat 2',
+      timestamp: 'Step 2',
       beatName: 'FULL FIT PROOF',
       description: 'Hold full-body front fit long enough for viewers to read silhouette, length, and proportion.',
       contextHint: 'Do not change room; keep continuity and trust-first realism.',
@@ -750,25 +750,25 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
     },
     {
       index: 2,
-      timestamp: 'Beat 3',
+      timestamp: 'Step 3',
       beatName: 'DETAIL CHECK',
       description: 'Move closer to mirror for fabric/waistline/finishing detail proof without losing outfit context.',
       contextHint: 'Keep same mirror ambience; avoid dramatic location transitions.',
-      cameraHint: 'Phone-held mid-close detail pass with slow vertical scan.',
+      cameraHint: 'Locked mid-close detail pass with slow vertical scan.',
       narrationHint: 'No spoken line; emphasize details through close visual proof.',
     },
     {
       index: 3,
-      timestamp: 'Beat 4',
+      timestamp: 'Step 4',
       beatName: 'ANGLE SWITCH',
       description: 'Do one short 3/4 angle switch to prove side-fit and movement behavior without turning full back.',
       contextHint: 'Small movement inside mirror frame, keep spatial continuity.',
-      cameraHint: 'Quick half-turn with controlled phone follow and no abrupt shake.',
+      cameraHint: 'Quick half-turn with controlled follow and no abrupt shake.',
       narrationHint: 'No spoken line; confidence is shown via movement and posture.',
     },
     {
       index: 4,
-      timestamp: 'Beat 5',
+      timestamp: 'Step 5',
       beatName: 'SOFT CLOSE',
       description: 'Return to hero mirror pose and finish with concise recommendation-style closing.',
       contextHint: 'Center frame again for clear visual end-point.',
@@ -776,11 +776,11 @@ const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       narrationHint: 'Optional on-screen CTA text only; no spoken CTA.',
     },
   ],
-  generatedScript: `Beat 1: Start with phone-in-hand mirror hook and instant full-fit frame.
-Beat 2: Hold front full-body fit proof for silhouette readability.
-Beat 3: Move into detail check (fabric, waistline, finishing).
-Beat 4: Add short 3/4 angle switch for side-fit confirmation (no full back turn).
-Beat 5: Return to hero mirror pose and close with soft CTA.`,
+  generatedScript: `Open with a stable front mirror frame and instant full-fit visibility.
+Hold front full-body fit proof for silhouette readability.
+Move into detail check (fabric, waistline, finishing).
+Add a short 3/4 angle switch for side-fit confirmation (no full back turn).
+Return to hero mirror pose and close with soft on-screen CTA.`,
   generatedAt: 0,
 }
 
@@ -3375,7 +3375,7 @@ function removeTurnCuePhrases(value: string): string {
 }
 
 function sanitizeVisualOnlyConciseAction(value: string): string {
-  const fallback = 'Natural fit-check movement with clear outfit visibility.'
+  const fallback = 'Natural outfit-proof motion with clear full-body visibility.'
   if (!value.trim()) return fallback
 
   let next = value
@@ -3384,8 +3384,16 @@ function sanitizeVisualOnlyConciseAction(value: string): string {
     { pattern: /\b(?:follow|follows|following)\s+(?:the\s+)?(?:visual\s+)?beat(?:\s+flow)?\b/gi, replacement: ' ' },
     { pattern: /\bbeat\s*\d+\b/gi, replacement: ' ' },
     { pattern: /\bbeat(?:\s+flow)?\b/gi, replacement: ' ' },
+    { pattern: /\bsocial-native\b/gi, replacement: ' ' },
+    { pattern: /\bmirror\s+fit-?check\b/gi, replacement: 'mirror outfit proof' },
+    { pattern: /\bfit-?check\b/gi, replacement: 'outfit proof' },
+    { pattern: /\bcommunicate\s+via\s+pose\b/gi, replacement: ' ' },
+    { pattern: /\b(?:acting|performance|performative|influencer|vlog|selfie(?:\s+vibe)?)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:handheld|hand\s+held|orbit\s+(?:left|right|up|low|down)|orbit)\b/gi, replacement: ' ' },
+    { pattern: /\bexecute\s+a\s+controlled\s+3\/4\s+angle\s+transition\b/gi, replacement: 'small controlled body-angle change' },
     { pattern: /\b(?:voiceover|dialogue|spoken|speaking|talking|narration|narrate)\b/gi, replacement: ' ' },
     { pattern: /\blip(?:-|\s)?sync(?:ing)?\b/gi, replacement: ' ' },
+    { pattern: /\b(?:mouth\s+movement|jaw\s+movement|pseudo-voice\s+acting)\b/gi, replacement: ' ' },
   ]
 
   for (const { pattern, replacement } of replacements) {
@@ -3397,7 +3405,7 @@ function sanitizeVisualOnlyConciseAction(value: string): string {
 }
 
 function sanitizeVisualOnlyConciseSceneNarrative(value: string): string {
-  const fallback = 'Concise visual fit-check progression with clear product visibility.'
+  const fallback = 'Concise visual outfit-proof progression with clear product visibility.'
   if (!value.trim()) return fallback
 
   let next = value
@@ -3406,8 +3414,40 @@ function sanitizeVisualOnlyConciseSceneNarrative(value: string): string {
     { pattern: /\b(?:follow|follows|following)\s+(?:the\s+)?(?:visual\s+)?beat(?:\s+flow)?\b/gi, replacement: ' ' },
     { pattern: /\bbeat\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/gi, replacement: ' ' },
     { pattern: /\bbeat(?:\s+flow)?\b/gi, replacement: ' ' },
+    { pattern: /\bsocial-native\b/gi, replacement: ' ' },
+    { pattern: /\bmirror\s+fit-?check\b/gi, replacement: 'mirror outfit proof' },
+    { pattern: /\bfit-?check\b/gi, replacement: 'outfit proof' },
+    { pattern: /\bcommunicate\s+via\s+pose\b/gi, replacement: ' ' },
+    { pattern: /\b(?:acting|performance|performative|influencer|vlog|selfie(?:\s+vibe)?)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:handheld|hand\s+held|orbit\s+(?:left|right|up|low|down)|orbit)\b/gi, replacement: ' ' },
+    { pattern: /\bexecute\s+a\s+controlled\s+3\/4\s+angle\s+transition\b/gi, replacement: 'small controlled body-angle change' },
     { pattern: /\b(?:voiceover|dialogue|spoken|speaking|talking|narration|narrate)\b/gi, replacement: ' ' },
     { pattern: /\blip(?:-|\s)?sync(?:ing)?\b/gi, replacement: ' ' },
+    { pattern: /\b(?:mouth\s+movement|jaw\s+movement|pseudo-voice\s+acting)\b/gi, replacement: ' ' },
+  ]
+
+  for (const { pattern, replacement } of replacements) {
+    next = next.replace(pattern, replacement)
+  }
+
+  next = normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
+  return next.length > 0 ? next : fallback
+}
+
+function sanitizeVisualOnlyConciseCamera(value: string): string {
+  const fallback = 'Locked eye-level camera with minimal linear movement and stable axis.'
+  if (!value.trim()) return fallback
+
+  let next = value
+  const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /\bsocial-native\b/gi, replacement: 'stable' },
+    { pattern: /\bhandheld\s+tracking\s+movement\b/gi, replacement: 'minimal linear movement' },
+    { pattern: /\b(?:handheld|hand\s+held|shaky\s+cam)\b/gi, replacement: 'locked camera' },
+    { pattern: /\borbit\s+(?:left|right|up|low|down)\b/gi, replacement: 'gentle linear shift' },
+    { pattern: /\borbit\b/gi, replacement: 'gentle linear shift' },
+    { pattern: /\barc\s+shot\b/gi, replacement: 'gentle linear shift' },
+    { pattern: /\bcircular\s+move\b/gi, replacement: 'gentle linear shift' },
+    { pattern: /\b(?:vlog|influencer|selfie)\b/gi, replacement: 'neutral' },
   ]
 
   for (const { pattern, replacement } of replacements) {
@@ -7317,17 +7357,21 @@ HARD CONSTRAINTS:
 - Never copy product identity/outfit details from analyzed TikTok video.
 - Keep product review focus anchored to REVIEW NOTES and current PRODUCT input image.
 - ${hasBackgroundLocationReference
-  ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).'
+  ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing for outfit proof in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).'
   : 'BACKGROUND LOCATION LOCK: no background input image provided.'}
 - ${shouldApplyFrontFaceQuarterBodyLock
   ? 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera/mirror on every keyframe; body direction is only front or gentle three-quarter-left or three-quarter-right; never use back-facing body orientation.'
   : 'FRONT-FACE / QUARTER-BODY LOCK: inactive.'}
-- NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual fit-check actions and optional on-screen text only.
+- NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual outfit-proof actions and optional on-screen text only.
 - TERMINOLOGY LOCK: avoid script-oriented wording and express pacing cues as visual beat flow only.
 - ${shouldEnforceConciseVisualOnlyAction
   ? 'ACTION WRITING LOCK: keep ACTION concise and physical, do not mention beat labels/references, and block speaking/voiceover/lip-sync wording.'
   : 'ACTION WRITING LOCK: keep ACTION clear, product-first, and visual.'}
-- Maintain believable social-native movement and camera continuity.
+- PERFORMANCE LOCK: block talking-to-camera behavior, lip articulation, jaw-speaking motion, speech-like head nodding, and presenter-style acting.
+- ${shouldEnforceConciseVisualOnlyAction
+  ? 'CAMERA MOTION LOCK: avoid handheld tracking and orbit motions; use locked camera or gentle linear movement only.'
+  : 'CAMERA MOTION LOCK: keep motion physically plausible and continuity-safe.'}
+- Maintain stable, non-performative movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
 - Do not copy exact identifiable text/signage/persons from source video context.
 
@@ -7397,7 +7441,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const fallbackScriptBeat = scriptBeatReferences[scriptBeatIndex]
       const fallbackContextBeat = contextBeatReferences[scriptBeatIndex]
       const fallbackAction = shouldEnforceConciseVisualOnlyAction
-        ? 'Natural fit-check movement with clear outfit visibility.'
+        ? 'Natural outfit-proof movement with clear outfit visibility.'
         : fallbackScriptBeat
           ? `Product review movement follows visual beat flow: ${fallbackScriptBeat}`
           : (analysis.sceneBeats[scriptBeatIndex]?.description || 'Natural product review motion with clear detail demonstration.')
@@ -7419,12 +7463,12 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const location = toSafeString(raw.location, fallbackLocation)
       const camera = toSafeString(
         raw.camera,
-        analysis.sceneBeats[scriptBeatIndex]?.cameraHint || 'Social-native camera framing with controlled movement and stable axis.',
+        analysis.sceneBeats[scriptBeatIndex]?.cameraHint || 'Stable camera framing with controlled movement and fixed axis continuity.',
       )
       const lighting = toSafeString(raw.lighting, `Natural soft lighting with ${analysis.colorGrade || 'balanced'} color mood and clear product details.`)
       const style = toSafeString(
         raw.style,
-        `TikTok social-native product review style; pacing ${analysis.pacing || 'mid-pace'}. Context remix from analyzed video environment.`,
+        `Mirror outfit-proof style; pacing ${analysis.pacing || 'mid-pace'}. Context remix from analyzed video environment.`,
       )
       const timestamp = `${Math.round((index * duration) / Math.max(1, keyframeCount - 1))}s`
       const subject = buildDefaultFrameSubject(aspectRatio)
@@ -7453,7 +7497,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
     })
 
     const anchoredTemplateLocation = hasBackgroundLocationReference
-      ? 'provided background mirror fit-check zone (exact uploaded background scene)'
+      ? 'provided background mirror outfit-proof zone (exact uploaded background scene)'
       : ''
 
     const keyframes: KeyframePrompt[] = keyframesDraft.map((keyframe, index) => {
@@ -7479,7 +7523,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       if (anchoredTemplateLocation) {
         finalAction = appendSentenceIfMissing(
           finalAction,
-          'Model stands closer to mirror and performs fit-check in the provided background scene with stable stance.',
+          'Model stands closer to mirror and performs outfit proof in the provided background scene with stable stance.',
         )
         finalLocation = anchoredTemplateLocation
         finalCamera = appendSentenceIfMissing(
@@ -7494,12 +7538,14 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
       if (shouldEnforceConciseVisualOnlyAction) {
         finalAction = sanitizeVisualOnlyConciseAction(finalAction)
+        finalCamera = sanitizeVisualOnlyConciseCamera(finalCamera)
+        finalStyle = sanitizeVisualOnlyConciseSceneNarrative(finalStyle)
       }
 
       finalAction = appendSentenceIfMissing(
         finalAction,
         shouldEnforceConciseVisualOnlyAction
-          ? 'Silent visual motion only; communicate via pose and movement.'
+          ? 'Silent visual motion only; keep mouth closed and avoid speech-like facial motion.'
           : 'Visual-only storytelling: no spoken dialogue or voiceover cues.',
       )
 
@@ -7551,7 +7597,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const scriptBeat = scriptBeatReferences[index] || analysis.sceneBeats[index]?.narrationHint || analysis.sceneBeats[index]?.description || ''
       const contextBeat = contextBeatReferences[index] || analysis.sceneBeats[index]?.contextHint || analysis.sceneBeats[index]?.description || ''
       const fallbackNarrative = shouldEnforceConciseVisualOnlyAction
-        ? 'Concise visual fit-check progression with clear product visibility.'
+        ? 'Concise visual outfit-proof progression with clear product visibility.'
         : scriptBeat.length > 0
           ? `Follow visual beat flow: ${scriptBeat}`
           : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
@@ -7592,13 +7638,16 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       narrative = appendSentenceIfMissing(
         narrative,
         shouldEnforceConciseVisualOnlyAction
-          ? 'Silent visual scene only; communicate via pose, framing, and on-screen text.'
+          ? 'Silent visual scene only; keep mouth closed, jaw stable, and no speech-like expression.'
           : 'Visual-only scene: no voiceover, spoken dialogue, or lip-sync actions.',
       )
 
+      const rawCameraMovement = toSafeString(raw.cameraMovement, '')
       const cameraMovement = normalizeSceneCameraMovementSpec(
-        toSafeString(raw.cameraMovement, ''),
-        analysis.sceneBeats[index]?.cameraHint || 'Controlled camera movement with stable direction and social-native pacing.',
+        shouldEnforceConciseVisualOnlyAction
+          ? sanitizeVisualOnlyConciseCamera(rawCameraMovement)
+          : rawCameraMovement,
+        analysis.sceneBeats[index]?.cameraHint || 'Controlled camera movement with stable direction and fixed-axis pacing.',
       )
 
       const startPose = keyframes[index]?.action || ''
@@ -7613,9 +7662,12 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const composition = anchoredTemplateLocation
         ? appendSentenceIfMissing(
           keyframes[index]?.camera || '',
-          'Composition lock: closer mirror fit-check with subject-dominant framing and stable background anchors.',
+          'Composition lock: closer mirror outfit-proof with subject-dominant framing and stable background anchors.',
         )
         : keyframes[index]?.camera || ''
+      const finalComposition = shouldEnforceConciseVisualOnlyAction
+        ? sanitizeVisualOnlyConciseCamera(composition)
+        : composition
       const lighting = keyframes[index]?.lighting || ''
       const timeRange = `${startSec}s-${endSec}s`
 
@@ -7626,14 +7678,14 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         narrative,
         startPose,
         endPose,
-        composition,
+        composition: finalComposition,
         cameraMovement,
         lighting,
         locationFlow,
         fullPrompt: [
           `SUBJECT: ${masterDNA}`,
           `ACTION: ${narrative}`,
-          composition ? `COMPOSITION: ${composition}` : '',
+          finalComposition ? `COMPOSITION: ${finalComposition}` : '',
           `CAMERA: ${cameraMovement}`,
           lighting ? `LIGHTING: ${lighting}` : '',
         ].filter(Boolean).join('\n'),
@@ -9627,9 +9679,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       `Target output duration: ${lockedDuration}s (reference source ${OOTD_TEMPLATE_SOURCE_DURATION_SEC}s). Expand/compress beat timing proportionally without changing beat order.`,
       'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.',
       'Action + scene writing rule: concise visual description only, no beat labels, no speaking/lip cues.',
-      'Voice rule: no voiceover/dialogue. Keep visual-only fit-check storytelling with optional on-screen text.',
+      'Performance rule: keep mouth closed at rest, jaw stable, no speech-like head nods, and no talking-presenter behavior.',
+      'Voice rule: no voiceover/dialogue. Keep visual-only outfit-proof storytelling with optional on-screen text.',
       backgroundImage
-        ? 'Background anchor lock: model must stand closer to mirror and fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
+        ? 'Background anchor lock: model must stand closer to mirror and perform outfit proof inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
         : 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.',
     ].join('\n')
 
@@ -10128,8 +10181,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
                   Direction lock: Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK){'\n'}
-                  Voice track: OFF (visual-only fit-check){'\n'}
-                  Background fit-check lock: {backgroundImage ? 'ON (closer mirror framing + full-body + anchor continuity)' : 'OFF (them background image de khoa)'}{"\n"}
+                  Voice track: OFF (visual-only outfit-proof){'\n'}
+                  Background outfit-proof lock: {backgroundImage ? 'ON (closer mirror framing + full-body + anchor continuity)' : 'OFF (them background image de khoa)'}{"\n"}
                   Narrative: {OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure}
                 </div>
 
