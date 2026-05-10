@@ -3380,6 +3380,7 @@ function sanitizeVisualOnlyConciseAction(value: string): string {
 
   let next = value
   const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /^\s*action\s*:?/gi, replacement: ' ' },
     { pattern: /\b(?:script|visual)\s+beat(?:\s+flow)?(?:\s+reference)?\b/gi, replacement: ' ' },
     { pattern: /\b(?:follow|follows|following)\s+(?:the\s+)?(?:visual\s+)?beat(?:\s+flow)?\b/gi, replacement: ' ' },
     { pattern: /\bbeat\s*\d+\b/gi, replacement: ' ' },
@@ -3387,6 +3388,7 @@ function sanitizeVisualOnlyConciseAction(value: string): string {
     { pattern: /\b(?:context\s+continuity|context\s+remix\s+reference|direction\s+lock|performance\s+rule|voice\s+rule)\s*:/gi, replacement: ' ' },
     { pattern: /\b(?:silent\s+visual(?:\s+scene)?\s+only)\b/gi, replacement: ' ' },
     { pattern: /\b(?:no\s+talking|no\s+dialogue|no\s+voice(?:over)?|no\s+lip(?:-|\s)?sync(?:ing)?)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:do\s+not|don't|never|avoid|without)\b[^.?!;|]*/gi, replacement: ' ' },
     { pattern: /\b(?:MIRROR\s+HOOK\s+FRAME|FULL\s+FIT\s+PROOF|DETAIL\s+CHECK|ANGLE\s+SWITCH|SOFT\s+CLOSE)\b/gi, replacement: ' ' },
     { pattern: /\bsocial-native\b/gi, replacement: ' ' },
     { pattern: /\bcommunicate\s+via\s+pose\b/gi, replacement: ' ' },
@@ -3412,6 +3414,7 @@ function sanitizeVisualOnlyConciseSceneNarrative(value: string): string {
 
   let next = value
   const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /^\s*action\s*:?/gi, replacement: ' ' },
     { pattern: /\b(?:script|visual)\s+beat(?:\s+flow)?(?:\s+reference)?\b/gi, replacement: ' ' },
     { pattern: /\b(?:follow|follows|following)\s+(?:the\s+)?(?:visual\s+)?beat(?:\s+flow)?\b/gi, replacement: ' ' },
     { pattern: /\bbeat\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/gi, replacement: ' ' },
@@ -3419,6 +3422,7 @@ function sanitizeVisualOnlyConciseSceneNarrative(value: string): string {
     { pattern: /\b(?:context\s+continuity|context\s+remix\s+reference|direction\s+lock|performance\s+rule|voice\s+rule)\s*:/gi, replacement: ' ' },
     { pattern: /\b(?:silent\s+visual(?:\s+scene)?\s+only)\b/gi, replacement: ' ' },
     { pattern: /\b(?:no\s+talking|no\s+dialogue|no\s+voice(?:over)?|no\s+lip(?:-|\s)?sync(?:ing)?)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:do\s+not|don't|never|avoid|without)\b[^.?!;|]*/gi, replacement: ' ' },
     { pattern: /\b(?:MIRROR\s+HOOK\s+FRAME|FULL\s+FIT\s+PROOF|DETAIL\s+CHECK|ANGLE\s+SWITCH|SOFT\s+CLOSE)\b/gi, replacement: ' ' },
     { pattern: /\bsocial-native\b/gi, replacement: ' ' },
     { pattern: /\bcommunicate\s+via\s+pose\b/gi, replacement: ' ' },
@@ -3444,6 +3448,7 @@ function sanitizeVisualOnlyConciseCamera(value: string): string {
 
   let next = value
   const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /\bcomposition\s+lock\s*:?/gi, replacement: ' ' },
     { pattern: /\bsocial-native\b/gi, replacement: 'natural' },
     { pattern: /\bhandheld\s+tracking\s+movement\b/gi, replacement: 'controlled phone-held tracking movement' },
     { pattern: /\b(?:handheld|hand\s+held)\b/gi, replacement: 'phone-held' },
@@ -3460,7 +3465,38 @@ function sanitizeVisualOnlyConciseCamera(value: string): string {
   }
 
   next = normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
+  const clauses = next.split(/[.!?]/).map((clause) => clause.trim()).filter((clause) => clause.length > 0)
+  const compact = clauses.slice(0, 2).join('. ').trim()
+  if (compact.length > 0) {
+    next = compact
+  }
   return next.length > 0 ? next : fallback
+}
+
+function sanitizeVisualOnlyConciseSubject(value: string): string {
+  const fallback = 'Mirror phone fit-check sequence with clear full-body outfit visibility in a stable indoor mirror setting.'
+  if (!value.trim()) return fallback
+
+  let next = value
+  const replacements: Array<{ pattern: RegExp; replacement: string }> = [
+    { pattern: /\[[^\]]+\]\s*:?/g, replacement: ' ' },
+    { pattern: /\b(?:rule|lock|constraint|priority)\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\b(?:do\s+not|don't|never|avoid|without|no|not)\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\b(?:voiceover|dialogue|lip(?:-|\s)?sync(?:ing)?|speech(?:-like)?|presenter-style)\b/gi, replacement: ' ' },
+    { pattern: /\s*\|\s*/g, replacement: ' ' },
+  ]
+
+  for (const { pattern, replacement } of replacements) {
+    next = next.replace(pattern, replacement)
+  }
+
+  next = normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
+  const firstSentence = next
+    .split(/[.!?]/)
+    .map((sentence) => sentence.trim())
+    .find((sentence) => sentence.length >= 24)
+
+  return firstSentence && firstSentence.length > 0 ? firstSentence : fallback
 }
 
 function createProductImageId(dataUrl: string): string {
@@ -7601,13 +7637,16 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const endSec = Math.round(((index + 1) * duration) / sceneCount)
       const scriptBeat = scriptBeatReferences[index] || analysis.sceneBeats[index]?.narrationHint || analysis.sceneBeats[index]?.description || ''
       const contextBeat = contextBeatReferences[index] || analysis.sceneBeats[index]?.contextHint || analysis.sceneBeats[index]?.description || ''
+      const conciseNarrativeSeed = sanitizeVisualOnlyConciseAction(keyframes[index]?.action || '')
       const fallbackNarrative = shouldEnforceConciseVisualOnlyAction
-        ? 'Hold full-fit front pose, then detail-check and gentle side-angle confirmation with clear outfit visibility.'
+        ? (conciseNarrativeSeed || 'Hold full-fit front pose, then detail-check and gentle side-angle confirmation with clear outfit visibility.')
         : scriptBeat.length > 0
           ? `Follow visual beat flow: ${scriptBeat}`
           : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
 
-      const baseNarrative = toSafeString(raw.narrative, fallbackNarrative)
+      const baseNarrative = shouldEnforceConciseVisualOnlyAction
+        ? fallbackNarrative
+        : toSafeString(raw.narrative, fallbackNarrative)
       let narrative = shouldEnforceConciseVisualOnlyAction
         ? sanitizeVisualOnlyConciseSceneNarrative(baseNarrative)
         : appendSentenceIfMissing(
@@ -7663,13 +7702,16 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const finalComposition = shouldEnforceConciseVisualOnlyAction
         ? sanitizeVisualOnlyConciseCamera(composition)
         : composition
+      const sceneSubject = shouldEnforceConciseVisualOnlyAction
+        ? sanitizeVisualOnlyConciseSubject(masterDNA)
+        : masterDNA
       const lighting = keyframes[index]?.lighting || ''
       const timeRange = `${startSec}s-${endSec}s`
 
       return {
         index,
         timeRange,
-        subject: masterDNA,
+        subject: sceneSubject,
         narrative,
         startPose,
         endPose,
@@ -7678,7 +7720,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         lighting,
         locationFlow,
         fullPrompt: [
-          `SUBJECT: ${masterDNA}`,
+          `SUBJECT: ${sceneSubject}`,
           `ACTION: ${narrative}`,
           finalComposition ? `COMPOSITION: ${finalComposition}` : '',
           `CAMERA: ${cameraMovement}`,
