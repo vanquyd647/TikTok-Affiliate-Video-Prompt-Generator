@@ -3384,6 +3384,10 @@ function sanitizeVisualOnlyConciseAction(value: string): string {
     { pattern: /\b(?:follow|follows|following)\s+(?:the\s+)?(?:visual\s+)?beat(?:\s+flow)?\b/gi, replacement: ' ' },
     { pattern: /\bbeat\s*\d+\b/gi, replacement: ' ' },
     { pattern: /\bbeat(?:\s+flow)?\b/gi, replacement: ' ' },
+    { pattern: /\b(?:context\s+continuity|context\s+remix\s+reference|direction\s+lock|performance\s+rule|voice\s+rule)\s*:/gi, replacement: ' ' },
+    { pattern: /\b(?:silent\s+visual(?:\s+scene)?\s+only)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:no\s+talking|no\s+dialogue|no\s+voice(?:over)?|no\s+lip(?:-|\s)?sync(?:ing)?)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:MIRROR\s+HOOK\s+FRAME|FULL\s+FIT\s+PROOF|DETAIL\s+CHECK|ANGLE\s+SWITCH|SOFT\s+CLOSE)\b/gi, replacement: ' ' },
     { pattern: /\bsocial-native\b/gi, replacement: ' ' },
     { pattern: /\bcommunicate\s+via\s+pose\b/gi, replacement: ' ' },
     { pattern: /\b(?:acting|performance|performative|influencer|vlog|selfie(?:\s+vibe)?)\b/gi, replacement: ' ' },
@@ -3397,6 +3401,7 @@ function sanitizeVisualOnlyConciseAction(value: string): string {
     next = next.replace(pattern, replacement)
   }
 
+  next = next.replace(/\s*\|\s*/g, ' ')
   next = normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
   return next.length > 0 ? next : fallback
 }
@@ -3411,6 +3416,10 @@ function sanitizeVisualOnlyConciseSceneNarrative(value: string): string {
     { pattern: /\b(?:follow|follows|following)\s+(?:the\s+)?(?:visual\s+)?beat(?:\s+flow)?\b/gi, replacement: ' ' },
     { pattern: /\bbeat\s*(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/gi, replacement: ' ' },
     { pattern: /\bbeat(?:\s+flow)?\b/gi, replacement: ' ' },
+    { pattern: /\b(?:context\s+continuity|context\s+remix\s+reference|direction\s+lock|performance\s+rule|voice\s+rule)\s*:/gi, replacement: ' ' },
+    { pattern: /\b(?:silent\s+visual(?:\s+scene)?\s+only)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:no\s+talking|no\s+dialogue|no\s+voice(?:over)?|no\s+lip(?:-|\s)?sync(?:ing)?)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:MIRROR\s+HOOK\s+FRAME|FULL\s+FIT\s+PROOF|DETAIL\s+CHECK|ANGLE\s+SWITCH|SOFT\s+CLOSE)\b/gi, replacement: ' ' },
     { pattern: /\bsocial-native\b/gi, replacement: ' ' },
     { pattern: /\bcommunicate\s+via\s+pose\b/gi, replacement: ' ' },
     { pattern: /\b(?:acting|performance|performative|influencer|vlog|selfie(?:\s+vibe)?)\b/gi, replacement: ' ' },
@@ -3424,6 +3433,7 @@ function sanitizeVisualOnlyConciseSceneNarrative(value: string): string {
     next = next.replace(pattern, replacement)
   }
 
+  next = next.replace(/\s*\|\s*/g, ' ')
   next = normalizePromptWhitespace(next).replace(/^[,.;:\-\s]+/, '').trim()
   return next.length > 0 ? next : fallback
 }
@@ -7537,21 +7547,21 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         finalStyle = sanitizeVisualOnlyConciseSceneNarrative(finalStyle)
       }
 
-      finalAction = appendSentenceIfMissing(
-        finalAction,
-        shouldEnforceConciseVisualOnlyAction
-          ? 'Silent visual motion only; keep mouth closed and avoid speech-like facial motion.'
-          : 'Visual-only storytelling: no spoken dialogue or voiceover cues.',
-      )
+      if (!shouldEnforceConciseVisualOnlyAction) {
+        finalAction = appendSentenceIfMissing(
+          finalAction,
+          'Visual-only storytelling: no spoken dialogue or voiceover cues.',
+        )
+      }
 
       if (lockedFrontQuarterFacing) {
         finalAction = enforceActionFacingDirection(finalAction, lockedFrontQuarterFacing)
-        finalAction = appendSentenceIfMissing(
-          finalAction,
-          shouldEnforceConciseVisualOnlyAction
-            ? 'Face front; body only front or three-quarter-left/right, never back.'
-            : 'Face remains front-oriented toward camera with clear eyes and jawline visibility. Body orientation must stay within front, three-quarter-left, or three-quarter-right only; avoid full back turns.',
-        )
+        if (!shouldEnforceConciseVisualOnlyAction) {
+          finalAction = appendSentenceIfMissing(
+            finalAction,
+            'Face remains front-oriented toward camera with clear eyes and jawline visibility. Body orientation must stay within front, three-quarter-left, or three-quarter-right only; avoid full back turns.',
+          )
+        }
       }
 
       return {
@@ -7592,50 +7602,40 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const scriptBeat = scriptBeatReferences[index] || analysis.sceneBeats[index]?.narrationHint || analysis.sceneBeats[index]?.description || ''
       const contextBeat = contextBeatReferences[index] || analysis.sceneBeats[index]?.contextHint || analysis.sceneBeats[index]?.description || ''
       const fallbackNarrative = shouldEnforceConciseVisualOnlyAction
-        ? 'Concise visual mirror phone fit-check progression with clear product visibility.'
+        ? 'Hold full-fit front pose, then detail-check and gentle side-angle confirmation with clear outfit visibility.'
         : scriptBeat.length > 0
           ? `Follow visual beat flow: ${scriptBeat}`
           : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
 
       const baseNarrative = toSafeString(raw.narrative, fallbackNarrative)
-      const narrativeWithScript = shouldEnforceConciseVisualOnlyAction
+      let narrative = shouldEnforceConciseVisualOnlyAction
         ? sanitizeVisualOnlyConciseSceneNarrative(baseNarrative)
         : appendSentenceIfMissing(
-          baseNarrative,
-          scriptBeat.length > 0 ? `Visual beat flow reference: ${scriptBeat}` : '',
+          appendSentenceIfMissing(
+            baseNarrative,
+            scriptBeat.length > 0 ? `Visual beat flow reference: ${scriptBeat}` : '',
+          ),
+          contextBeat.length > 0 ? `Context remix reference: ${contextBeat}` : '',
         )
-      let narrative = appendSentenceIfMissing(
-        narrativeWithScript,
-        shouldEnforceConciseVisualOnlyAction
-          ? ''
-          : contextBeat.length > 0 ? `Context remix reference: ${contextBeat}` : '',
-      )
 
-      if (shouldEnforceConciseVisualOnlyAction && contextBeat.length > 0) {
+      if (!shouldEnforceConciseVisualOnlyAction) {
+        if (anchoredTemplateLocation) {
+          narrative = appendSentenceIfMissing(
+            narrative,
+            'Keep model standing closer to mirror for clearer outfit visibility, preserve key background composition anchors, and avoid venue changes.',
+          )
+        }
+        if (shouldApplyFrontFaceQuarterBodyLock) {
+          narrative = appendSentenceIfMissing(
+            narrative,
+            'Direction lock: face remains front-oriented; body uses only front or gentle three-quarter-left/right angles; no back-facing body poses.',
+          )
+        }
         narrative = appendSentenceIfMissing(
           narrative,
-          `Context continuity: ${sanitizeVisualOnlyConciseSceneNarrative(contextBeat)}`,
+          'Visual-only scene: no voiceover, spoken dialogue, or lip-sync actions.',
         )
       }
-
-      if (anchoredTemplateLocation) {
-        narrative = appendSentenceIfMissing(
-          narrative,
-          'Keep model standing closer to mirror for clearer outfit visibility, preserve key background composition anchors, and avoid venue changes.',
-        )
-      }
-      if (shouldApplyFrontFaceQuarterBodyLock) {
-        narrative = appendSentenceIfMissing(
-          narrative,
-          'Direction lock: face remains front-oriented; body uses only front or gentle three-quarter-left/right angles; no back-facing body poses.',
-        )
-      }
-      narrative = appendSentenceIfMissing(
-        narrative,
-        shouldEnforceConciseVisualOnlyAction
-          ? 'Silent visual scene only; keep mouth closed, jaw stable, and no speech-like expression.'
-          : 'Visual-only scene: no voiceover, spoken dialogue, or lip-sync actions.',
-      )
 
       const rawCameraMovement = toSafeString(raw.cameraMovement, '')
       const cameraMovement = normalizeSceneCameraMovementSpec(
