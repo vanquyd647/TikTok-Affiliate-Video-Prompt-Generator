@@ -788,20 +788,20 @@ const OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME = '7812247666227.mp4'
 const OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC = 26
 const OOTD_TEMPLATE_COZY_PRODUCT_BRIEF = `Keep front-camera outfit presentation progression while matching the cozy home background style from the reference video.
 - Preserve observer-camera framing (model stands in front of filming lens), no phone-in-hand mirror framing.
-- Keep progression: cozy hook -> front-fit proof -> side/back reveal -> front reset -> soft half-turn close.
+- Keep progression: cozy hook -> front-fit proof -> side-angle reveal -> front reset -> soft three-quarter close.
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat.
 - Background style lock: warm cream walls, wood floor, soft practical home light, shelf decor, and indoor-plant accents in one continuous room.
 - Camera lock: front-lens observer camera with stable tripod-like framing and no mirror reflection composition.
 - Framing lock: keep full-body head-to-toe in one stable frame, avoid aggressive push-in/zoom or close-up takeover.
-- Direction lock: prioritize FRONT and gentle 3/4 LEFT/RIGHT turns; avoid prolonged back-facing.
+- Direction lock: face stays FRONT toward camera; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; never back-facing.
 - Voice rule: visual-only front-camera outfit presentation, no voiceover/spoken dialogue, no lip-sync behavior.`
 const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootd',
   detectedDurationSec: OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC,
   hookStyle: 'Cozy home front-camera hook with warm practical lighting and immediate full-fit visibility.',
-  narrativeStructure: 'Cozy room front-camera hook -> full-fit proof -> side/back reveal -> front reset -> concise half-turn close (order lock, timeline-flex).',
+  narrativeStructure: 'Cozy room front-camera hook -> full-fit proof -> side-angle reveal -> front reset -> concise three-quarter close (order lock, timeline-flex).',
   ctaStyle: 'Soft recommendation close, no hard sell, text-only suggestion.',
   colorGrade: 'warm neutral indoor practical lighting, soft highlight rolloff, natural skin tone',
   pacing: 'steady front-camera pacing with subtle pose-loop changes and adaptive cut length by target duration',
@@ -827,8 +827,8 @@ const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
     {
       index: 2,
       timestamp: 'Step 3',
-      beatName: 'SIDE/BACK REVEAL',
-      description: 'Do a gentle side-to-back reveal to prove silhouette and back-fit while keeping movement smooth.',
+      beatName: 'SIDE-ANGLE REVEAL',
+      description: 'Do a gentle side-angle reveal to prove silhouette and side-fit while keeping movement smooth.',
       contextHint: 'Stay in the same cozy room setup; preserve shelf/lamp/floor anchors for continuity.',
       cameraHint: 'Static front-lens camera with subject pivot; no handheld shake and no close-up takeover.',
       narrationHint: 'No spoken line; confidence is shown through controlled turn and posture.',
@@ -845,8 +845,8 @@ const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
     {
       index: 4,
       timestamp: 'Step 5',
-      beatName: 'HALF-TURN CLOSE',
-      description: 'Finish with a concise half-turn closing pose that transitions cleanly into end card behavior.',
+      beatName: 'THREE-QUARTER CLOSE',
+      description: 'Finish with a concise three-quarter closing pose that transitions cleanly into end card behavior.',
       contextHint: 'Maintain same cozy room anchors until the final beat without scene change.',
       cameraHint: 'Stable front-lens full-body frame through the final turn; no late zoom/push-in.',
       narrationHint: 'Optional on-screen CTA text only; no spoken CTA.',
@@ -854,9 +854,9 @@ const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   ],
   generatedScript: `Open with a cozy home front-camera frame and immediate full-fit visibility.
 Hold front full-body fit proof for silhouette readability.
-Add a gentle side/back reveal while keeping the same static camera and room anchors.
+Add a gentle side-angle reveal while keeping the same static camera and room anchors.
 Reset to front hero stance with subtle pose-loop changes in the same composition.
-Finish with a concise half-turn close into end-card timing.`,
+Finish with a concise three-quarter close into end-card timing.`,
   generatedAt: 0,
 }
 
@@ -7404,6 +7404,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   options?: {
     enforceFrontFaceQuarterBodyLock?: boolean
     enforceConciseVisualOnlyAction?: boolean
+    templateCameraFormat?: 'mirror_phone' | 'front_camera'
   },
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
@@ -7420,6 +7421,8 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const hasBackgroundLocationReference = Boolean(backgroundImage)
   const shouldApplyFrontFaceQuarterBodyLock = options?.enforceFrontFaceQuarterBodyLock === true
   const shouldEnforceConciseVisualOnlyAction = options?.enforceConciseVisualOnlyAction === true
+  const templateCameraFormat = options?.templateCameraFormat || 'mirror_phone'
+  const isFrontCameraTemplate = templateCameraFormat === 'front_camera'
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
   const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
@@ -7437,6 +7440,22 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const contextReferenceSummary = contextBeatReferences
     .map((reference, index) => `Scene ${index + 1}: ${reference}`)
     .join('\n')
+
+  const backgroundLocationLockPrompt = hasBackgroundLocationReference
+    ? (isFrontCameraTemplate
+      ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement), and treat this image as environment anchor only (not identity/product source).'
+      : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing for mirror phone fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).')
+    : 'BACKGROUND LOCATION LOCK: no background input image provided.'
+
+  const noVoiceTrackPrompt = isFrontCameraTemplate
+    ? 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual front-camera outfit presentation actions and optional on-screen text only.'
+    : 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual mirror phone fit-check actions and optional on-screen text only.'
+
+  const cameraMotionLockPrompt = shouldEnforceConciseVisualOnlyAction
+    ? (isFrontCameraTemplate
+      ? 'CAMERA MOTION LOCK: keep observer-camera framing stable; avoid handheld shake, aggressive orbit, and excessive zoom.'
+      : 'CAMERA MOTION LOCK: allow controlled phone-held mirror framing; avoid aggressive orbit and excessive shake.')
+    : 'CAMERA MOTION LOCK: keep motion physically plausible and continuity-safe.'
 
   const parts: GeminiContentPart[] = []
   if (faceImage) {
@@ -7516,21 +7535,17 @@ HARD CONSTRAINTS:
 - Use analyzed TikTok video only as structure and rhythm reference.
 - Never copy product identity/outfit details from analyzed TikTok video.
 - Keep product review focus anchored to REVIEW NOTES and current PRODUCT input image.
-- ${hasBackgroundLocationReference
-  ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing for mirror phone fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).'
-  : 'BACKGROUND LOCATION LOCK: no background input image provided.'}
+- ${backgroundLocationLockPrompt}
 - ${shouldApplyFrontFaceQuarterBodyLock
   ? 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera/mirror on every keyframe; body direction is only front or gentle three-quarter-left or three-quarter-right; never use back-facing body orientation.'
   : 'FRONT-FACE / QUARTER-BODY LOCK: inactive.'}
-- NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual mirror phone fit-check actions and optional on-screen text only.
+- ${noVoiceTrackPrompt}
 - TERMINOLOGY LOCK: avoid script-oriented wording and express pacing cues as visual beat flow only.
 - ${shouldEnforceConciseVisualOnlyAction
   ? 'ACTION WRITING LOCK: keep ACTION concise and physical, do not mention beat labels/references, and block speaking/voiceover/lip-sync wording.'
   : 'ACTION WRITING LOCK: keep ACTION clear, product-first, and visual.'}
 - PERFORMANCE LOCK: block talking-to-camera behavior, lip articulation, jaw-speaking motion, speech-like head nodding, and presenter-style acting.
-- ${shouldEnforceConciseVisualOnlyAction
-  ? 'CAMERA MOTION LOCK: allow controlled phone-held mirror framing; avoid aggressive orbit and excessive shake.'
-  : 'CAMERA MOTION LOCK: keep motion physically plausible and continuity-safe.'}
+- ${cameraMotionLockPrompt}
 - Maintain stable, non-performative movement and camera continuity.
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
 - Do not copy exact identifiable text/signage/persons from source video context.
@@ -7601,7 +7616,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const fallbackScriptBeat = scriptBeatReferences[scriptBeatIndex]
       const fallbackContextBeat = contextBeatReferences[scriptBeatIndex]
       const fallbackAction = shouldEnforceConciseVisualOnlyAction
-        ? 'Natural mirror phone fit-check movement with clear outfit visibility.'
+        ? (isFrontCameraTemplate
+          ? 'Natural front-camera outfit presentation movement with clear full-body visibility.'
+          : 'Natural mirror phone fit-check movement with clear outfit visibility.')
         : fallbackScriptBeat
           ? `Product review movement follows visual beat flow: ${fallbackScriptBeat}`
           : (analysis.sceneBeats[scriptBeatIndex]?.description || 'Natural product review motion with clear detail demonstration.')
@@ -7623,12 +7640,17 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const location = toSafeString(raw.location, fallbackLocation)
       const camera = toSafeString(
         raw.camera,
-        analysis.sceneBeats[scriptBeatIndex]?.cameraHint || 'Phone-held mirror framing with controlled movement and stable axis continuity.',
+        analysis.sceneBeats[scriptBeatIndex]?.cameraHint
+          || (isFrontCameraTemplate
+            ? 'Observer-camera framing with controlled movement and stable axis continuity.'
+            : 'Phone-held mirror framing with controlled movement and stable axis continuity.'),
       )
       const lighting = toSafeString(raw.lighting, `Natural soft lighting with ${analysis.colorGrade || 'balanced'} color mood and clear product details.`)
       const style = toSafeString(
         raw.style,
-        `Mirror phone fit-check style; pacing ${analysis.pacing || 'mid-pace'}. Context remix from analyzed video environment.`,
+        isFrontCameraTemplate
+          ? `Front-camera outfit presentation style; pacing ${analysis.pacing || 'mid-pace'}. Context remix from analyzed video environment.`
+          : `Mirror phone fit-check style; pacing ${analysis.pacing || 'mid-pace'}. Context remix from analyzed video environment.`,
       )
       const timestamp = `${Math.round((index * duration) / Math.max(1, keyframeCount - 1))}s`
       const subject = buildDefaultFrameSubject(aspectRatio)
@@ -7657,7 +7679,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
     })
 
     const anchoredTemplateLocation = hasBackgroundLocationReference
-      ? 'provided background mirror phone fit-check zone (exact uploaded background scene)'
+      ? (isFrontCameraTemplate
+        ? 'provided cozy home front-camera zone (exact uploaded background scene)'
+        : 'provided background mirror phone fit-check zone (exact uploaded background scene)')
       : ''
 
     const keyframes: KeyframePrompt[] = keyframesDraft.map((keyframe, index) => {
@@ -7683,16 +7707,22 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       if (anchoredTemplateLocation) {
         finalAction = appendSentenceIfMissing(
           finalAction,
-          'Model stands closer to mirror and performs mirror phone fit-check in the provided background scene with stable stance.',
+          isFrontCameraTemplate
+            ? 'Model stands in front of filming camera and performs front-camera outfit presentation in the provided background scene with stable stance.'
+            : 'Model stands closer to mirror and performs mirror phone fit-check in the provided background scene with stable stance.',
         )
         finalLocation = anchoredTemplateLocation
         finalCamera = appendSentenceIfMissing(
           finalCamera,
-          'Closer mirror framing: model occupies around 70-85% frame while still keeping full-body head-to-toe visibility and key background anchors readable.',
+          isFrontCameraTemplate
+            ? 'Stable front-camera framing: keep full-body head-to-toe visibility with key background anchors readable and no aggressive zoom.'
+            : 'Closer mirror framing: model occupies around 70-85% frame while still keeping full-body head-to-toe visibility and key background anchors readable.',
         )
         finalStyle = appendSentenceIfMissing(
           finalStyle,
-          'Maintain background continuity via key anchors (mirror edges, floor line, decor placement) with no venue drift.',
+          isFrontCameraTemplate
+            ? 'Maintain background continuity via key anchors (wall/floor/decor placement) with no venue drift.'
+            : 'Maintain background continuity via key anchors (mirror edges, floor line, decor placement) with no venue drift.',
         )
       }
 
@@ -7711,12 +7741,27 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
       if (lockedFrontQuarterFacing) {
         finalAction = enforceActionFacingDirection(finalAction, lockedFrontQuarterFacing)
-        if (!shouldEnforceConciseVisualOnlyAction) {
-          finalAction = appendSentenceIfMissing(
-            finalAction,
-            'Face remains front-oriented toward camera with clear eyes and jawline visibility. Body orientation must stay within front, three-quarter-left, or three-quarter-right only; avoid full back turns.',
-          )
-        }
+        finalAction = appendSentenceIfMissing(
+          finalAction,
+          shouldEnforceConciseVisualOnlyAction
+            ? 'Face remains front-oriented toward camera; no back-facing body orientation.'
+            : 'Face remains front-oriented toward camera with clear eyes and jawline visibility. Body orientation must stay within front, three-quarter-left, or three-quarter-right only; avoid full back turns.',
+        )
+      }
+
+      if (isFrontCameraTemplate) {
+        finalAction = appendSentenceIfMissing(
+          removeOotdMirrorHandheldDevicePhrases(finalAction),
+          'Model is not holding any phone or camera and keeps both hands free for natural posing.',
+        )
+        finalCamera = appendSentenceIfMissing(
+          removeOotdMirrorHandheldDevicePhrases(finalCamera),
+          'Use stable observer-camera framing in front of model with full-body visibility.',
+        )
+        finalStyle = appendSentenceIfMissing(
+          removeOotdMirrorHandheldDevicePhrases(finalStyle),
+          'Hands-free front-camera outfit presentation with stable cozy-room continuity.',
+        )
       }
 
       return {
@@ -7780,7 +7825,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         if (anchoredTemplateLocation) {
           narrative = appendSentenceIfMissing(
             narrative,
-            'Keep model standing closer to mirror for clearer outfit visibility, preserve key background composition anchors, and avoid venue changes.',
+            isFrontCameraTemplate
+              ? 'Keep model standing in front of camera for clearer full-body outfit visibility, preserve key background composition anchors, and avoid venue changes.'
+              : 'Keep model standing closer to mirror for clearer outfit visibility, preserve key background composition anchors, and avoid venue changes.',
           )
         }
         if (shouldApplyFrontFaceQuarterBodyLock) {
@@ -7792,6 +7839,13 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         narrative = appendSentenceIfMissing(
           narrative,
           'Visual-only scene: no voiceover, spoken dialogue, or lip-sync actions.',
+        )
+      }
+
+      if (isFrontCameraTemplate) {
+        narrative = appendSentenceIfMissing(
+          removeOotdMirrorHandheldDevicePhrases(narrative),
+          'Model remains hands-free with no handheld recording device.',
         )
       }
 
@@ -7815,7 +7869,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const composition = anchoredTemplateLocation
         ? appendSentenceIfMissing(
           keyframes[index]?.camera || '',
-          'Composition lock: closer mirror phone fit-check with subject-dominant framing and stable background anchors.',
+          isFrontCameraTemplate
+            ? 'Composition lock: stable front-camera full-body framing with subject-dominant readability and stable background anchors.'
+            : 'Composition lock: closer mirror phone fit-check with subject-dominant framing and stable background anchors.',
         )
         : keyframes[index]?.camera || ''
       const finalComposition = shouldEnforceConciseVisualOnlyAction
@@ -9042,7 +9098,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const isMirrorPhoneTemplateScenario = activeOotdTemplateScenario.cameraFormat === 'mirror_phone'
   const ootdTemplateDirectionLockLabel = isMirrorPhoneTemplateScenario
     ? 'Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK)'
-    : 'Observer-camera front-lens framing with FRONT + gentle 3/4 LEFT/RIGHT turns (avoid prolonged BACK-facing); keep framing stable.'
+    : 'Face FRONT toward camera + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK); keep framing stable.'
   const ootdTemplateVoiceTrackLabel = isMirrorPhoneTemplateScenario
     ? 'OFF (visual-only mirror phone fit-check)'
     : 'OFF (visual-only front-camera outfit presentation)'
@@ -9846,9 +9902,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
 
     const activeTemplateScenario = activeOotdTemplateScenario
     const usesMirrorPhoneTemplate = activeTemplateScenario.cameraFormat === 'mirror_phone'
+    const shouldEnforceFrontFaceNoBackLock = usesMirrorPhoneTemplate || activeTemplateScenario.id === 'cozy_home_background'
     const directionRule = usesMirrorPhoneTemplate
       ? 'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.'
-      : 'Direction rule: keep observer-camera presentation in front of lens; allow FRONT and gentle 3/4 LEFT/RIGHT turns, avoid sustained BACK body orientation, and keep the camera frame stable.'
+      : 'Direction rule: face must stay FRONT toward camera; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation; keep the camera frame stable.'
     const voiceRule = usesMirrorPhoneTemplate
       ? 'Voice rule: no voiceover/dialogue. Keep visual-only mirror phone fit-check storytelling with optional on-screen text.'
       : 'Voice rule: no voiceover/dialogue. Keep visual-only front-camera outfit presentation storytelling with optional on-screen text.'
@@ -9914,8 +9971,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         activeTemplateScenario.lockedAnalysis,
         reviewProductNotes,
         {
-          enforceFrontFaceQuarterBodyLock: usesMirrorPhoneTemplate,
+          enforceFrontFaceQuarterBodyLock: shouldEnforceFrontFaceNoBackLock,
           enforceConciseVisualOnlyAction: true,
+          templateCameraFormat: activeTemplateScenario.cameraFormat,
         },
       )
 
