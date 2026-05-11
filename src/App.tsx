@@ -328,6 +328,7 @@ type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image'
 type AppPageMode = 'core' | 'ootd_template'
+type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
 type LookbookTheme = 'auto' | 'minimal_studio' | 'street_casual' | 'office_chic' | 'party_night' | 'vacation_resort'
@@ -705,14 +706,13 @@ const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
 const FIXED_STRATEGY_LABEL = 'TikTok Shop Core (Strict AUTO + Soft Sell)'
 const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-first de ban ben vung.'
 const OOTD_TEMPLATE_ROUTE_PATH = '/ootd-template'
-const OOTD_TEMPLATE_REFERENCE_VIDEO_ID = '7633009640682442005'
-const OOTD_TEMPLATE_REFERENCE_VIDEO_FILE_NAME = 'snaptik.vn_7633009640682442005.mp4'
-const OOTD_TEMPLATE_REFERENCE_VIDEO_URL = new URL(`../${OOTD_TEMPLATE_REFERENCE_VIDEO_FILE_NAME}`, import.meta.url).href
 const OOTD_TEMPLATE_LOCKED_DURATION = 24
-const OOTD_TEMPLATE_SOURCE_DURATION_SEC = 13.838
 const OOTD_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
 const OOTD_TEMPLATE_LOCKED_CONTENT_TYPE: ResolvedContentType = 'ootdmirror'
-const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the same mirror phone fit-check progression from the reference video.
+const OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_ID = '7633009640682442005'
+const OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_FILE_NAME = 'snaptik.vn_7633009640682442005.mp4'
+const OOTD_TEMPLATE_CLASSIC_SOURCE_DURATION_SEC = 13.838
+const OOTD_TEMPLATE_CLASSIC_PRODUCT_BRIEF = `Keep the same mirror phone fit-check progression from the reference video.
 - Preserve phone-in-hand mirror framing with controlled handheld energy.
 - Keep progression: mirror hook -> full-fit proof -> detail proof -> soft confidence close.
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
@@ -721,9 +721,9 @@ const OOTD_TEMPLATE_PRODUCT_BRIEF = `Keep the same mirror phone fit-check progre
 - Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.
 - Direction lock: face stays FRONT; body angle only FRONT, 3/4 LEFT, or 3/4 RIGHT; never back-facing.
 - Voice rule: visual-only mirror phone fit-check, no voiceover/spoken dialogue, no lip-sync behavior.`
-const OOTD_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
+const OOTD_TEMPLATE_CLASSIC_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootdmirror',
-  detectedDurationSec: OOTD_TEMPLATE_SOURCE_DURATION_SEC,
+  detectedDurationSec: OOTD_TEMPLATE_CLASSIC_SOURCE_DURATION_SEC,
   hookStyle: 'Minimal mirror phone hook text with immediate full-fit visibility in closer mirror framing.',
   narrativeStructure: 'Phone-held mirror hook -> full-fit proof -> detail check -> angle switch -> concise close (order lock, timeline-flex).',
   ctaStyle: 'Soft recommendation close, no hard sell, text-only suggestion.',
@@ -783,6 +783,119 @@ Add a short 3/4 angle switch for side-fit confirmation (no full back turn).
 Return to hero mirror pose and close with soft on-screen CTA.`,
   generatedAt: 0,
 }
+
+const OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_ID = '7812247666227'
+const OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME = '7812247666227.mp4'
+const OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC = 26
+const OOTD_TEMPLATE_COZY_PRODUCT_BRIEF = `Keep mirror phone fit-check progression while matching the cozy home background style from the reference video.
+- Preserve phone-in-hand mirror framing with controlled handheld energy.
+- Keep progression: cozy room hook -> full-fit proof -> detail proof -> angle switch -> soft confidence close.
+- Keep beat order, but do not clone exact second-by-second timeline from the reference.
+- The only variable is the outfit/product from current PRODUCT input image.
+- Maintain full-body readability while keeping product details visible in every beat.
+- Background style lock: warm cream walls, wood floor, soft practical home light, shelf decor, and indoor-plant accents in one continuous room.
+- Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.
+- Direction lock: face stays FRONT; body angle only FRONT, 3/4 LEFT, or 3/4 RIGHT; never back-facing.
+- Voice rule: visual-only mirror phone fit-check, no voiceover/spoken dialogue, no lip-sync behavior.`
+const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
+  detectedContentType: 'ootdmirror',
+  detectedDurationSec: OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC,
+  hookStyle: 'Cozy home mirror hook with warm practical lighting and immediate full-fit visibility.',
+  narrativeStructure: 'Cozy room mirror hook -> full-fit proof -> detail check -> angle switch -> concise close (order lock, timeline-flex).',
+  ctaStyle: 'Soft recommendation close, no hard sell, text-only suggestion.',
+  colorGrade: 'warm neutral indoor mirror lighting, soft highlight rolloff, natural skin tone',
+  pacing: 'steady micro-beat mirror pacing with gentle handheld realism and adaptive cut length by target duration',
+  sceneBeats: [
+    {
+      index: 0,
+      timestamp: 'Step 1',
+      beatName: 'COZY MIRROR HOOK',
+      description: 'Open in front of mirror with phone visible and a warm home background to establish social-native trust.',
+      contextHint: 'Warm cream wall, wood floor, shelf decor, and plant accents in frame.',
+      cameraHint: 'Phone-held steady start at closer mirror distance, tight full-body framing with minimal empty margins.',
+      narrationHint: 'No spoken line; use visual hook and optional on-screen text only.',
+    },
+    {
+      index: 1,
+      timestamp: 'Step 2',
+      beatName: 'FULL FIT PROOF',
+      description: 'Hold full-body front fit long enough for viewers to read silhouette, length, and proportion.',
+      contextHint: 'Keep same cozy room continuity and keep decor anchors stable across cuts.',
+      cameraHint: 'Stable mirror frame, subject occupies around 70-85% of frame while preserving head-to-toe readability.',
+      narrationHint: 'No spoken line; let framing show fit and wearability.',
+    },
+    {
+      index: 2,
+      timestamp: 'Step 3',
+      beatName: 'DETAIL CHECK',
+      description: 'Move closer to mirror for fabric/waistline/finishing detail proof without losing outfit context.',
+      contextHint: 'Retain warm practical light and visible home decor cues; avoid scene switching.',
+      cameraHint: 'Phone-held mid-close detail pass with slow vertical scan.',
+      narrationHint: 'No spoken line; emphasize details through close visual proof.',
+    },
+    {
+      index: 3,
+      timestamp: 'Step 4',
+      beatName: 'ANGLE SWITCH',
+      description: 'Do one short 3/4 angle switch to prove side-fit and movement behavior without turning full back.',
+      contextHint: 'Small movement inside mirror frame, preserve doorway/shelf/plant anchors for continuity.',
+      cameraHint: 'Quick half-turn with controlled follow and no abrupt shake.',
+      narrationHint: 'No spoken line; confidence is shown via movement and posture.',
+    },
+    {
+      index: 4,
+      timestamp: 'Step 5',
+      beatName: 'SOFT CLOSE',
+      description: 'Return to hero mirror pose and finish with concise recommendation-style closing.',
+      contextHint: 'Center frame again and keep warm room mood as the visual end-point.',
+      cameraHint: 'Short hold on closer hero full-body pose with tiny push-in for clearer outfit readability.',
+      narrationHint: 'Optional on-screen CTA text only; no spoken CTA.',
+    },
+  ],
+  generatedScript: `Open with a cozy home mirror frame and immediate full-fit visibility.
+Hold front full-body fit proof for silhouette readability.
+Move into detail check (fabric, waistline, finishing) while keeping warm room continuity.
+Add a short 3/4 angle switch for side-fit confirmation (no full back turn).
+Return to hero mirror pose and close with soft on-screen CTA.`,
+  generatedAt: 0,
+}
+
+const OOTD_TEMPLATE_SCENARIOS: Array<{
+  id: OotdTemplateScenarioId
+  label: string
+  desc: string
+  referenceVideoId: string
+  referenceVideoFileName: string
+  referenceVideoUrl: string
+  sourceDurationSec: number
+  productBrief: string
+  lockedAnalysis: TikTokAnalysisResult
+}> = [
+  {
+    id: 'classic_mirror_phone',
+    label: 'Mirror Phone Classic',
+    desc: 'Mirror fit-check co ban',
+    referenceVideoId: OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_ID,
+    referenceVideoFileName: OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_FILE_NAME,
+    referenceVideoUrl: new URL(`../${OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_FILE_NAME}`, import.meta.url).href,
+    sourceDurationSec: OOTD_TEMPLATE_CLASSIC_SOURCE_DURATION_SEC,
+    productBrief: OOTD_TEMPLATE_CLASSIC_PRODUCT_BRIEF,
+    lockedAnalysis: OOTD_TEMPLATE_CLASSIC_LOCKED_ANALYSIS,
+  },
+  {
+    id: 'cozy_home_background',
+    label: 'Cozy Home Background',
+    desc: 'Nen phong nha am, decor cay xanh',
+    referenceVideoId: OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_ID,
+    referenceVideoFileName: OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME,
+    referenceVideoUrl: new URL(`../${OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME}`, import.meta.url).href,
+    sourceDurationSec: OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC,
+    productBrief: OOTD_TEMPLATE_COZY_PRODUCT_BRIEF,
+    lockedAnalysis: OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS,
+  },
+]
+
+const OOTD_TEMPLATE_DEFAULT_SCENARIO_ID: OotdTemplateScenarioId = 'classic_mirror_phone'
 
 const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'ootd',
@@ -8369,6 +8482,7 @@ type AppProps = {
 export default function App({ initialPageMode = 'core' }: AppProps) {
   // State
   const [pageMode, setPageMode] = useState<AppPageMode>(initialPageMode)
+  const [ootdTemplateScenarioId, setOotdTemplateScenarioId] = useState<OotdTemplateScenarioId>(OOTD_TEMPLATE_DEFAULT_SCENARIO_ID)
   const [apiKey, setApiKey] = useState(() => localStorage.getItem('aff_api_key') || '')
   const [showApiKey, setShowApiKey] = useState(false)
   const [model, setModel] = useState(() => localStorage.getItem('aff_model') || 'gemini-2.5-flash')
@@ -8453,6 +8567,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const [productLocationHistory, setProductLocationHistory] = useState<ProductLocationHistoryMap>(() => loadProductLocationHistory())
   const [outfitTypeLocationHistory, setOutfitTypeLocationHistory] = useState<OutfitTypeLocationHistoryMap>(() => loadOutfitTypeLocationHistory())
   const isOotdTemplatePage = pageMode === 'ootd_template'
+  const activeOotdTemplateScenario = OOTD_TEMPLATE_SCENARIOS.find((item) => item.id === ootdTemplateScenarioId)
+    || OOTD_TEMPLATE_SCENARIOS[0]
 
   // TikTok Video Analysis
   const [tiktokVideoFile, setTiktokVideoFile] = useState<File | null>(null)
@@ -8931,9 +9047,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       : error
         ? 'Co loi khi tao prompt OOTD template. Kiem tra thong bao de thu lai.'
         : hasPromptResult
-          ? `Prompt OOTD template da san sang (${selectedContentType.toUpperCase()} • ${duration}s • script inspired tu video mau ${OOTD_TEMPLATE_REFERENCE_VIDEO_ID}, timeline linh hoat).`
+          ? `Prompt OOTD template da san sang (${selectedContentType.toUpperCase()} • ${duration}s • scenario ${activeOotdTemplateScenario.label} • video ${activeOotdTemplateScenario.referenceVideoId}).`
           : canGenerate
-            ? 'Page nay khoa beat script OOTD theo video mau. Ban co the doi duration output, doi anh san pham roi bam Tao Prompt OOTD Template (khong can giong timeline tung giay).'
+            ? `Page nay khoa beat script OOTD theo scenario ${activeOotdTemplateScenario.label}. Ban co the doi duration output, doi anh san pham roi bam Tao Prompt OOTD Template (khong can giong timeline tung giay).`
             : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
     : loading
       ? promptLoadingStep
@@ -9705,15 +9821,16 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       return
     }
 
+    const activeTemplateScenario = activeOotdTemplateScenario
     const lockedDuration = DURATIONS.find((entry) => entry.value === duration)?.value || OOTD_TEMPLATE_LOCKED_DURATION
 
     const reviewProductNotes = [
-      OOTD_TEMPLATE_PRODUCT_BRIEF,
+      activeTemplateScenario.productBrief,
       `Product category hint: ${activeProductCategoryOption.label}.`,
       `Detail hint: ${activeProductCategoryOption.detailHint}`,
       'Ignore all non-product visual identity from the reference video. Keep only pacing and scene progression.',
       'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
-      `Target output duration: ${lockedDuration}s (reference source ${OOTD_TEMPLATE_SOURCE_DURATION_SEC}s). Expand/compress beat timing proportionally without changing beat order.`,
+      `Target output duration: ${lockedDuration}s (reference source ${activeTemplateScenario.sourceDurationSec}s). Expand/compress beat timing proportionally without changing beat order.`,
       'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.',
       'Action + scene writing rule: concise visual description only, no beat labels, no speaking/lip cues.',
       'Performance rule: keep mouth closed at rest, jaw stable, no speech-like head nods, and no talking-presenter behavior.',
@@ -9739,7 +9856,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     setLoadingStageIndex(0)
     setPromptToast({
       kind: 'loading',
-      message: 'Dang tao Prompt OOTD Template tu beat-flow lock cua video mau...',
+      message: `Dang tao Prompt OOTD Template theo scenario ${activeTemplateScenario.label}...`,
     })
     setError('')
     setResult(null)
@@ -9748,7 +9865,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     const logLines: string[] = []
     const pushLog = (line: string) => { logLines.push(line) }
 
-    pushLog(`[START] ${new Date().toISOString()} — source=ootd-template-lock model=${model} duration=${lockedDuration}s ratio=${lockedAspectRatio} type=${lockedContentType}`)
+    pushLog(`[START] ${new Date().toISOString()} — source=ootd-template-lock scenario=${activeTemplateScenario.id} refVideo=${activeTemplateScenario.referenceVideoId} model=${model} duration=${lockedDuration}s ratio=${lockedAspectRatio} type=${lockedContentType}`)
 
     try {
       const res = await generatePromptPackageFromTikTokAnalysisWithGemini(
@@ -9759,7 +9876,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         backgroundImage,
         lockedDuration,
         lockedAspectRatio,
-        OOTD_TEMPLATE_LOCKED_ANALYSIS,
+        activeTemplateScenario.lockedAnalysis,
         reviewProductNotes,
         {
           enforceFrontFaceQuarterBodyLock: true,
@@ -9778,7 +9895,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       setActiveTab('keyframes')
       setPromptToast({
         kind: 'success',
-        message: 'Da tao xong Prompt OOTD Template. Ban chi can doi outfit va tao lai khi can.',
+        message: `Da tao xong Prompt OOTD Template (${activeTemplateScenario.label}). Ban chi can doi outfit va tao lai khi can.`,
       })
 
       const generatedLocations = Array.from(
@@ -9846,11 +9963,11 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         generatedAt: Date.now(),
         metadata: {
           generationMode: 'video_prompt',
-          generationSource: `ootd_template_${OOTD_TEMPLATE_REFERENCE_VIDEO_ID}`,
+          generationSource: `ootd_template_${activeTemplateScenario.referenceVideoId}`,
           inputContentType: lockedContentType,
           resolvedContentType: resolvedType,
           duration: lockedDuration,
-          sourceDurationSec: OOTD_TEMPLATE_SOURCE_DURATION_SEC,
+          sourceDurationSec: activeTemplateScenario.sourceDurationSec,
           aspectRatio: lockedAspectRatio,
           keyframeCount: res.keyframes.length,
           sceneCount: res.scenes.length,
@@ -9858,8 +9975,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
           hasFaceImage: Boolean(faceImage),
           hasProductImage: Boolean(productImage),
           hasBackgroundImage: Boolean(backgroundImage),
-          templateReferenceVideo: OOTD_TEMPLATE_REFERENCE_VIDEO_FILE_NAME,
-          templateNarrativeStructure: OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure,
+          templateScenarioId: activeTemplateScenario.id,
+          templateScenarioLabel: activeTemplateScenario.label,
+          templateReferenceVideo: activeTemplateScenario.referenceVideoFileName,
+          templateNarrativeStructure: activeTemplateScenario.lockedAnalysis.narrativeStructure,
           promptPackage: promptPackageForHistory,
         },
       })
@@ -10080,7 +10199,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
               <h1 className="header-title">AFF Video Prompt</h1>
               <p className="header-subtitle">
                 {isOotdTemplatePage
-                  ? `OOTD Template Page (Beat-flow lock theo video ${OOTD_TEMPLATE_REFERENCE_VIDEO_FILE_NAME})`
+                  ? `OOTD Template Page (Beat-flow lock theo video ${activeOotdTemplateScenario.referenceVideoFileName})`
                   : 'TikTok Affiliate Video Prompt Generator'}
               </p>
             </div>
@@ -10167,13 +10286,35 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                 }}
               >
                 <div className="card-title" style={{ color: '#38bdf8' }}>
-                  <Film /> OOTD Template Lock ({OOTD_TEMPLATE_REFERENCE_VIDEO_FILE_NAME})
+                  <Film /> OOTD Template Lock ({activeOotdTemplateScenario.label} • {activeOotdTemplateScenario.referenceVideoFileName})
                 </div>
 
                 <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 10 }}>
-                  Page nay tach rieng khoi core. Kich ban duoc khoa theo beat flow cua video mau (khong clone timeline tung giay),
+                  Page nay tach rieng khoi core. Kich ban duoc khoa theo beat flow cua scenario da chon (khong clone timeline tung giay),
                   ban co the doi duration output va thay doi anh san pham (trang phuc) de tao lai prompt. Face image va background image la tuy chon.
                 </p>
+
+                <div className="input-group" style={{ marginBottom: 12 }}>
+                  <label className="input-label">
+                    <Film size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                    Kich ban template
+                  </label>
+                  <div className="chip-group">
+                    {OOTD_TEMPLATE_SCENARIOS.map((scenarioOption) => (
+                      <button
+                        key={`ootd-template-scenario-${scenarioOption.id}`}
+                        className={`chip ${ootdTemplateScenarioId === scenarioOption.id ? 'active' : ''}`}
+                        onClick={() => setOotdTemplateScenarioId(scenarioOption.id)}
+                        id={`ootd-template-scenario-${scenarioOption.id}`}
+                      >
+                        {scenarioOption.label}
+                        <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                          {scenarioOption.desc}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 <div className="input-group" style={{ marginBottom: 12 }}>
                   <label className="input-label">
@@ -10198,7 +10339,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                 </div>
 
                 <video
-                  src={OOTD_TEMPLATE_REFERENCE_VIDEO_URL}
+                  src={activeOotdTemplateScenario.referenceVideoUrl}
                   controls
                   preload="metadata"
                   playsInline
@@ -10214,18 +10355,19 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
 
                 <div className="prompt-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 10 }}>
                   <strong>Lock config:</strong>{'\n'}
-                  Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {OOTD_TEMPLATE_SOURCE_DURATION_SEC}s, chi de tham khao nhip){'\n'}
+                  Scenario: {activeOotdTemplateScenario.label} (video {activeOotdTemplateScenario.referenceVideoId}){'\n'}
+                  Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {activeOotdTemplateScenario.sourceDurationSec}s, chi de tham khao nhip){'\n'}
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
                   Direction lock: Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK){'\n'}
                   Voice track: OFF (visual-only mirror phone fit-check){'\n'}
                   Background mirror phone fit-check lock: {backgroundImage ? 'ON (closer mirror framing + full-body + anchor continuity)' : 'OFF (them background image de khoa)'}{"\n"}
-                  Narrative: {OOTD_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure}
+                  Narrative: {activeOotdTemplateScenario.lockedAnalysis.narrativeStructure}
                 </div>
 
                 <div className="prompt-text" style={{ whiteSpace: 'pre-wrap' }}>
                   <strong>Beat flow (giu thu tu, timeline linh hoat):</strong>{'\n'}
-                  {OOTD_TEMPLATE_LOCKED_ANALYSIS.sceneBeats
+                  {activeOotdTemplateScenario.lockedAnalysis.sceneBeats
                     .map((beat) => `${beat.timestamp}: ${beat.beatName}`)
                     .join('\n')}
                 </div>
