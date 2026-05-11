@@ -3440,7 +3440,7 @@ function enforceOotdMirrorHandsFreeAction(action: string): string {
   const sanitized = removeOotdMirrorHandheldDevicePhrases(action)
   return appendSentenceIfMissing(
     sanitized,
-    'Model is not holding any phone or camera and keeps both hands free for natural posing.',
+    'Natural hand gestures support outfit presentation with clear mirror readability.',
   )
 }
 
@@ -3458,8 +3458,7 @@ function enforceOotdMirrorSceneNarrative(narrative: string): string {
   let next = removeOotdMirrorHandheldDevicePhrases(narrative)
   next = appendSentenceIfMissing(next, 'Use observer-camera coverage with the mirror behind the model for reflection proof')
   next = appendSentenceIfMissing(next, 'Keep face orientation front to camera while body angle stays gentle three-quarter left or right')
-  next = appendSentenceIfMissing(next, 'Do not use full back-facing turns in the mirror sequence')
-  next = appendSentenceIfMissing(next, 'Model remains hands-free with no handheld recording device')
+  next = appendSentenceIfMissing(next, 'Hand gestures stay natural and coordinated with the outfit showcase flow')
   return next
 }
 
@@ -3517,6 +3516,11 @@ function sanitizeVisualOnlyConciseAction(value: string): string {
     { pattern: /\b(?:voiceover|dialogue|spoken|speaking|talking|narration|narrate)\b/gi, replacement: ' ' },
     { pattern: /\blip(?:-|\s)?sync(?:ing)?\b/gi, replacement: ' ' },
     { pattern: /\b(?:mouth\s+movement|jaw\s+movement|pseudo-voice\s+acting)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:body\s+facing\s+(?:front|back|left|right|three(?:-|\s)?quarter(?:-|\s)?(?:left|right)))\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\b(?:face\s+remains?\s+front(?:-|\s)?oriented)\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\bmodel\s+is\s+not\s+holding\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\bmodel\s+remains?\s+hands(?:-|\s)?free\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\brear\s+mirror\s+(?:remains?|stays?)\s+behind\s+model\b[^.?!;|]*/gi, replacement: ' ' },
   ]
 
   for (const { pattern, replacement } of replacements) {
@@ -3551,6 +3555,11 @@ function sanitizeVisualOnlyConciseSceneNarrative(value: string): string {
     { pattern: /\b(?:voiceover|dialogue|spoken|speaking|talking|narration|narrate)\b/gi, replacement: ' ' },
     { pattern: /\blip(?:-|\s)?sync(?:ing)?\b/gi, replacement: ' ' },
     { pattern: /\b(?:mouth\s+movement|jaw\s+movement|pseudo-voice\s+acting)\b/gi, replacement: ' ' },
+    { pattern: /\b(?:body\s+facing\s+(?:front|back|left|right|three(?:-|\s)?quarter(?:-|\s)?(?:left|right)))\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\b(?:face\s+remains?\s+front(?:-|\s)?oriented)\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\bmodel\s+is\s+not\s+holding\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\bmodel\s+remains?\s+hands(?:-|\s)?free\b[^.?!;|]*/gi, replacement: ' ' },
+    { pattern: /\brear\s+mirror\s+(?:remains?|stays?)\s+behind\s+model\b[^.?!;|]*/gi, replacement: ' ' },
   ]
 
   for (const { pattern, replacement } of replacements) {
@@ -7755,28 +7764,14 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         finalStyle = sanitizeVisualOnlyConciseSceneNarrative(finalStyle)
       }
 
-      if (!shouldEnforceConciseVisualOnlyAction) {
-        finalAction = appendSentenceIfMissing(
-          finalAction,
-          'Visual-only storytelling: no spoken dialogue or voiceover cues.',
-        )
-      }
-
       if (lockedFrontQuarterFacing) {
-        finalAction = enforceActionFacingDirection(finalAction, lockedFrontQuarterFacing)
-        finalAction = appendSentenceIfMissing(
-          finalAction,
-          shouldEnforceConciseVisualOnlyAction
-            ? 'Face remains front-oriented toward camera; no back-facing body orientation.'
-            : 'Face remains front-oriented toward camera with clear eyes and jawline visibility. Body orientation must stay within front, three-quarter-left, or three-quarter-right only; avoid full back turns.',
-        )
+        if (!shouldEnforceConciseVisualOnlyAction) {
+          finalAction = enforceActionFacingDirection(finalAction, lockedFrontQuarterFacing)
+        }
       }
 
       if (isFrontCameraTemplate) {
-        finalAction = appendSentenceIfMissing(
-          removeOotdMirrorHandheldDevicePhrases(finalAction),
-          'Model is not holding any phone or camera and keeps both hands free for natural posing.',
-        )
+        finalAction = removeOotdMirrorHandheldDevicePhrases(finalAction)
         finalCamera = appendSentenceIfMissing(
           removeOotdMirrorHandheldDevicePhrases(finalCamera),
           'Use stable observer-camera framing in front of model with full-body visibility.',
@@ -7785,13 +7780,6 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           removeOotdMirrorHandheldDevicePhrases(finalStyle),
           'Hands-free front-camera outfit presentation with stable cozy-room continuity.',
         )
-
-        if (shouldEnforceRearMirrorReflection) {
-          finalAction = appendSentenceIfMissing(
-            finalAction,
-            'Rear mirror remains behind model as reflection proof while face stays front-oriented to camera.',
-          )
-        }
       }
 
       return {
@@ -7873,17 +7861,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       }
 
       if (isFrontCameraTemplate) {
-        narrative = appendSentenceIfMissing(
-          removeOotdMirrorHandheldDevicePhrases(narrative),
-          'Model remains hands-free with no handheld recording device.',
-        )
-
-        if (shouldEnforceRearMirrorReflection) {
-          narrative = appendSentenceIfMissing(
-            narrative,
-            'Rear mirror stays behind model and visible for stable reflection continuity throughout the scene.',
-          )
-        }
+        narrative = removeOotdMirrorHandheldDevicePhrases(narrative)
       }
 
       const rawCameraMovement = toSafeString(raw.cameraMovement, '')
