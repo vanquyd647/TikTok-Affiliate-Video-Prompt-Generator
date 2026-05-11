@@ -708,7 +708,6 @@ const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-fir
 const OOTD_TEMPLATE_ROUTE_PATH = '/ootd-template'
 const OOTD_TEMPLATE_LOCKED_DURATION = 24
 const OOTD_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
-const OOTD_TEMPLATE_LOCKED_CONTENT_TYPE: ResolvedContentType = 'ootdmirror'
 const OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_ID = '7633009640682442005'
 const OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_FILE_NAME = 'snaptik.vn_7633009640682442005.mp4'
 const OOTD_TEMPLATE_CLASSIC_SOURCE_DURATION_SEC = 13.838
@@ -787,32 +786,32 @@ Return to hero mirror pose and close with soft on-screen CTA.`,
 const OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_ID = '7812247666227'
 const OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME = '7812247666227.mp4'
 const OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC = 26
-const OOTD_TEMPLATE_COZY_PRODUCT_BRIEF = `Keep mirror phone fit-check progression while matching the cozy home background style from the reference video.
-- Preserve phone-in-hand mirror framing with controlled handheld energy.
-- Keep progression: cozy room hook -> full-fit proof -> detail proof -> angle switch -> soft confidence close.
+const OOTD_TEMPLATE_COZY_PRODUCT_BRIEF = `Keep front-camera outfit presentation progression while matching the cozy home background style from the reference video.
+- Preserve observer-camera framing (model stands in front of filming lens), no phone-in-hand mirror framing.
+- Keep progression: cozy hook -> full-fit proof -> detail proof -> angle switch -> soft confidence close.
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat.
 - Background style lock: warm cream walls, wood floor, soft practical home light, shelf decor, and indoor-plant accents in one continuous room.
-- Mirror distance lock: stand closer to mirror so outfit appears larger (target subject occupancy ~70-85% frame) while still keeping head-to-toe visibility.
-- Direction lock: face stays FRONT; body angle only FRONT, 3/4 LEFT, or 3/4 RIGHT; never back-facing.
-- Voice rule: visual-only mirror phone fit-check, no voiceover/spoken dialogue, no lip-sync behavior.`
+- Camera lock: front-lens observer camera with stable tripod-like framing and no mirror reflection composition.
+- Direction lock: prioritize FRONT and gentle 3/4 LEFT/RIGHT turns; avoid prolonged back-facing.
+- Voice rule: visual-only front-camera outfit presentation, no voiceover/spoken dialogue, no lip-sync behavior.`
 const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
-  detectedContentType: 'ootdmirror',
+  detectedContentType: 'ootd',
   detectedDurationSec: OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC,
-  hookStyle: 'Cozy home mirror hook with warm practical lighting and immediate full-fit visibility.',
-  narrativeStructure: 'Cozy room mirror hook -> full-fit proof -> detail check -> angle switch -> concise close (order lock, timeline-flex).',
+  hookStyle: 'Cozy home front-camera hook with warm practical lighting and immediate full-fit visibility.',
+  narrativeStructure: 'Cozy room front-camera hook -> full-fit proof -> detail check -> angle switch -> concise close (order lock, timeline-flex).',
   ctaStyle: 'Soft recommendation close, no hard sell, text-only suggestion.',
-  colorGrade: 'warm neutral indoor mirror lighting, soft highlight rolloff, natural skin tone',
-  pacing: 'steady micro-beat mirror pacing with gentle handheld realism and adaptive cut length by target duration',
+  colorGrade: 'warm neutral indoor practical lighting, soft highlight rolloff, natural skin tone',
+  pacing: 'steady micro-beat front-camera pacing with natural movement and adaptive cut length by target duration',
   sceneBeats: [
     {
       index: 0,
       timestamp: 'Step 1',
-      beatName: 'COZY MIRROR HOOK',
-      description: 'Open in front of mirror with phone visible and a warm home background to establish social-native trust.',
+      beatName: 'COZY CAMERA HOOK',
+      description: 'Open standing in front of the filming camera and establish a warm cozy home background in one shot.',
       contextHint: 'Warm cream wall, wood floor, shelf decor, and plant accents in frame.',
-      cameraHint: 'Phone-held steady start at closer mirror distance, tight full-body framing with minimal empty margins.',
+      cameraHint: 'Observer-camera start, stable front-lens framing, full-body with minimal empty margins.',
       narrationHint: 'No spoken line; use visual hook and optional on-screen text only.',
     },
     {
@@ -828,9 +827,9 @@ const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       index: 2,
       timestamp: 'Step 3',
       beatName: 'DETAIL CHECK',
-      description: 'Move closer to mirror for fabric/waistline/finishing detail proof without losing outfit context.',
+      description: 'Move slightly toward camera for fabric/waistline/finishing detail proof without losing full outfit context.',
       contextHint: 'Retain warm practical light and visible home decor cues; avoid scene switching.',
-      cameraHint: 'Phone-held mid-close detail pass with slow vertical scan.',
+      cameraHint: 'Observer-camera mid-close detail pass with slow controlled vertical framing shift.',
       narrationHint: 'No spoken line; emphasize details through close visual proof.',
     },
     {
@@ -838,25 +837,25 @@ const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       timestamp: 'Step 4',
       beatName: 'ANGLE SWITCH',
       description: 'Do one short 3/4 angle switch to prove side-fit and movement behavior without turning full back.',
-      contextHint: 'Small movement inside mirror frame, preserve doorway/shelf/plant anchors for continuity.',
-      cameraHint: 'Quick half-turn with controlled follow and no abrupt shake.',
+      contextHint: 'Small movement inside the same cozy zone, preserve doorway/shelf/plant anchors for continuity.',
+      cameraHint: 'Quick half-turn with controlled static-camera framing and no abrupt shake.',
       narrationHint: 'No spoken line; confidence is shown via movement and posture.',
     },
     {
       index: 4,
       timestamp: 'Step 5',
       beatName: 'SOFT CLOSE',
-      description: 'Return to hero mirror pose and finish with concise recommendation-style closing.',
+      description: 'Return to hero front-camera pose and finish with concise recommendation-style closing.',
       contextHint: 'Center frame again and keep warm room mood as the visual end-point.',
-      cameraHint: 'Short hold on closer hero full-body pose with tiny push-in for clearer outfit readability.',
+      cameraHint: 'Short hold on hero full-body pose with tiny push-in for clearer outfit readability.',
       narrationHint: 'Optional on-screen CTA text only; no spoken CTA.',
     },
   ],
-  generatedScript: `Open with a cozy home mirror frame and immediate full-fit visibility.
+  generatedScript: `Open with a cozy home front-camera frame and immediate full-fit visibility.
 Hold front full-body fit proof for silhouette readability.
 Move into detail check (fabric, waistline, finishing) while keeping warm room continuity.
 Add a short 3/4 angle switch for side-fit confirmation (no full back turn).
-Return to hero mirror pose and close with soft on-screen CTA.`,
+Return to hero front-camera pose and close with soft on-screen CTA.`,
   generatedAt: 0,
 }
 
@@ -868,6 +867,8 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
   referenceVideoFileName: string
   referenceVideoUrl: string
   sourceDurationSec: number
+  lockedContentType: ResolvedContentType
+  cameraFormat: 'mirror_phone' | 'front_camera'
   productBrief: string
   lockedAnalysis: TikTokAnalysisResult
 }> = [
@@ -879,6 +880,8 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
     referenceVideoFileName: OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_FILE_NAME,
     referenceVideoUrl: new URL(`../${OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_FILE_NAME}`, import.meta.url).href,
     sourceDurationSec: OOTD_TEMPLATE_CLASSIC_SOURCE_DURATION_SEC,
+    lockedContentType: 'ootdmirror',
+    cameraFormat: 'mirror_phone',
     productBrief: OOTD_TEMPLATE_CLASSIC_PRODUCT_BRIEF,
     lockedAnalysis: OOTD_TEMPLATE_CLASSIC_LOCKED_ANALYSIS,
   },
@@ -890,6 +893,8 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
     referenceVideoFileName: OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME,
     referenceVideoUrl: new URL(`../${OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME}`, import.meta.url).href,
     sourceDurationSec: OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC,
+    lockedContentType: 'ootd',
+    cameraFormat: 'front_camera',
     productBrief: OOTD_TEMPLATE_COZY_PRODUCT_BRIEF,
     lockedAnalysis: OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS,
   },
@@ -8611,6 +8616,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   useEffect(() => {
     if (!isOotdTemplatePage) return
 
+    const lockedScenarioContentType = activeOotdTemplateScenario.lockedContentType
+
     if (generationMode !== 'video_prompt') {
       setGenerationMode('video_prompt')
     }
@@ -8621,8 +8628,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     if (aspectRatio !== OOTD_TEMPLATE_LOCKED_ASPECT_RATIO) {
       setAspectRatio(OOTD_TEMPLATE_LOCKED_ASPECT_RATIO)
     }
-    if (contentType !== OOTD_TEMPLATE_LOCKED_CONTENT_TYPE) {
-      setContentType(OOTD_TEMPLATE_LOCKED_CONTENT_TYPE)
+    if (contentType !== lockedScenarioContentType) {
+      setContentType(lockedScenarioContentType)
     }
     if (!isContentTypeManuallyLocked) {
       setIsContentTypeManuallyLocked(true)
@@ -8637,6 +8644,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     generationMode,
     isContentTypeManuallyLocked,
     isOotdTemplatePage,
+    activeOotdTemplateScenario.lockedContentType,
     videoPoseDirectionLock,
   ])
 
@@ -9030,6 +9038,20 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const lookbookStyleToneLabel = lookbookStyleTone === 'sexy' ? 'Sexy' : 'Classic'
   const lookbookThemeLabel = getLookbookThemeOption(lookbookTheme).label
   const videoPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === videoPoseDirectionLock)?.label || 'Auto'
+  const isMirrorPhoneTemplateScenario = activeOotdTemplateScenario.cameraFormat === 'mirror_phone'
+  const ootdTemplateDirectionLockLabel = isMirrorPhoneTemplateScenario
+    ? 'Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK)'
+    : 'Observer-camera front-lens framing with FRONT + gentle 3/4 LEFT/RIGHT turns (avoid prolonged BACK-facing).'
+  const ootdTemplateVoiceTrackLabel = isMirrorPhoneTemplateScenario
+    ? 'OFF (visual-only mirror phone fit-check)'
+    : 'OFF (visual-only front-camera outfit presentation)'
+  const ootdTemplateBackgroundLockLabel = isMirrorPhoneTemplateScenario
+    ? (backgroundImage
+      ? 'ON (closer mirror framing + full-body + anchor continuity)'
+      : 'OFF (them background image de khoa)')
+    : (backgroundImage
+      ? 'ON (front-camera set continuity + full-body readability + anchor continuity)'
+      : 'OFF (them background image de khoa)')
   const promptPrimaryLabel = isOotdTemplatePage
     ? 'Prompt OOTD Template'
     : generationMode === 'lookbook_image'
@@ -9822,6 +9844,20 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     }
 
     const activeTemplateScenario = activeOotdTemplateScenario
+    const usesMirrorPhoneTemplate = activeTemplateScenario.cameraFormat === 'mirror_phone'
+    const directionRule = usesMirrorPhoneTemplate
+      ? 'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.'
+      : 'Direction rule: keep observer-camera presentation in front of lens; allow FRONT and gentle 3/4 LEFT/RIGHT turns, avoid sustained BACK body orientation.'
+    const voiceRule = usesMirrorPhoneTemplate
+      ? 'Voice rule: no voiceover/dialogue. Keep visual-only mirror phone fit-check storytelling with optional on-screen text.'
+      : 'Voice rule: no voiceover/dialogue. Keep visual-only front-camera outfit presentation storytelling with optional on-screen text.'
+    const backgroundAnchorRule = backgroundImage
+      ? (usesMirrorPhoneTemplate
+        ? 'Background anchor lock: model must stand closer to mirror and perform mirror phone fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
+        : 'Background anchor lock: model must stand in front of filming camera inside the provided cozy home background, keep full-body head-to-toe framing, preserve key background anchors, and hold the same venue across beats.')
+      : (usesMirrorPhoneTemplate
+        ? 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.'
+        : 'Background anchor lock: no background image provided, so keep one cozy home venue continuity with observer-camera framing.')
     const lockedDuration = DURATIONS.find((entry) => entry.value === duration)?.value || OOTD_TEMPLATE_LOCKED_DURATION
 
     const reviewProductNotes = [
@@ -9831,17 +9867,15 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       'Ignore all non-product visual identity from the reference video. Keep only pacing and scene progression.',
       'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
       `Target output duration: ${lockedDuration}s (reference source ${activeTemplateScenario.sourceDurationSec}s). Expand/compress beat timing proportionally without changing beat order.`,
-      'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.',
+      directionRule,
       'Action + scene writing rule: concise visual description only, no beat labels, no speaking/lip cues.',
       'Performance rule: keep mouth closed at rest, jaw stable, no speech-like head nods, and no talking-presenter behavior.',
-      'Voice rule: no voiceover/dialogue. Keep visual-only mirror phone fit-check storytelling with optional on-screen text.',
-      backgroundImage
-        ? 'Background anchor lock: model must stand closer to mirror and perform mirror phone fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
-        : 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.',
+      voiceRule,
+      backgroundAnchorRule,
     ].join('\n')
 
     const lockedAspectRatio = OOTD_TEMPLATE_LOCKED_ASPECT_RATIO
-    const lockedContentType = OOTD_TEMPLATE_LOCKED_CONTENT_TYPE
+    const lockedContentType = activeTemplateScenario.lockedContentType
     const currentProductImageId = productImage ? createProductImageId(productImage) : null
 
     setGenerationMode('video_prompt')
@@ -9879,7 +9913,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         activeTemplateScenario.lockedAnalysis,
         reviewProductNotes,
         {
-          enforceFrontFaceQuarterBodyLock: true,
+          enforceFrontFaceQuarterBodyLock: usesMirrorPhoneTemplate,
           enforceConciseVisualOnlyAction: true,
         },
       )
@@ -10358,10 +10392,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   Scenario: {activeOotdTemplateScenario.label} (video {activeOotdTemplateScenario.referenceVideoId}){'\n'}
                   Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {activeOotdTemplateScenario.sourceDurationSec}s, chi de tham khao nhip){'\n'}
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
-                  Content type: {OOTD_TEMPLATE_LOCKED_CONTENT_TYPE.toUpperCase()}{'\n'}
-                  Direction lock: Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK){'\n'}
-                  Voice track: OFF (visual-only mirror phone fit-check){'\n'}
-                  Background mirror phone fit-check lock: {backgroundImage ? 'ON (closer mirror framing + full-body + anchor continuity)' : 'OFF (them background image de khoa)'}{"\n"}
+                  Content type: {activeOotdTemplateScenario.lockedContentType.toUpperCase()}{'\n'}
+                  Direction lock: {ootdTemplateDirectionLockLabel}{'\n'}
+                  Voice track: {ootdTemplateVoiceTrackLabel}{'\n'}
+                  Background continuity lock: {ootdTemplateBackgroundLockLabel}{"\n"}
                   Narrative: {activeOotdTemplateScenario.lockedAnalysis.narrativeStructure}
                 </div>
 
