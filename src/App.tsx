@@ -788,22 +788,23 @@ const OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME = '7812247666227.mp4'
 const OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC = 26
 const OOTD_TEMPLATE_COZY_PRODUCT_BRIEF = `Keep front-camera outfit presentation progression while matching the cozy home background style from the reference video.
 - Preserve observer-camera framing (model stands in front of filming lens), no phone-in-hand mirror framing.
-- Keep progression: cozy hook -> full-fit proof -> detail proof -> angle switch -> soft confidence close.
+- Keep progression: cozy hook -> front-fit proof -> side/back reveal -> front reset -> soft half-turn close.
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat.
 - Background style lock: warm cream walls, wood floor, soft practical home light, shelf decor, and indoor-plant accents in one continuous room.
 - Camera lock: front-lens observer camera with stable tripod-like framing and no mirror reflection composition.
+- Framing lock: keep full-body head-to-toe in one stable frame, avoid aggressive push-in/zoom or close-up takeover.
 - Direction lock: prioritize FRONT and gentle 3/4 LEFT/RIGHT turns; avoid prolonged back-facing.
 - Voice rule: visual-only front-camera outfit presentation, no voiceover/spoken dialogue, no lip-sync behavior.`
 const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootd',
   detectedDurationSec: OOTD_TEMPLATE_COZY_SOURCE_DURATION_SEC,
   hookStyle: 'Cozy home front-camera hook with warm practical lighting and immediate full-fit visibility.',
-  narrativeStructure: 'Cozy room front-camera hook -> full-fit proof -> detail check -> angle switch -> concise close (order lock, timeline-flex).',
+  narrativeStructure: 'Cozy room front-camera hook -> full-fit proof -> side/back reveal -> front reset -> concise half-turn close (order lock, timeline-flex).',
   ctaStyle: 'Soft recommendation close, no hard sell, text-only suggestion.',
   colorGrade: 'warm neutral indoor practical lighting, soft highlight rolloff, natural skin tone',
-  pacing: 'steady micro-beat front-camera pacing with natural movement and adaptive cut length by target duration',
+  pacing: 'steady front-camera pacing with subtle pose-loop changes and adaptive cut length by target duration',
   sceneBeats: [
     {
       index: 0,
@@ -820,42 +821,42 @@ const OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       beatName: 'FULL FIT PROOF',
       description: 'Hold full-body front fit long enough for viewers to read silhouette, length, and proportion.',
       contextHint: 'Keep same cozy room continuity and keep decor anchors stable across cuts.',
-      cameraHint: 'Stable mirror frame, subject occupies around 70-85% of frame while preserving head-to-toe readability.',
+      cameraHint: 'Stable observer-camera frame, full-body head-to-toe readability, no dramatic zoom behavior.',
       narrationHint: 'No spoken line; let framing show fit and wearability.',
     },
     {
       index: 2,
       timestamp: 'Step 3',
-      beatName: 'DETAIL CHECK',
-      description: 'Move slightly toward camera for fabric/waistline/finishing detail proof without losing full outfit context.',
-      contextHint: 'Retain warm practical light and visible home decor cues; avoid scene switching.',
-      cameraHint: 'Observer-camera mid-close detail pass with slow controlled vertical framing shift.',
-      narrationHint: 'No spoken line; emphasize details through close visual proof.',
+      beatName: 'SIDE/BACK REVEAL',
+      description: 'Do a gentle side-to-back reveal to prove silhouette and back-fit while keeping movement smooth.',
+      contextHint: 'Stay in the same cozy room setup; preserve shelf/lamp/floor anchors for continuity.',
+      cameraHint: 'Static front-lens camera with subject pivot; no handheld shake and no close-up takeover.',
+      narrationHint: 'No spoken line; confidence is shown through controlled turn and posture.',
     },
     {
       index: 3,
       timestamp: 'Step 4',
-      beatName: 'ANGLE SWITCH',
-      description: 'Do one short 3/4 angle switch to prove side-fit and movement behavior without turning full back.',
-      contextHint: 'Small movement inside the same cozy zone, preserve doorway/shelf/plant anchors for continuity.',
-      cameraHint: 'Quick half-turn with controlled static-camera framing and no abrupt shake.',
-      narrationHint: 'No spoken line; confidence is shown via movement and posture.',
+      beatName: 'FRONT RESET',
+      description: 'Return to front-facing hero stance and cycle two to three subtle hand/hip pose changes.',
+      contextHint: 'Keep identical composition and cozy-light mood with no location drift.',
+      cameraHint: 'Locked-off observer-camera frame with full-body continuity and balanced headroom.',
+      narrationHint: 'No spoken line; pose-loop rhythm carries the beat.',
     },
     {
       index: 4,
       timestamp: 'Step 5',
-      beatName: 'SOFT CLOSE',
-      description: 'Return to hero front-camera pose and finish with concise recommendation-style closing.',
-      contextHint: 'Center frame again and keep warm room mood as the visual end-point.',
-      cameraHint: 'Short hold on hero full-body pose with tiny push-in for clearer outfit readability.',
+      beatName: 'HALF-TURN CLOSE',
+      description: 'Finish with a concise half-turn closing pose that transitions cleanly into end card behavior.',
+      contextHint: 'Maintain same cozy room anchors until the final beat without scene change.',
+      cameraHint: 'Stable front-lens full-body frame through the final turn; no late zoom/push-in.',
       narrationHint: 'Optional on-screen CTA text only; no spoken CTA.',
     },
   ],
   generatedScript: `Open with a cozy home front-camera frame and immediate full-fit visibility.
 Hold front full-body fit proof for silhouette readability.
-Move into detail check (fabric, waistline, finishing) while keeping warm room continuity.
-Add a short 3/4 angle switch for side-fit confirmation (no full back turn).
-Return to hero front-camera pose and close with soft on-screen CTA.`,
+Add a gentle side/back reveal while keeping the same static camera and room anchors.
+Reset to front hero stance with subtle pose-loop changes in the same composition.
+Finish with a concise half-turn close into end-card timing.`,
   generatedAt: 0,
 }
 
@@ -888,7 +889,7 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
   {
     id: 'cozy_home_background',
     label: 'Cozy Home Background',
-    desc: 'Nen phong nha am, decor cay xanh',
+    desc: 'Front-camera phong nha am, decor cay xanh',
     referenceVideoId: OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_ID,
     referenceVideoFileName: OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME,
     referenceVideoUrl: new URL(`../${OOTD_TEMPLATE_COZY_REFERENCE_VIDEO_FILE_NAME}`, import.meta.url).href,
@@ -9041,7 +9042,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const isMirrorPhoneTemplateScenario = activeOotdTemplateScenario.cameraFormat === 'mirror_phone'
   const ootdTemplateDirectionLockLabel = isMirrorPhoneTemplateScenario
     ? 'Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK)'
-    : 'Observer-camera front-lens framing with FRONT + gentle 3/4 LEFT/RIGHT turns (avoid prolonged BACK-facing).'
+    : 'Observer-camera front-lens framing with FRONT + gentle 3/4 LEFT/RIGHT turns (avoid prolonged BACK-facing); keep framing stable.'
   const ootdTemplateVoiceTrackLabel = isMirrorPhoneTemplateScenario
     ? 'OFF (visual-only mirror phone fit-check)'
     : 'OFF (visual-only front-camera outfit presentation)'
@@ -9050,7 +9051,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       ? 'ON (closer mirror framing + full-body + anchor continuity)'
       : 'OFF (them background image de khoa)')
     : (backgroundImage
-      ? 'ON (front-camera set continuity + full-body readability + anchor continuity)'
+      ? 'ON (front-camera set continuity + full-body readability + anchor continuity, no aggressive zoom)'
       : 'OFF (them background image de khoa)')
   const promptPrimaryLabel = isOotdTemplatePage
     ? 'Prompt OOTD Template'
@@ -9847,17 +9848,17 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     const usesMirrorPhoneTemplate = activeTemplateScenario.cameraFormat === 'mirror_phone'
     const directionRule = usesMirrorPhoneTemplate
       ? 'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.'
-      : 'Direction rule: keep observer-camera presentation in front of lens; allow FRONT and gentle 3/4 LEFT/RIGHT turns, avoid sustained BACK body orientation.'
+      : 'Direction rule: keep observer-camera presentation in front of lens; allow FRONT and gentle 3/4 LEFT/RIGHT turns, avoid sustained BACK body orientation, and keep the camera frame stable.'
     const voiceRule = usesMirrorPhoneTemplate
       ? 'Voice rule: no voiceover/dialogue. Keep visual-only mirror phone fit-check storytelling with optional on-screen text.'
       : 'Voice rule: no voiceover/dialogue. Keep visual-only front-camera outfit presentation storytelling with optional on-screen text.'
     const backgroundAnchorRule = backgroundImage
       ? (usesMirrorPhoneTemplate
         ? 'Background anchor lock: model must stand closer to mirror and perform mirror phone fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
-        : 'Background anchor lock: model must stand in front of filming camera inside the provided cozy home background, keep full-body head-to-toe framing, preserve key background anchors, and hold the same venue across beats.')
+        : 'Background anchor lock: model must stand in front of filming camera inside the provided cozy home background, keep full-body head-to-toe framing, preserve key background anchors, hold the same venue across beats, and avoid aggressive push-in/zoom behavior.')
       : (usesMirrorPhoneTemplate
         ? 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.'
-        : 'Background anchor lock: no background image provided, so keep one cozy home venue continuity with observer-camera framing.')
+        : 'Background anchor lock: no background image provided, so keep one cozy home venue continuity with observer-camera framing and stable full-body composition.')
     const lockedDuration = DURATIONS.find((entry) => entry.value === duration)?.value || OOTD_TEMPLATE_LOCKED_DURATION
 
     const reviewProductNotes = [
