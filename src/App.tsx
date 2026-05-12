@@ -328,7 +328,7 @@ type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image'
 type AppPageMode = 'core' | 'ootd_template'
-type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background'
+type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
 type LookbookTheme = 'auto' | 'minimal_studio' | 'street_casual' | 'office_chic' | 'party_night' | 'vacation_resort'
@@ -861,6 +861,83 @@ Finish with a concise three-quarter close into end-card timing.`,
   generatedAt: 0,
 }
 
+const OOTD_TEMPLATE_NIGHT_GLOW_REFERENCE_VIDEO_ID = '7817146311637'
+const OOTD_TEMPLATE_NIGHT_GLOW_REFERENCE_VIDEO_FILE_NAME = '7817146311637.mp4'
+const OOTD_TEMPLATE_NIGHT_GLOW_SOURCE_DURATION_SEC = 12.003991
+const OOTD_TEMPLATE_NIGHT_GLOW_PRODUCT_BRIEF = `Keep the same night-glam front-camera progression from the reference video.
+- Preserve observer-camera fashion presentation (no phone-in-hand mirror framing).
+- Keep progression: hero full-body hook -> brief back-reveal turn -> three-quarter return flow -> upper-body detail close -> centered glam close with nightlife glow transition.
+- Keep beat order, but do not clone exact second-by-second timeline from the reference.
+- The only variable is the outfit/product from current PRODUCT input image.
+- Maintain elegant body-line readability and fabric sheen visibility in every beat.
+- Environment lock: nighttime high-rise window backdrop, city bokeh lights, dark reflective floor, and one continuous indoor evening venue until final close.
+- Camera lock: mostly stable front-lens observer camera; allow smooth push-in from full-body to upper-body close, then hold centered close.
+- Framing lock: open with full-body, then transition to medium/upper-body detail around neckline/texture, and finish centered glam posture.
+- Direction rule: allow one short back-reveal beat in the middle, then return to front/three-quarter for closing.
+- Voice rule: visual-only evening fashion presentation, no voiceover/spoken dialogue, no lip-sync behavior.`
+const OOTD_TEMPLATE_NIGHT_GLOW_LOCKED_ANALYSIS: TikTokAnalysisResult = {
+  detectedContentType: 'ootd',
+  detectedDurationSec: OOTD_TEMPLATE_NIGHT_GLOW_SOURCE_DURATION_SEC,
+  hookStyle: 'Night citylight front-camera hook with full-body glam pose, satin sheen highlights, and skyline bokeh backdrop.',
+  narrativeStructure: 'Night hero full-body hook -> brief back-reveal turn -> three-quarter return flow -> upper-body detail close -> centered glam closer with nightlife glow transition (order lock, timeline-flex).',
+  ctaStyle: 'Soft recommendation close, no hard sell, text-only suggestion.',
+  colorGrade: 'cool-to-neutral night contrast, city bokeh glow, and crisp satin highlight separation',
+  pacing: 'medium-fast glam pacing with smooth pose transitions and soft final glow transition',
+  sceneBeats: [
+    {
+      index: 0,
+      timestamp: 'Step 1',
+      beatName: 'NIGHT HERO HOOK',
+      description: 'Open with full-body front-facing hero stance and a confident glam pose in front of citylight windows.',
+      contextHint: 'Floor-to-ceiling windows, nighttime city bokeh, dark glossy floor, no venue switch.',
+      cameraHint: 'Stable front-lens observer framing, full-body head-to-toe readability, minimal shake.',
+      narrationHint: 'No spoken line; use visual hook and optional on-screen text only.',
+    },
+    {
+      index: 1,
+      timestamp: 'Step 2',
+      beatName: 'BACK REVEAL TURN',
+      description: 'Execute one controlled pivot into a brief back-view silhouette reveal, then hold shortly.',
+      contextHint: 'Keep the same window zone and citylight anchors; no location drift.',
+      cameraHint: 'Keep observer-camera axis stable while subject turns; no abrupt shake or jump.',
+      narrationHint: 'No spoken line; confidence is shown through controlled body line and posture.',
+    },
+    {
+      index: 2,
+      timestamp: 'Step 3',
+      beatName: 'THREE-QUARTER RETURN',
+      description: 'Return from back reveal into a three-quarter/front-glance pose with smooth hemline movement.',
+      contextHint: 'Maintain the same venue composition and city-bokeh continuity.',
+      cameraHint: 'Gentle follow or subtle push to keep silhouette readable while turning back toward camera.',
+      narrationHint: 'No spoken line; visual flow carries the transition beat.',
+    },
+    {
+      index: 3,
+      timestamp: 'Step 4',
+      beatName: 'UPPER-BODY DETAIL CLOSE',
+      description: 'Shift to medium/upper-body framing to highlight neckline, satin drape texture, and accessory details.',
+      contextHint: 'Keep same night-window backdrop and practical light mood while moving closer.',
+      cameraHint: 'Smooth push-in from full-body to upper-body close, keep face sharp and motion controlled.',
+      narrationHint: 'No spoken line; detail proof comes from framing and micro-pose changes.',
+    },
+    {
+      index: 4,
+      timestamp: 'Step 5',
+      beatName: 'GLAM CLOSER TRANSITION',
+      description: 'Finish in centered front glam posture and allow a brief nightlife crowd-glow style transition in the final moment.',
+      contextHint: 'Keep core night-glam identity; any crowd-glow transition should appear only at the closing second.',
+      cameraHint: 'Stable centered medium framing for close, no aggressive zoom, no abrupt location jump before end.',
+      narrationHint: 'Optional on-screen CTA text only; no spoken CTA.',
+    },
+  ],
+  generatedScript: `Open with a full-body front hero pose in a night citylight window setting.
+Add one short controlled back-reveal turn to show silhouette.
+Return to a three-quarter/front-glance flow with smooth fabric movement.
+Push in to upper-body detail proof (neckline, texture, accessory cues).
+End in centered glam close with a brief nightlife glow transition at the final moment.`,
+  generatedAt: 0,
+}
+
 const OOTD_TEMPLATE_SCENARIOS: Array<{
   id: OotdTemplateScenarioId
   label: string
@@ -899,6 +976,19 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
     cameraFormat: 'front_camera',
     productBrief: OOTD_TEMPLATE_COZY_PRODUCT_BRIEF,
     lockedAnalysis: OOTD_TEMPLATE_COZY_LOCKED_ANALYSIS,
+  },
+  {
+    id: 'night_city_glam',
+    label: 'Night City Glam',
+    desc: 'Front-camera citylight glam, back-reveal ngan + close-up texture',
+    referenceVideoId: OOTD_TEMPLATE_NIGHT_GLOW_REFERENCE_VIDEO_ID,
+    referenceVideoFileName: OOTD_TEMPLATE_NIGHT_GLOW_REFERENCE_VIDEO_FILE_NAME,
+    referenceVideoUrl: new URL(`../${OOTD_TEMPLATE_NIGHT_GLOW_REFERENCE_VIDEO_FILE_NAME}`, import.meta.url).href,
+    sourceDurationSec: OOTD_TEMPLATE_NIGHT_GLOW_SOURCE_DURATION_SEC,
+    lockedContentType: 'ootd',
+    cameraFormat: 'front_camera',
+    productBrief: OOTD_TEMPLATE_NIGHT_GLOW_PRODUCT_BRIEF,
+    lockedAnalysis: OOTD_TEMPLATE_NIGHT_GLOW_LOCKED_ANALYSIS,
   },
 ]
 
@@ -9113,9 +9203,12 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const lookbookThemeLabel = getLookbookThemeOption(lookbookTheme).label
   const videoPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === videoPoseDirectionLock)?.label || 'Auto'
   const isMirrorPhoneTemplateScenario = activeOotdTemplateScenario.cameraFormat === 'mirror_phone'
+  const isCozyTemplateScenario = activeOotdTemplateScenario.id === 'cozy_home_background'
   const ootdTemplateDirectionLockLabel = isMirrorPhoneTemplateScenario
     ? 'Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK)'
-    : 'Face FRONT toward camera + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK); keep framing stable.'
+    : isCozyTemplateScenario
+      ? 'Face FRONT toward camera + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK); keep framing stable.'
+      : 'Allow FRONT/3/4 with one short BACK-reveal beat; return to FRONT/3/4 for closing while keeping framing stable.'
   const ootdTemplateVoiceTrackLabel = isMirrorPhoneTemplateScenario
     ? 'OFF (visual-only mirror phone fit-check)'
     : 'OFF (visual-only front-camera outfit presentation)'
@@ -9124,7 +9217,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       ? 'ON (closer mirror framing + full-body + anchor continuity)'
       : 'OFF (them background image de khoa)')
     : (backgroundImage
-      ? 'ON (front-camera set continuity + rear mirror behind model + full-body readability + anchor continuity, no aggressive zoom)'
+      ? (isCozyTemplateScenario
+        ? 'ON (front-camera set continuity + rear mirror behind model + full-body readability + anchor continuity, no aggressive zoom)'
+        : 'ON (front-camera set continuity + full-body-to-medium progression + anchor continuity)')
       : 'OFF (them background image de khoa)')
   const promptPrimaryLabel = isOotdTemplatePage
     ? 'Prompt OOTD Template'
@@ -9919,21 +10014,28 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
 
     const activeTemplateScenario = activeOotdTemplateScenario
     const usesMirrorPhoneTemplate = activeTemplateScenario.cameraFormat === 'mirror_phone'
-    const shouldEnforceFrontFaceNoBackLock = usesMirrorPhoneTemplate || activeTemplateScenario.id === 'cozy_home_background'
-    const shouldEnforceRearMirrorReflection = usesMirrorPhoneTemplate || activeTemplateScenario.id === 'cozy_home_background'
-    const directionRule = usesMirrorPhoneTemplate
-      ? 'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.'
-      : 'Direction rule: face must stay FRONT toward camera; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation; keep the camera frame stable.'
+    const isCozyTemplateScenario = activeTemplateScenario.id === 'cozy_home_background'
+    const shouldEnforceFrontFaceNoBackLock = usesMirrorPhoneTemplate || isCozyTemplateScenario
+    const shouldEnforceRearMirrorReflection = usesMirrorPhoneTemplate || isCozyTemplateScenario
+    const directionRule = shouldEnforceFrontFaceNoBackLock
+      ? (usesMirrorPhoneTemplate
+        ? 'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.'
+        : 'Direction rule: face must stay FRONT toward camera; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation; keep the camera frame stable.')
+      : 'Direction rule: allow FRONT, 3/4 LEFT, 3/4 RIGHT, and one short BACK reveal beat when the selected scenario requires it; avoid prolonged back-facing hold and return to FRONT/3/4 for closing.'
     const voiceRule = usesMirrorPhoneTemplate
       ? 'Voice rule: no voiceover/dialogue. Keep visual-only mirror phone fit-check storytelling with optional on-screen text.'
       : 'Voice rule: no voiceover/dialogue. Keep visual-only front-camera outfit presentation storytelling with optional on-screen text.'
     const backgroundAnchorRule = backgroundImage
       ? (usesMirrorPhoneTemplate
         ? 'Background anchor lock: model must stand closer to mirror and perform mirror phone fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
-        : 'Background anchor lock: model must stand in front of filming camera inside the provided cozy home background, keep full-body head-to-toe framing, preserve key background anchors including rear mirror placement, hold the same venue across beats, and avoid aggressive push-in/zoom behavior.')
+        : (isCozyTemplateScenario
+          ? 'Background anchor lock: model must stand in front of filming camera inside the provided cozy home background, keep full-body head-to-toe framing, preserve key background anchors including rear mirror placement, hold the same venue across beats, and avoid aggressive push-in/zoom behavior.'
+          : 'Background anchor lock: model must stay in front of filming camera inside the provided selected-scenario background, preserve key venue anchors (window frame/citylight/floor line/decor), keep continuity across all beats, and allow only smooth full-body-to-medium push-in progression when needed.'))
       : (usesMirrorPhoneTemplate
         ? 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.'
-        : 'Background anchor lock: no background image provided, so keep one cozy home venue continuity with observer-camera framing, rear mirror behind model, and stable full-body composition.')
+        : (isCozyTemplateScenario
+          ? 'Background anchor lock: no background image provided, so keep one cozy home venue continuity with observer-camera framing, rear mirror behind model, and stable full-body composition.'
+          : 'Background anchor lock: no background image provided, so keep one selected-scenario venue continuity with observer-camera framing and stable anchor composition.'))
     const rearMirrorReflectionRule = shouldEnforceRearMirrorReflection
       ? 'Rear mirror reflection lock: keep mirror behind model visible as reflection proof across all beats; never show camera/tripod/operator in mirror reflection.'
       : 'Rear mirror reflection lock: inactive.'
