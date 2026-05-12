@@ -7506,6 +7506,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     enforceConciseVisualOnlyAction?: boolean
     templateCameraFormat?: 'mirror_phone' | 'front_camera'
     enforceRearMirrorReflection?: boolean
+    templateScenarioId?: OotdTemplateScenarioId
   },
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
@@ -7525,6 +7526,9 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const templateCameraFormat = options?.templateCameraFormat || 'mirror_phone'
   const isFrontCameraTemplate = templateCameraFormat === 'front_camera'
   const shouldEnforceRearMirrorReflection = options?.enforceRearMirrorReflection === true
+  const templateScenarioId = options?.templateScenarioId
+  const isCozyTemplateScenario = templateScenarioId === 'cozy_home_background'
+  const isNightCityTemplateScenario = templateScenarioId === 'night_city_glam'
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
   const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
@@ -7547,7 +7551,9 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     ? (isFrontCameraTemplate
       ? (shouldEnforceRearMirrorReflection
         ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement + rear mirror anchor), and treat this image as environment anchor only (not identity/product source).'
-        : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement), and treat this image as environment anchor only (not identity/product source).')
+        : (isNightCityTemplateScenario
+          ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep strong outfit readability, preserve key background anchors (window frame/citylight/floor/decor placement), and treat this image as environment anchor only (not identity/product source).'
+          : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement), and treat this image as environment anchor only (not identity/product source).'))
       : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing for mirror phone fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).')
     : 'BACKGROUND LOCATION LOCK: no background input image provided.'
 
@@ -7789,9 +7795,13 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
     const anchoredTemplateLocation = hasBackgroundLocationReference
       ? (isFrontCameraTemplate
-        ? (shouldEnforceRearMirrorReflection
-          ? 'provided cozy home front-camera zone with rear mirror reflection (exact uploaded background scene)'
-          : 'provided cozy home front-camera zone (exact uploaded background scene)')
+        ? (isCozyTemplateScenario
+          ? (shouldEnforceRearMirrorReflection
+            ? 'provided cozy home front-camera zone with rear mirror reflection (exact uploaded background scene)'
+            : 'provided cozy home front-camera zone (exact uploaded background scene)')
+          : (isNightCityTemplateScenario
+            ? 'provided night city glam front-camera zone (exact uploaded background scene)'
+            : 'provided selected front-camera scenario zone (exact uploaded background scene)'))
         : 'provided background mirror phone fit-check zone (exact uploaded background scene)')
       : ''
 
@@ -7832,7 +7842,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         finalStyle = appendSentenceIfMissing(
           finalStyle,
           isFrontCameraTemplate
-            ? 'Maintain background continuity via key anchors (wall/floor/decor placement) with no venue drift.'
+            ? (isNightCityTemplateScenario
+              ? 'Maintain background continuity via key anchors (window frame/citylight/floor/decor placement) with no venue drift.'
+              : 'Maintain background continuity via key anchors (wall/floor/decor placement) with no venue drift.')
             : 'Maintain background continuity via key anchors (mirror edges, floor line, decor placement) with no venue drift.',
         )
 
@@ -7868,7 +7880,11 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         )
         finalStyle = appendSentenceIfMissing(
           removeOotdMirrorHandheldDevicePhrases(finalStyle),
-          'Hands-free front-camera outfit presentation with stable cozy-room continuity.',
+          isCozyTemplateScenario
+            ? 'Hands-free front-camera outfit presentation with stable cozy-room continuity.'
+            : (isNightCityTemplateScenario
+              ? 'Hands-free front-camera outfit presentation with stable night-city continuity.'
+              : 'Hands-free front-camera outfit presentation with stable scenario continuity.'),
         )
       }
 
@@ -10099,6 +10115,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
           enforceConciseVisualOnlyAction: true,
           templateCameraFormat: activeTemplateScenario.cameraFormat,
           enforceRearMirrorReflection: shouldEnforceRearMirrorReflection,
+          templateScenarioId: activeTemplateScenario.id,
         },
       )
 
