@@ -7529,6 +7529,16 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const templateScenarioId = options?.templateScenarioId
   const isCozyTemplateScenario = templateScenarioId === 'cozy_home_background'
   const isNightCityTemplateScenario = templateScenarioId === 'night_city_glam'
+  const frontCameraNaturalActionFallback = isNightCityTemplateScenario
+    ? 'Natural front-camera glam fit-check flow with smooth step-in, gentle turn-return, and clear outfit readability.'
+    : (isCozyTemplateScenario
+      ? 'Natural front-camera fit-check flow with subtle weight shifts, gentle turn-return, and clear full-body outfit readability.'
+      : 'Natural front-camera fit-check movement with relaxed micro-poses and clear outfit readability.')
+  const frontCameraAnchoredActionSentence = isNightCityTemplateScenario
+    ? 'Model performs a natural front-camera glam fit-check flow in the provided background scene with smooth step-in, shoulder-line turns, and confident close posture.'
+    : (isCozyTemplateScenario
+      ? 'Model performs a natural front-camera fit-check flow in the provided background scene with subtle weight shifts, gentle turn-return, and relaxed hand-to-hip pose changes.'
+      : 'Model performs a natural front-camera fit-check flow in the provided background scene with relaxed micro-poses and smooth turn-return continuity.')
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
   const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
@@ -7732,7 +7742,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const fallbackContextBeat = contextBeatReferences[scriptBeatIndex]
       const fallbackAction = shouldEnforceConciseVisualOnlyAction
         ? (isFrontCameraTemplate
-          ? 'Natural front-camera outfit presentation movement with clear full-body visibility.'
+          ? frontCameraNaturalActionFallback
           : 'Natural mirror phone fit-check movement with clear outfit visibility.')
         : fallbackScriptBeat
           ? `Product review movement follows visual beat flow: ${fallbackScriptBeat}`
@@ -7829,7 +7839,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         finalAction = appendSentenceIfMissing(
           finalAction,
           isFrontCameraTemplate
-            ? 'Model stands in front of filming camera and performs front-camera outfit presentation in the provided background scene with stable stance.'
+            ? frontCameraAnchoredActionSentence
             : 'Model stands closer to mirror and performs mirror phone fit-check in the provided background scene with stable stance.',
         )
         finalLocation = anchoredTemplateLocation
@@ -7927,7 +7937,11 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const contextBeat = contextBeatReferences[index] || analysis.sceneBeats[index]?.contextHint || analysis.sceneBeats[index]?.description || ''
       const conciseNarrativeSeed = sanitizeVisualOnlyConciseAction(keyframes[index]?.action || '')
       const fallbackNarrative = shouldEnforceConciseVisualOnlyAction
-        ? (conciseNarrativeSeed || 'Hold full-fit front pose, then detail-check and gentle side-angle confirmation with clear outfit visibility.')
+        ? (conciseNarrativeSeed || (isFrontCameraTemplate
+          ? (isNightCityTemplateScenario
+            ? 'Natural glam fit-check flow: full-look hero, smooth turn-return, upper-body detail pass, and confident close.'
+            : 'Natural fit-check flow: full-look pose, gentle turn-return, detail-check, and relaxed close with clear outfit visibility.')
+          : 'Hold full-fit front pose, then detail-check and gentle side-angle confirmation with clear outfit visibility.'))
         : scriptBeat.length > 0
           ? `Follow visual beat flow: ${scriptBeat}`
           : 'Follow hook -> value -> proof -> close progression with product-first review clarity.'
