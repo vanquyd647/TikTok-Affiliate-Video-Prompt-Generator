@@ -4,7 +4,11 @@ import App from './App'
 import './index.css'
 
 const normalizedPath = window.location.pathname.replace(/\/+$/, '') || '/'
-const initialPageMode = normalizedPath === '/ootd-template' ? 'ootd_template' : 'core'
+const initialPageMode = normalizedPath === '/ootd-template'
+  ? 'ootd_template'
+  : normalizedPath === '/prompt-library'
+    ? 'prompt_library'
+    : 'core'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

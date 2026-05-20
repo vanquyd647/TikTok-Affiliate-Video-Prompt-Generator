@@ -327,7 +327,7 @@ type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image'
-type AppPageMode = 'core' | 'ootd_template'
+type AppPageMode = 'core' | 'ootd_template' | 'prompt_library'
 type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
@@ -706,6 +706,7 @@ const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
 const FIXED_STRATEGY_LABEL = 'TikTok Shop Core (Strict AUTO + Soft Sell)'
 const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-first de ban ben vung.'
 const OOTD_TEMPLATE_ROUTE_PATH = '/ootd-template'
+const PROMPT_LIBRARY_ROUTE_PATH = '/prompt-library'
 const OOTD_TEMPLATE_LOCKED_DURATION = 24
 const OOTD_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
 const OOTD_TEMPLATE_CLASSIC_REFERENCE_VIDEO_ID = '7633009640682442005'
@@ -8671,6 +8672,350 @@ function Timeline({
   return <div className="timeline">{nodes}</div>
 }
 
+type PromptLibraryItem = {
+  id: string
+  title: string
+  stage: string
+  platform: string
+  output: string
+  icon: React.ElementType
+  accent: string
+  prompt: string
+}
+
+const INTERN_PROMPT_LIBRARY: PromptLibraryItem[] = [
+  {
+    id: 'idea-sprint',
+    title: 'Idea Sprint 9:16',
+    stage: 'Len y tuong',
+    platform: 'TikTok / Reels / Shorts',
+    output: '10 concept co hook, visual, CTA',
+    icon: Sparkles,
+    accent: '#8b5cf6',
+    prompt: `ROLE: You are a senior short-form creative strategist mentoring an AI Video Editor Intern.
+TASK: Generate 10 professional 9:16 video ideas for [ARTIST/PROJECT/BRAND].
+CONTEXT:
+- Objective: [awareness / fan engagement / ticket push / release promo / affiliate conversion]
+- Target audience: [age, interest, region]
+- Key asset available: [photo / product / song / interview clip / behind-the-scenes]
+- Tone: [cinematic / playful / premium / emotional / street / bold]
+
+For each idea, return:
+1. Concept name
+2. 1-line hook for first 2 seconds
+3. Visual sequence in 5 beats
+4. AI assets needed
+5. Editing notes for 9:16
+6. Caption angle
+7. CTA
+
+Constraints:
+- Make it feasible for an intern using AI tools.
+- Prioritize trend-native pacing, clear visual proof, and simple production.
+- Avoid generic ideas. Each concept must have a distinct visual angle.`,
+  },
+  {
+    id: 'image-to-video',
+    title: 'AI Image-To-Video Master Prompt',
+    stage: 'Viet prompt',
+    platform: 'Veo / Runway / Kling / Pika',
+    output: 'Prompt video 8-12s',
+    icon: Film,
+    accent: '#06b6d4',
+    prompt: `Create a vertical 9:16 AI video from the provided reference image.
+
+SUBJECT:
+[Describe artist/product/person/outfit precisely. Preserve identity, clothing, logo, and key details.]
+
+SCENE:
+[Location, mood, props, background, time of day.]
+
+ACTION:
+The subject starts with [opening pose/action], then [micro movement], ending with [final pose/action].
+
+CAMERA:
+Vertical 9:16, social-native framing, [close-up / medium shot / full body], smooth handheld or slow push-in, natural parallax, no sudden camera jumps.
+
+LIGHTING:
+[Soft window light / neon night / studio key light / golden hour], realistic shadows, clean skin tone, readable product details.
+
+STYLE:
+[cinematic / fashion editorial / music promo / authentic TikTok / premium commercial], realistic motion, high detail, no distortion.
+
+EDIT INTENT:
+Leave clean space for subtitles in lower third. Create a strong first-frame hook and a clean final frame for CTA.
+
+NEGATIVE:
+No extra fingers, no face morphing, no text artifacts, no duplicated bodies, no warped logos, no unstable background, no low-res blur.`,
+  },
+  {
+    id: 'shot-list',
+    title: 'Shot List Tu Concept',
+    stage: 'San xuat',
+    platform: 'CapCut / Premiere / AI editor',
+    output: 'Timeline 24-35s',
+    icon: Clapperboard,
+    accent: '#ec4899',
+    prompt: `Convert this concept into a production-ready vertical 9:16 shot list.
+
+CONCEPT:
+[Paste idea/concept here]
+
+AVAILABLE ASSETS:
+- Artist/product images:
+- Video clips:
+- Audio/music:
+- Brand/project notes:
+
+Return a timeline table with:
+- Timestamp
+- Scene purpose
+- Visual/shot description
+- AI generation prompt if needed
+- Editing action
+- Subtitle/on-screen text
+- Sound/music cue
+- Transition/effect
+
+Rules:
+- Total duration: [15s / 24s / 30s / 45s]
+- First 2 seconds must be a strong hook.
+- Every 4-6 seconds must introduce a visual change.
+- Keep transitions simple: cut, speed ramp, zoom, match cut, light leak, whip pan.
+- Build for mobile viewing and retention.`,
+  },
+  {
+    id: 'voice-over',
+    title: 'Voice-Over Script',
+    stage: 'Voice-over',
+    platform: 'ElevenLabs / CapCut / TTS',
+    output: 'Script doc theo timestamp',
+    icon: MessageSquare,
+    accent: '#10b981',
+    prompt: `Write a professional voice-over script for a vertical short-form video.
+
+VIDEO TOPIC:
+[Topic / artist / project / product]
+
+GOAL:
+[Introduce / promote / explain / emotional storytelling / conversion]
+
+STYLE:
+[Natural Vietnamese Gen Z / premium narrator / energetic creator / calm documentary / fanpage editor]
+
+DURATION:
+[15s / 24s / 30s / 45s]
+
+Return:
+1. Full voice-over script
+2. Timestamped lines
+3. Subtitle-ready version, short line breaks
+4. 3 alternate hooks
+5. 3 CTA endings
+
+Rules:
+- Spoken language must sound natural, not corporate.
+- Sentence length should fit TikTok/Reels pacing.
+- Avoid overexplaining. Make every sentence visual and useful.
+- Add pauses where the edit needs impact.`,
+  },
+  {
+    id: 'subtitle-pack',
+    title: 'Subtitle & Text Overlay Pack',
+    stage: 'Subtitle',
+    platform: 'CapCut / Premiere',
+    output: 'Caption lines va style guide',
+    icon: FileText,
+    accent: '#f59e0b',
+    prompt: `Create subtitle and on-screen text for a 9:16 short video.
+
+SCRIPT/VOICEOVER:
+[Paste script here]
+
+BRAND/ARTIST TONE:
+[Minimal / bold / luxury / street / emotional / playful]
+
+Return:
+1. Subtitle lines with natural breaks
+2. On-screen hook text for first frame
+3. Highlight words to animate
+4. Text style recommendation
+5. Placement notes for 9:16
+6. Safe-area notes for TikTok/Reels/Shorts
+
+Rules:
+- Each subtitle line should be short enough for mobile.
+- Avoid blocking face, product, or key motion.
+- Use emphasis only on high-value words.
+- Keep text clean and professional.`,
+  },
+  {
+    id: 'edit-director',
+    title: 'Editing Director Notes',
+    stage: 'Cat ghep',
+    platform: 'CapCut / Premiere / DaVinci',
+    output: 'Huong dan dung video',
+    icon: Layers,
+    accent: '#22c55e',
+    prompt: `Act as a short-form video editing director. Review this raw plan and turn it into clear editing instructions.
+
+VIDEO PLAN:
+[Paste timeline / shot list / raw idea]
+
+TARGET PLATFORM:
+[TikTok / Reels / YouTube Shorts]
+
+ASSETS:
+[List clips, AI videos, photos, music, voice-over, subtitles]
+
+Return:
+- Final structure by timestamp
+- Cut points and pacing notes
+- Music and beat-sync instructions
+- B-roll / AI insert suggestions
+- Subtitle rhythm
+- Simple effects only where useful
+- Color and export notes
+- Final QC checklist before publishing
+
+Rules:
+- Keep it achievable for an AI Video Editor Intern.
+- Prefer clean edits over excessive effects.
+- Optimize for retention and clarity in 9:16.`,
+  },
+  {
+    id: 'trend-adapter',
+    title: 'Trend Adapter',
+    stage: 'Cap nhat xu huong',
+    platform: 'TikTok research',
+    output: 'Bien trend thanh format dung duoc',
+    icon: TrendingUp,
+    accent: '#38bdf8',
+    prompt: `Analyze this TikTok/Reels trend and adapt it for [ARTIST/PROJECT/BRAND].
+
+TREND DESCRIPTION OR LINK NOTES:
+[Paste trend notes here]
+
+PROJECT CONTEXT:
+- Artist/project:
+- Audience:
+- Campaign goal:
+- Assets available:
+
+Return:
+1. What makes the trend work
+2. Safe adaptation angle
+3. 5 video concepts using the trend
+4. Hook text options
+5. Shot list for the best concept
+6. AI prompts needed
+7. Risks to avoid
+
+Rules:
+- Do not copy a creator exactly.
+- Keep the recognizable trend mechanic, but make the idea project-specific.
+- Make it production-ready for a 9:16 short.`,
+  },
+  {
+    id: 'team-brief',
+    title: 'Creative Team Handoff',
+    stage: 'Phoi hop team',
+    platform: 'Content / Creative',
+    output: 'Brief giao viec ro rang',
+    icon: Palette,
+    accent: '#a855f7',
+    prompt: `Create a concise handoff brief for Content/Creative team.
+
+VIDEO OBJECTIVE:
+[Objective]
+
+CONCEPT:
+[Concept summary]
+
+ASSETS NEEDED:
+[Artist images, product images, music, footage, logo, reference videos]
+
+Return a brief with:
+- Goal
+- Target audience
+- Core message
+- Visual direction
+- Required assets
+- AI generation tasks
+- Editing tasks
+- Caption/hashtag notes
+- Approval checklist
+- Delivery format: 9:16, [duration], [platform]
+
+Tone:
+Professional, clear, easy for a team to execute.`,
+  },
+]
+
+function PromptLibraryPage() {
+  const fullLibraryText = INTERN_PROMPT_LIBRARY
+    .map((item, index) => `${index + 1}. ${item.title}\nSTAGE: ${item.stage}\nOUTPUT: ${item.output}\n\n${item.prompt}`)
+    .join('\n\n---\n\n')
+
+  return (
+    <main className="prompt-library-page fade-in">
+      <section className="prompt-library-hero">
+        <div className="prompt-library-kicker">
+          <Sparkles size={14} />
+          AI Video Editor Intern Toolkit
+        </div>
+        <div className="prompt-library-hero-grid">
+          <div>
+            <h2>Bo prompt dung san cho san xuat video AI chuyen nghiep</h2>
+            <p>
+              Thu vien nay gom cac prompt theo dung workflow: len y tuong, viet prompt,
+              san xuat video 9:16, voice-over, cat ghep, subtitle, trend research va handoff cho team Content/Creative.
+            </p>
+          </div>
+          <div className="prompt-library-actions">
+            <CopyButton text={fullLibraryText} />
+            <span>Copy full toolkit</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="prompt-library-workflow" aria-label="AI Video Editor Intern workflow">
+        {['Idea', 'Prompt', 'Production', 'Voice', 'Edit', 'Publish'].map((step) => (
+          <div key={step} className="prompt-library-step">{step}</div>
+        ))}
+      </section>
+
+      <section className="prompt-library-grid">
+        {INTERN_PROMPT_LIBRARY.map((item) => {
+          const Icon = item.icon
+
+          return (
+            <article key={item.id} className="prompt-library-card" style={{ ['--library-accent' as string]: item.accent }}>
+              <div className="prompt-library-card-head">
+                <div className="prompt-library-icon">
+                  <Icon size={18} />
+                </div>
+                <div>
+                  <p className="prompt-library-stage">{item.stage}</p>
+                  <h3>{item.title}</h3>
+                </div>
+                <CopyButton text={item.prompt} />
+              </div>
+
+              <div className="prompt-library-meta">
+                <span>{item.platform}</span>
+                <span>{item.output}</span>
+              </div>
+
+              <pre className="prompt-library-prompt">{item.prompt}</pre>
+            </article>
+          )
+        })}
+      </section>
+    </main>
+  )
+}
+
 // ═══════════════════════════════════════════════
 // MAIN APP
 // ═══════════════════════════════════════════════
@@ -8795,12 +9140,17 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   useEffect(() => { localStorage.setItem('aff_auto_apply_product_category_type', autoApplyCategoryType ? '1' : '0') }, [autoApplyCategoryType])
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
+  const isPromptLibraryPage = pageMode === 'prompt_library'
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
-    const targetPath = pageMode === 'ootd_template' ? OOTD_TEMPLATE_ROUTE_PATH : '/'
+    const targetPath = pageMode === 'ootd_template'
+      ? OOTD_TEMPLATE_ROUTE_PATH
+      : pageMode === 'prompt_library'
+        ? PROMPT_LIBRARY_ROUTE_PATH
+        : '/'
 
     if (currentPath !== targetPath) {
       window.history.replaceState(null, '', `${targetPath}${window.location.search}${window.location.hash}`)
@@ -10447,7 +10797,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
             <div>
               <h1 className="header-title">AFF Video Prompt</h1>
               <p className="header-subtitle">
-                {isOotdTemplatePage
+                {isPromptLibraryPage
+                  ? 'AI Video Editor Intern Prompt Library'
+                  : isOotdTemplatePage
                   ? `OOTD Template Page (Beat-flow lock theo video ${activeOotdTemplateScenario.referenceVideoFileName})`
                   : 'TikTok Affiliate Video Prompt Generator'}
               </p>
@@ -10476,6 +10828,19 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
               >
                 OOTD Template Page
               </button>
+              <button
+                type="button"
+                className={`chip ${pageMode === 'prompt_library' ? 'active' : ''}`}
+                onClick={() => setPageMode('prompt_library')}
+                id="switch-page-prompt-library"
+                style={pageMode === 'prompt_library' ? {
+                  borderColor: '#10b981',
+                  color: '#10b981',
+                  background: 'color-mix(in srgb, #10b981 14%, transparent)',
+                } : {}}
+              >
+                Prompt Library
+              </button>
             </div>
             <select
               className="select-field"
@@ -10493,6 +10858,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
           </div>
         </header>
 
+        {isPromptLibraryPage ? (
+          <PromptLibraryPage />
+        ) : (
+          <>
         {/* Main Layout */}
         <div className="main-layout">
           {/* ─── INPUT PANEL ─── */}
@@ -12131,6 +12500,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
               <p className="prompt-toast-message">{promptToast.message}</p>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
     </>
