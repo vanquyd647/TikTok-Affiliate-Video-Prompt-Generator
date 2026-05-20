@@ -9504,7 +9504,7 @@ function PromptLibraryPage() {
         </div>
         <div className="prompt-library-hero-grid">
           <div>
-            <h2>Prompt Library cho vi tri AI Video Editor Intern</h2>
+            <h2>Prompt Library cho AI Video Editor</h2>
             <p>
               Bo prompt dung san de len y tuong, viet prompt va san xuat video AI cho nghe si/du an truyen thong:
               TikTok, Reels, YouTube Shorts 9:16, voice-over, cat ghep, nhac, subtitle, hieu ung don gian,
