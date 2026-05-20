@@ -8683,79 +8683,255 @@ type PromptLibraryItem = {
   prompt: string
 }
 
-const INTERN_PROMPT_LIBRARY: PromptLibraryItem[] = [
+const PROMPT_LIBRARY_FRAMEWORK_STEPS = [
   {
-    id: 'idea-sprint',
-    title: 'Idea Sprint 9:16',
-    stage: 'Len y tuong',
-    platform: 'TikTok / Reels / Shorts',
-    output: '10 concept co hook, visual, CTA',
-    icon: Sparkles,
-    accent: '#8b5cf6',
-    prompt: `ROLE: You are a senior short-form creative strategist mentoring an AI Video Editor Intern.
-TASK: Generate 10 professional 9:16 video ideas for [ARTIST/PROJECT/BRAND].
-CONTEXT:
-- Objective: [awareness / fan engagement / ticket push / release promo / affiliate conversion]
-- Target audience: [age, interest, region]
-- Key asset available: [photo / product / song / interview clip / behind-the-scenes]
-- Tone: [cinematic / playful / premium / emotional / street / bold]
-
-For each idea, return:
-1. Concept name
-2. 1-line hook for first 2 seconds
-3. Visual sequence in 5 beats
-4. AI assets needed
-5. Editing notes for 9:16
-6. Caption angle
-7. CTA
-
-Constraints:
-- Make it feasible for an intern using AI tools.
-- Prioritize trend-native pacing, clear visual proof, and simple production.
-- Avoid generic ideas. Each concept must have a distinct visual angle.`,
+    title: '1. Art Direction',
+    desc: 'Xac dinh mood & tone cho nghe si/du an: Modern, Cinematic, Y2K, Streetwear Outdoor, Luxury, Emotional.',
   },
   {
-    id: 'image-to-video',
-    title: 'AI Image-To-Video Master Prompt',
-    stage: 'Viet prompt',
-    platform: 'Veo / Runway / Kling / Pika',
-    output: 'Prompt video 8-12s',
+    title: '2. Short-video Strategy',
+    desc: 'Dinh hinh video doc: Hook 3s dau, body cat theo nhip nhac, visual proof, CTA ro rang cho TikTok/Reels/Shorts.',
+  },
+  {
+    title: '3. Developer Logic',
+    desc: 'Dich y tuong thanh layer prompt co cau truc, kiem soat subject, outfit, background, camera, lighting va guardrail.',
+  },
+]
+
+const PROMPT_LAYERING_FORMULA = '[Subject/Artist Style] + [Outfit & Textures] + [Environment/Background] + [Camera Movement & Angle] + [Lighting & Render Engine]'
+
+const INTERN_PROMPT_LIBRARY: PromptLibraryItem[] = [
+  {
+    id: 'workflow-strategy',
+    title: 'Framework y tuong & quy trinh san xuat cap toc',
+    stage: 'Workflow',
+    platform: 'TikTok / Reels / Shorts',
+    output: 'Art direction -> Strategy -> Prompt layers',
+    icon: Sparkles,
+    accent: '#8b5cf6',
+    prompt: `ROLE: You are an AI Video Editor Intern with strong creative direction and developer-style prompt logic.
+TASK: Build a complete 9:16 AI video workflow for [ARTIST / PROJECT / CAMPAIGN].
+
+STEP 1 - ART DIRECTION:
+- Define mood & tone: [Modern / Cinematic / Y2K / Streetwear Outdoor / Luxury / Emotional / Performance-driven].
+- Define artist image: wardrobe attitude, visual world, color palette, facial energy, movement language.
+- Define reference direction without copying any creator exactly.
+
+STEP 2 - SHORT-VIDEO STRATEGY:
+- Structure: Hook first 3 seconds -> Body transitions synced to music -> CTA or memorable ending.
+- Platform: TikTok / Instagram Reels / YouTube Shorts, vertical 9:16.
+- Retention rule: introduce a new visual beat every 3-5 seconds.
+- Editing rule: keep cuts readable, subtitles safe, face/outfit/product unobstructed.
+
+STEP 3 - DEVELOPER LOGIC:
+- Convert the idea into prompt layers:
+  [Subject/Artist Style] + [Outfit & Textures] + [Environment/Background] + [Camera Movement & Angle] + [Lighting & Render Engine]
+- Split output into: image prompt, video prompt, voice-over, subtitle, music/effect note, export checklist.
+
+RETURN:
+1. One-line creative concept
+2. Mood board keywords
+3. 5-beat vertical video structure
+4. Prompt layer breakdown
+5. Tools to use: [Midjourney / VEO3 / Higgsfield / CapCut / Premiere]
+6. Risk notes and safe wording`,
+  },
+  {
+    id: 'prompt-layering',
+    title: 'Prompt Layering System',
+    stage: 'Prompt Logic',
+    platform: 'VEO3 / Higgsfield / Midjourney',
+    output: 'Cong thuc prompt co the tai su dung',
     icon: Film,
     accent: '#06b6d4',
-    prompt: `Create a vertical 9:16 AI video from the provided reference image.
+    prompt: `Use this fixed prompt architecture for professional AI video generation:
+
+FORMULA:
+[Subject/Artist Style] + [Outfit & Textures] + [Environment/Background] + [Camera Movement & Angle] + [Lighting & Render Engine]
 
 SUBJECT:
-[Describe artist/product/person/outfit precisely. Preserve identity, clothing, logo, and key details.]
+- [Artist/talent/model description], age range, attitude, expression, pose language, performance energy.
+- Keep identity consistent with reference assets if provided.
 
-SCENE:
-[Location, mood, props, background, time of day.]
+OUTFIT & TEXTURES:
+- [Garment type], [fit], [silhouette], [fabric], [texture], [accessories].
+- Example: detailed streetwear fabric weave, reflective leather jacket, high-fidelity silk texture, tailored body-con silhouette.
 
-ACTION:
-The subject starts with [opening pose/action], then [micro movement], ending with [final pose/action].
+ENVIRONMENT:
+- [Studio / streetwear outdoor / backstage / rooftop / neon city / clean fashion showroom].
+- Include background objects only if they support the artist/project message.
 
 CAMERA:
-Vertical 9:16, social-native framing, [close-up / medium shot / full body], smooth handheld or slow push-in, natural parallax, no sudden camera jumps.
+- [3/4 Front Left View / 3/4 Front Right View / close-up / full-body / low-angle hero / smooth panning].
+- Define camera position by placement, not body anatomy.
+
+LIGHTING & RENDER:
+- [cinematic softbox / golden hour / neon rim light / high fashion editorial / hyper-realistic render / natural skin tone].
+
+NEGATIVE CONTROL:
+- no face morphing, no extra limbs, no warped logos, no unstable clothes, no random text, no oversexualized framing, no flicker.`,
+  },
+  {
+    id: 'camera-control',
+    title: 'Camera Control & Motion Commands',
+    stage: 'Camera',
+    platform: 'VEO3 / Higgsfield / Runway',
+    output: 'Goc may 3/4 va motion muot',
+    icon: Camera,
+    accent: '#38bdf8',
+    prompt: `CAMERA CONTROL PROMPT BLOCK:
+
+3/4 FRONT LEFT VIEW:
+Set the camera in front of the subject, slightly to the subject's left side, around a 45-degree angle from center. Keep the face, outfit silhouette, and expression visible. Use this for artist lookbook, outfit reveal, performance close-up, and fashion editorial framing.
+
+3/4 FRONT RIGHT VIEW:
+Set the camera in front of the subject, slightly to the subject's right side, around a 45-degree angle from center. Define the camera position clearly by camera placement, not body anatomy. Keep the body readable and avoid twisted posture.
+
+SMOOTH MOTION COMMANDS:
+- cinematic slow motion
+- smooth panning
+- subtle camera drift
+- gentle dolly-in
+- stabilized handheld movement
+- realistic cloth physics
+- hyper-realistic physics
+- natural body movement
+- clean motion interpolation
+
+NEGATIVE MOTION CONTROL:
+No shaky jitter, no sudden zoom jump, no rubber body, no sliding feet, no flickering clothes, no duplicated subject, no distorted hands, no camera teleport.
+
+COPY-READY VIDEO LINE:
+Vertical 9:16 cinematic short video, 3/4 Front Left View, smooth panning with subtle camera drift, natural body movement, realistic cloth physics, clean facial consistency, fashion editorial lighting, hyper-realistic render, no jitter, no morphing.`,
+  },
+  {
+    id: 'fashion-texture',
+    title: 'Fashion & Texture cho nghe si',
+    stage: 'Visual Fashion',
+    platform: 'Midjourney / VEO3 / Higgsfield',
+    output: 'Chat lieu, outfit, visual nghe si',
+    icon: Shirt,
+    accent: '#ec4899',
+    prompt: `FASHION & TEXTURE PROMPT BLOCK:
+
+Use these texture keywords when building artist visuals:
+- high-fidelity silk texture
+- detailed streetwear fabric weave
+- reflective leather
+- premium denim grain
+- satin highlight rolloff
+- ribbed knit texture
+- sheer organza layering
+- metallic accessory reflection
+- body-con silhouette
+- oversized streetwear silhouette
+- tailored blazer structure
+- outdoor performance styling
+
+ARTIST VISUAL STYLE TEMPLATE:
+[Artist/talent] wearing [outfit description] with [fabric texture], styled for [music video / social campaign / fashion lookbook], in [environment], with [camera angle], [lighting], and [render style].
+
+EXAMPLE:
+Young Vietnamese music artist wearing an oversized black streetwear jacket with detailed fabric weave, reflective leather boots, silver accessories, standing in a night city outdoor environment, 3/4 Front Right View, subtle camera drift, neon rim light, cinematic high-fashion editorial render, vertical 9:16.
+
+QUALITY CONTROL:
+Keep garment details readable, avoid random logos, avoid warped jewelry, preserve clean silhouette, keep face and outfit unobstructed.`,
+  },
+  {
+    id: 'safe-terms',
+    title: 'Safe Terms Guardrail',
+    stage: 'Policy-safe wording',
+    platform: 'All AI tools',
+    output: 'Tu khoa thay the an toan',
+    icon: AlertCircle,
+    accent: '#f59e0b',
+    prompt: `SAFE TERMS GUARDRAIL FOR FASHION / TALENT / OUTDOOR VISUALS:
+
+Use refined, production-safe wording:
+- shapewear instead of overly explicit body-focused wording
+- tailored swimwear instead of provocative swim wording
+- aerodynamic athletic wear instead of sexualized sportswear wording
+- body-con silhouette instead of explicit body emphasis
+- sculpted fit instead of suggestive framing
+- elegant fitted styling instead of revealing/sexy wording
+- confidence-forward pose instead of provocative pose
+- fashion editorial framing instead of sensual framing
+- tasteful silhouette emphasis instead of body-focused emphasis
+
+GUARDRAIL RULE:
+Describe garment structure, styling purpose, movement, and confidence. Do not describe nudity, explicit body parts, or sexual behavior. Keep the subject adult, professionally styled, and campaign-safe.
+
+SAFE COPY-READY LINE:
+The model wears elegant fitted styling with a sculpted silhouette, tailored swimwear-inspired structure, confidence-forward pose, fashion editorial framing, tasteful outdoor campaign energy, no explicit or sexualized framing.`,
+  },
+  {
+    id: 'veo-higgsfield-video',
+    title: 'VEO3 / Higgsfield Image-to-Video',
+    stage: 'AI Video Production',
+    platform: 'VEO3 / Higgsfield',
+    output: 'Prompt video 8-12s',
+    icon: Wand2,
+    accent: '#22c55e',
+    prompt: `Create a vertical 9:16 AI video from the provided artist/product reference.
+
+SUBJECT / ARTIST STYLE:
+[Artist/talent/model], [expression], [pose], [performance energy], preserve identity from reference.
+
+OUTFIT & TEXTURE:
+[Outfit], [fabric texture], [silhouette], [accessory details], keep garment fidelity.
+
+ENVIRONMENT / BACKGROUND:
+[Modern studio / streetwear outdoor / rooftop / backstage / neon city / fashion showroom], clean background hierarchy.
+
+ACTION:
+[Opening pose] -> [micro movement synced to music] -> [final hero frame for CTA].
+
+CAMERA:
+Vertical 9:16, [3/4 Front Left View / 3/4 Front Right View], smooth panning, subtle camera drift, stabilized handheld feel, clear face and outfit readability.
 
 LIGHTING:
-[Soft window light / neon night / studio key light / golden hour], realistic shadows, clean skin tone, readable product details.
+[Cinematic softbox / neon rim light / golden hour / clean editorial lighting], natural skin tone, realistic cloth shadows.
 
-STYLE:
-[cinematic / fashion editorial / music promo / authentic TikTok / premium commercial], realistic motion, high detail, no distortion.
+RENDER:
+Hyper-realistic physics, realistic cloth movement, premium music-promo look, clean high-detail render.
 
 EDIT INTENT:
-Leave clean space for subtitles in lower third. Create a strong first-frame hook and a clean final frame for CTA.
+Leave safe lower-third space for subtitles. Strong first frame, clean final frame.
 
 NEGATIVE:
-No extra fingers, no face morphing, no text artifacts, no duplicated bodies, no warped logos, no unstable background, no low-res blur.`,
+No face morphing, no extra limbs, no warped logos, no flickering clothes, no random text, no shaky jitter, no low-res blur.`,
+  },
+  {
+    id: 'midjourney-moodboard',
+    title: 'Midjourney Moodboard cho nghe si',
+    stage: 'Moodboard',
+    platform: 'Midjourney',
+    output: 'Visual reference / key art',
+    icon: ImageIcon,
+    accent: '#a855f7',
+    prompt: `/imagine prompt:
+[Artist/talent style], [campaign mood], [outfit & texture], [environment], [camera angle], [lighting], [art direction], [render quality]
+
+Example:
+Vietnamese pop artist in a modern cinematic streetwear outdoor campaign, oversized technical jacket with detailed fabric weave, reflective leather accessories, neon city background, 3/4 Front Left View, low-angle fashion editorial camera, cinematic rim light, high-fidelity skin texture, premium music video key art, clean composition, vertical poster crop --ar 9:16 --style raw
+
+NEGATIVE / AVOID:
+random text, distorted face, extra fingers, warped logo, messy background, copied celebrity identity, oversexualized framing.
+
+USE FOR:
+- Artist visual moodboard
+- Cover frame
+- AI video first-frame reference
+- Creative direction handoff to Content/Creative team`,
   },
   {
     id: 'shot-list',
-    title: 'Shot List Tu Concept',
-    stage: 'San xuat',
-    platform: 'CapCut / Premiere / AI editor',
-    output: 'Timeline 24-35s',
+    title: 'Shot List & timeline dung video co ban',
+    stage: 'Editing Plan',
+    platform: 'CapCut / Premiere / DaVinci',
+    output: 'Timeline 9:16 theo timestamp',
     icon: Clapperboard,
-    accent: '#ec4899',
+    accent: '#14b8a6',
     prompt: `Convert this concept into a production-ready vertical 9:16 shot list.
 
 CONCEPT:
@@ -8786,13 +8962,13 @@ Rules:
   },
   {
     id: 'voice-over',
-    title: 'Voice-Over Script',
-    stage: 'Voice-over',
+    title: 'Voice-over, music, subtitle pack',
+    stage: 'Post-production',
     platform: 'ElevenLabs / CapCut / TTS',
-    output: 'Script doc theo timestamp',
+    output: 'VO + subtitle + music cue',
     icon: MessageSquare,
     accent: '#10b981',
-    prompt: `Write a professional voice-over script for a vertical short-form video.
+    prompt: `Create the post-production pack for a 9:16 short-form video.
 
 VIDEO TOPIC:
 [Topic / artist / project / product]
@@ -8808,23 +8984,26 @@ DURATION:
 
 Return:
 1. Full voice-over script
-2. Timestamped lines
-3. Subtitle-ready version, short line breaks
-4. 3 alternate hooks
-5. 3 CTA endings
+2. Timestamped voice-over lines
+3. Subtitle-ready version with short line breaks
+4. Music direction: genre, BPM feel, beat-drop moment
+5. Simple effect notes: speed ramp, zoom, light leak, blur, flash, match cut
+6. 3 alternate hooks
+7. 3 CTA endings
 
 Rules:
 - Spoken language must sound natural, not corporate.
 - Sentence length should fit TikTok/Reels pacing.
 - Avoid overexplaining. Make every sentence visual and useful.
-- Add pauses where the edit needs impact.`,
+- Add pauses where the edit needs impact.
+- Subtitles must not cover face, outfit, logo, or key product detail.`,
   },
   {
     id: 'subtitle-pack',
-    title: 'Subtitle & Text Overlay Pack',
+    title: 'Subtitle & text overlay QC',
     stage: 'Subtitle',
     platform: 'CapCut / Premiere',
-    output: 'Caption lines va style guide',
+    output: 'Caption style & safe area',
     icon: FileText,
     accent: '#f59e0b',
     prompt: `Create subtitle and on-screen text for a 9:16 short video.
@@ -8885,10 +9064,10 @@ Rules:
   },
   {
     id: 'trend-adapter',
-    title: 'Trend Adapter',
-    stage: 'Cap nhat xu huong',
+    title: 'AI & TikTok Trend Adapter',
+    stage: 'Trend Research',
     platform: 'TikTok research',
-    output: 'Bien trend thanh format dung duoc',
+    output: 'Bien trend thanh format cho du an',
     icon: TrendingUp,
     accent: '#38bdf8',
     prompt: `Analyze this TikTok/Reels trend and adapt it for [ARTIST/PROJECT/BRAND].
@@ -8918,8 +9097,8 @@ Rules:
   },
   {
     id: 'team-brief',
-    title: 'Creative Team Handoff',
-    stage: 'Phoi hop team',
+    title: 'Creative Team Handoff cho nghe si/du an',
+    stage: 'Team Workflow',
     platform: 'Content / Creative',
     output: 'Brief giao viec ro rang',
     icon: Palette,
@@ -8953,6 +9132,13 @@ Professional, clear, easy for a team to execute.`,
 ]
 
 function PromptLibraryPage() {
+  const frameworkText = [
+    'AI VIDEO EDITOR INTERN WORKFLOW',
+    ...PROMPT_LIBRARY_FRAMEWORK_STEPS.map((step) => `${step.title}: ${step.desc}`),
+    '',
+    `PROMPT LAYERING FORMULA: ${PROMPT_LAYERING_FORMULA}`,
+  ].join('\n')
+
   const fullLibraryText = INTERN_PROMPT_LIBRARY
     .map((item, index) => `${index + 1}. ${item.title}\nSTAGE: ${item.stage}\nOUTPUT: ${item.output}\n\n${item.prompt}`)
     .join('\n\n---\n\n')
@@ -8966,23 +9152,52 @@ function PromptLibraryPage() {
         </div>
         <div className="prompt-library-hero-grid">
           <div>
-            <h2>Bo prompt dung san cho san xuat video AI chuyen nghiep</h2>
+            <h2>Prompt Library cho vi tri AI Video Editor Intern</h2>
             <p>
-              Thu vien nay gom cac prompt theo dung workflow: len y tuong, viet prompt,
-              san xuat video 9:16, voice-over, cat ghep, subtitle, trend research va handoff cho team Content/Creative.
+              Bo prompt dung san de len y tuong, viet prompt va san xuat video AI cho nghe si/du an truyen thong:
+              TikTok, Reels, YouTube Shorts 9:16, voice-over, cat ghep, nhac, subtitle, hieu ung don gian,
+              lam viec cung team Content/Creative va cap nhat trend AI/TikTok.
             </p>
           </div>
           <div className="prompt-library-actions">
-            <CopyButton text={fullLibraryText} />
+            <CopyButton text={`${frameworkText}\n\n---\n\n${fullLibraryText}`} />
             <span>Copy full toolkit</span>
           </div>
         </div>
       </section>
 
       <section className="prompt-library-workflow" aria-label="AI Video Editor Intern workflow">
-        {['Idea', 'Prompt', 'Production', 'Voice', 'Edit', 'Publish'].map((step) => (
+        {['Art Direction', 'Short-video Strategy', 'Developer Logic', 'Prompt Layering', 'AI Video', 'Post-production'].map((step) => (
           <div key={step} className="prompt-library-step">{step}</div>
         ))}
+      </section>
+
+      <section className="prompt-library-framework">
+        <div className="prompt-library-framework-main">
+          <div className="card-title">
+            <Layers /> Framework y tuong & quy trinh san xuat cap toc
+          </div>
+          <div className="prompt-library-framework-grid">
+            {PROMPT_LIBRARY_FRAMEWORK_STEPS.map((step) => (
+              <div key={step.title} className="prompt-library-framework-item">
+                <h3>{step.title}</h3>
+                <p>{step.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="prompt-library-formula">
+          <div className="card-title">
+            <FileText /> Prompt Layering Formula
+            <CopyButton text={PROMPT_LAYERING_FORMULA} />
+          </div>
+          <code>{PROMPT_LAYERING_FORMULA}</code>
+          <p>
+            Cong thuc nay giup intern dich brief nghe thuat thanh prompt co logic,
+            giam loi bien dang va de handoff cho team san xuat.
+          </p>
+        </div>
       </section>
 
       <section className="prompt-library-grid">
