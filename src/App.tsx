@@ -8683,6 +8683,23 @@ type PromptLibraryItem = {
   prompt: string
 }
 
+type PromptShotCommand = {
+  id: string
+  title: string
+  english: string
+  purpose: string
+}
+
+type ProductImagePromptPreset = {
+  id: string
+  title: string
+  bodyOption: string
+  hairOption: string
+  outfitReference: string
+  useCase: string
+  prompt: string
+}
+
 const PROMPT_LIBRARY_FRAMEWORK_STEPS = [
   {
     title: '1. Art Direction',
@@ -8699,6 +8716,316 @@ const PROMPT_LIBRARY_FRAMEWORK_STEPS = [
 ]
 
 const PROMPT_LAYERING_FORMULA = '[Subject/Artist Style] + [Outfit & Textures] + [Environment/Background] + [Camera Movement & Angle] + [Lighting & Render Engine]'
+
+const PROMPT_LIBRARY_SHOT_COMMANDS: PromptShotCommand[] = [
+  {
+    id: 'front-bodice',
+    title: 'Lenh 1: Goc truoc - Ton vong 1 va chi tiet mat truoc trang phuc',
+    english: 'Front View - Bust Line, Bodice Fit, and Front Outfit Detail Focus',
+    purpose: 'Dung cho anh/video mo dau de thay ro phom than tren, cau truc cup/nguc ao, corset, nut, khoa, hoa tiet va do om cua trang phuc.',
+  },
+  {
+    id: 'back-silhouette',
+    title: 'Lenh 2: Goc sau - Diem nhan duong cong vong 3 va phom dang phia sau',
+    english: 'Back View - Back Silhouette, Hip/Glute Contour, and Rear Outfit Construction Focus',
+    purpose: 'Dung de kiem tra phom dang phia sau, duong may, do om, day dan corset, khoa keo, tui sau va ty le eo-hong mot cach thoi trang, khong phan cam.',
+  },
+  {
+    id: 'side-profile',
+    title: 'Lenh 3: Goc nghieng 90 do - Toi da hoa duong cong chu S',
+    english: 'Full Side Profile - Maximizing the S-Curve, Posture, and Garment Fit',
+    purpose: 'Dung cho lookbook hoac video body profile, the hien tu the, do dung phom, do om eo-hong va cach chat lieu nam tren co the.',
+  },
+  {
+    id: 'front-three-quarter',
+    title: 'Lenh 4: Goc cheo truoc 3/4 - Can bang than tren va hong',
+    english: 'Dynamic 3/4 Front View - Balanced Bust, Waist, and Hip Proportion Showcase',
+    purpose: 'Goc chuyen nghiep cho nghe si/model, giup thay dong thoi bieu cam, than tren, eo, hong va chuyen dong outfit.',
+  },
+  {
+    id: 'back-three-quarter',
+    title: 'Lenh 5: Goc cheo sau 3/4 - Duong cong vong 3 va chi tiet lung',
+    english: 'Dynamic 3/4 Back View - Glute Curve, Waist-to-Hip Ratio, and Back Detail Focus',
+    purpose: 'Dung cho corset, vay om, quan jeans, do the thao hoac look co chi tiet mat sau nhu day dan, cat cup, tui, seam line.',
+  },
+  {
+    id: 'top-closeup',
+    title: 'Lenh 6: Can canh than tren - Chat lieu phan ao va corset/bodice',
+    english: 'Close-up of the Top/Bodice - Fabric Texture, Fit, Neckline, and Corset Detail Focus',
+    purpose: 'Tap trung vao ren, lua, cup ao, neckline, vai, tay ao, day dan, nut, khoa va texture ma khong lam mat tong the thoi trang.',
+  },
+  {
+    id: 'bottom-closeup',
+    title: 'Lenh 7: Can canh than duoi - Do om sat va duong net hong/vong 3',
+    english: 'Close-up of the Bottom - Outfit Fit, Fabric Sheen, Hip Line, and Lower Silhouette Focus',
+    purpose: 'Dung de khoe chat lieu satin, denim, da, thun co gian, do bong, do day vai va cach vay/quan giu phom o vung hong.',
+  },
+  {
+    id: 'macro-texture',
+    title: 'Lenh 8: Can canh cuc dai Macro - Chat lieu, duong may va phu kien',
+    english: 'Extreme Close-up / Macro Shot - Fabric Texture, Fine Stitching, Patterns, and Hardware Focus',
+    purpose: 'Zoom sat vao ren, lua, da, denim, nut, khoa keo, hoa tiet theu, hat dinh, phu kien de khoe do sac net san pham.',
+  },
+  {
+    id: 'full-body-lookbook',
+    title: 'Lenh 9: Truc dien toan than Lookbook - Tron ven thiet ke va phom dang',
+    english: 'Full Body Clear View - Head-to-Toe Showcase of Outfit Design, Proportions, and Overall Fit',
+    purpose: 'Anh/video catalog chuan form, thay ro toan bo trang phuc tu dau den chan, ty le phoi do va tong the silhouette.',
+  },
+  {
+    id: 'layered-outerwear',
+    title: 'Lenh 10: Tach lop trang phuc - Ao khoac/lop ngoai mo nhe',
+    english: 'Open Outerwear / Layered Detail View - Inner Lining, Construction, and Layering Focus',
+    purpose: 'Dung cho jacket, coat, suit, blazer, ao khoac nhieu lop de hien ro lop lot, cau truc may va cach phoi voi lop ben trong.',
+  },
+  {
+    id: 'movement-shot',
+    title: 'Lenh 11: Goc bat khoanh khac chuyen dong - Do ru va tung bay cua chat lieu',
+    english: 'Dynamic Action / Movement Shot - Capturing Fabric Drape, Flow, and Garment Movement',
+    purpose: 'Dung khi model buoc di, xoay nguoi, hat toc, tao chuyen dong cho vay xe, quan suong, ao lua, chiffon, organza.',
+  },
+  {
+    id: 'upper-detail',
+    title: 'Lenh 12: Dac ta vien co, vai va tay ao - Cau truc than tren',
+    english: 'Upper Detail Shot - Neckline, Shoulder Construction, Sleeves, and Collar Focus',
+    purpose: 'Tap trung vao co V, cup nguc, co yem, be nhun vai, tay phong, tay om, lapel, collar va diem cat may than tren.',
+  },
+  {
+    id: 'seated-leaning',
+    title: 'Lenh 13: Tu the ngoi hoac nghieng nguoi - Do co gian va giu phom',
+    english: 'Seated or Leaning Pose - Fabric Stretch, Resilience, and Fit Under Tension',
+    purpose: 'Kiem tra do co gian cua jeans, do om, activewear, do thun; xem trang phuc co giu phom khi doi tu the hay khong.',
+  },
+  {
+    id: 'rim-lighting',
+    title: 'Lenh 14: Anh sang nguoc/ven - Vien phom dang va do mong nhe cua chat lieu',
+    english: 'Backlit / Rim Lighting Shot - Silhouette Precision, Edge Contours, and Fabric Sheerness Focus',
+    purpose: 'Dung cho ren, voan, luoi, lua mong, hoac outfit co contour ro; anh sang ven lam noi bat duong cat va vien silhouette.',
+  },
+  {
+    id: 'midsection-detail',
+    title: 'Lenh 15: Dac ta eo, dai quan/vay va tui - Tien ich va diem noi',
+    english: 'Midsection Detail - Waistband, Belt Loops, Pockets, and Seam Transitions Focus',
+    purpose: 'Can canh khu vuc eo-hong de thay cap quan/vay, ly xep, tui, that lung, seam transition va chat luong gia cong.',
+  },
+]
+
+const PRODUCT_IMAGE_BODY_OPTIONS = [
+  'Natural golden-ratio silhouette',
+  'Tall statuesque fashion model',
+  'Curvy hourglass product-fit profile',
+  'Lean athletic editorial profile',
+  'Soft feminine catalog profile',
+] as const
+
+const PRODUCT_IMAGE_HAIR_OPTIONS = [
+  'deep burgundy-red soft waves',
+  'deep burgundy-red elegant curled hair',
+  'deep burgundy-red office bun',
+  'soft black glossy waves',
+  'clean high ponytail',
+] as const
+
+const PRODUCT_IMAGE_PROMPT_PRESETS: ProductImagePromptPreset[] = [
+  {
+    id: 'front-back-product-demo',
+    title: 'Product Demo Split-Screen Front / Back',
+    bodyOption: 'Tall statuesque fashion model',
+    hairOption: 'deep burgundy-red soft waves',
+    outfitReference: 'IMAGE_1, IMAGE_2, IMAGE_3 outfit references',
+    useCase: 'Full product view for catalog, landing page, and AI video first-frame reference.',
+    prompt: `Create a vertical portrait product demo image in TRUE 9:16 ratio, UHD 8K.
+
+INPUT REFERENCES:
+- IMAGE_0: facial likeness and identity reference only.
+- IMAGE_1, IMAGE_2, IMAGE_3: outfit, garment structure, fabric, color, accessories, and footwear reference.
+
+FACIAL LIKENESS:
+Render a hyper-realistic photographic likeness based on IMAGE_0. Preserve face shape, eyes, nose, lips, skin texture, and expression style.
+
+REFERENCE IMAGE OVERRIDES:
+Do not reuse the old outfit from IMAGE_0. Use the outfit shown in IMAGE_1, IMAGE_2, IMAGE_3. Preserve garment design exactly: no redesign, no reinterpretation, no added handbags, no price tags, no security devices, no random labels.
+
+MODEL OPTIONS:
+- Real adult female model, not a mannequin or doll.
+- Tall fashion-model proportion, approximately 180cm.
+- Body profile: tall statuesque fashion model with a refined hourglass silhouette.
+- Hair: deep burgundy-red soft waves.
+- Makeup: polished high-fashion beauty makeup.
+
+GARMENT FIT:
+The garment fits closely and follows the model's natural silhouette. Fabric tension, seam placement, embroidery, lace, piping, buttons, sheer panels, and hardware must be razor-sharp and accurate. Complex prints or embroidery must follow the body curvature naturally without distortion.
+
+LAYOUT:
+Split-screen layout with TWO FULL VIEWS:
+- Left panel: FRONT VIEW, full model including face.
+- Right panel: BACK VIEW, full model showing the back of the garment, rear silhouette, hair, and head.
+Both panels must show the full product perfectly framed from head to high heels.
+
+LIGHTING & BACKGROUND:
+Clean studio lighting, texture-enhancing rim light, product-color contrast background, crisp shadow separation.
+
+TEXT:
+Small clean English note at the bottom: "PRODUCT DEMO - REAL MODEL DISPLAY WITH FACIAL LIKENESS"
+Minimal labels: FRONT VIEW, BACK VIEW.
+
+NEGATIVE:
+No face morphing, no warped hands, no distorted garment, no extra accessories, no random text, no fused slits, no missing heels, no mannequin look.`,
+  },
+  {
+    id: 'golden-ratio-studio',
+    title: 'Natural Golden-Ratio Studio Demo',
+    bodyOption: 'Natural golden-ratio silhouette',
+    hairOption: 'deep burgundy-red elegant curled hair',
+    outfitReference: 'IMAGE_1+ outfit reference, IMAGE_0 face reference',
+    useCase: 'Safer clean product showcase when the tool rejects extreme body wording.',
+    prompt: `Create a vertical portrait product demo image in TRUE 9:16 ratio, UHD 8K.
+
+PURPOSE:
+Real model fashion product display generated from input portrait and outfit references.
+
+REFERENCES:
+- IMAGE_0 controls facial likeness only.
+- IMAGE_1, IMAGE_2, IMAGE_3 control outfit design, fabric, trim, accessories, and footwear.
+
+MODEL:
+Real adult female model with exact facial likeness from IMAGE_0. Tall 180cm runway-inspired proportion, porcelain skin with realistic pores and natural soft tissue behavior.
+
+BODY PROFILE:
+Natural golden-ratio silhouette: slender defined waist, balanced bust, naturally rounded hips, elegant posture, athletic and graceful proportions. The outfit should enhance natural curves without distortion.
+
+HAIR & MAKEUP:
+Deep burgundy-red elegant curled hair. Exquisite high-fashion makeup with clean skin finish, defined eyes, and polished lips.
+
+GARMENT RULE:
+Preserve the referenced garment exactly. Render embroidery, lace, frog buttons, piping, sequins, sheer panels, slits, seams, waistband, pockets, and hardware with razor-sharp clarity. Remove labels, price tags, and security devices.
+
+FRAMING:
+If top or short dress: torso focus from upper thighs up including full face.
+If pants, long dress, jumpsuit, ao dai, qipao, or gown: full body from face to high heels.
+
+FABRIC PHYSICS:
+Heavy fabrics hang cleanly. Light fabrics flow softly. Form-fit garments show natural fabric tension and realistic seam behavior.
+
+LIGHTING:
+Clean contrast studio background, rim light for texture, premium catalog photography.
+
+NEGATIVE:
+No redesign, no copied old outfit from IMAGE_0, no handbags, no random text, no unnatural body proportions, no distorted fabric pattern.`,
+  },
+  {
+    id: 'corset-mermaid-skirt',
+    title: 'Corset + Long Mermaid Silk Skirt',
+    bodyOption: 'Curvy hourglass product-fit profile',
+    hairOption: 'deep burgundy-red youthful volume waves',
+    outfitReference: 'Corset top + vanilla long mermaid silk skirt references',
+    useCase: 'Fashion-fit prompt for corset and fitted skirt product pages.',
+    prompt: `Create a vertical portrait product demo in TRUE 9:16 ratio, UHD 8K.
+
+INPUT:
+- IMAGE_0: facial likeness reference only.
+- IMAGE_1, IMAGE_2, IMAGE_3: corset top, long vanilla mermaid silk skirt, jewelry, and high heels reference.
+
+MODEL:
+Real adult female model, exact facial likeness from IMAGE_0, tall 180cm representation, porcelain skin with realistic texture.
+
+STYLE:
+Douyin-inspired glamorous beauty makeup, luminous but still realistic. Deep burgundy-red youthful volume waves.
+
+BODY & FIT:
+Curvy hourglass product-fit profile with defined waist, full natural bust line, and rounded hip silhouette. The garment follows the model's natural shape with smooth fabric tension and refined catalog styling.
+
+GARMENT DETAILS:
+Preserve the corset and silk mermaid skirt exactly. Render lace, boning, seams, satin sheen, waist transition, skirt contour, hem flow, jewelry, and high heels with high clarity. No labels, no price tags, no security devices, no added handbags.
+
+POSE & FRAMING:
+Full body, face to high heels. Elegant studio stance with one hip subtly shifted so the skirt shape and waist-to-hem flow are visible. Keep hands relaxed and away from key garment details.
+
+LIGHTING:
+Clean studio lighting, rim light along hair and fabric edge, background color contrasting with vanilla skirt.
+
+ANNOTATION:
+Bottom note: "PRODUCT DEMO - REAL MODEL DISPLAY WITH FACIAL LIKENESS"
+Optional labels: FRONT VIEW, BACK VIEW, DETAIL VIEW.
+
+NEGATIVE:
+No garment redesign, no unnatural anatomy, no distorted corset lines, no melted fabric, no random accessories, no text artifacts.`,
+  },
+  {
+    id: 'ao-dai-qipao-detail',
+    title: 'Ao Dai / Qipao Intricate Detail Demo',
+    bodyOption: 'Tall statuesque fashion model',
+    hairOption: 'deep burgundy-red office bun',
+    outfitReference: 'Ao Dai, qipao, cheongsam, brocade, frog-button references',
+    useCase: 'Best for slit construction, embroidery, frog buttons, brocade, and formal styling.',
+    prompt: `Create a vertical portrait product demo image in TRUE 9:16 ratio, UHD 8K.
+
+REFERENCES:
+- IMAGE_0: exact facial likeness only.
+- IMAGE_1, IMAGE_2, IMAGE_3: ao dai/qipao/cheongsam garment, jewelry, heels, brocade, trims, and styling.
+
+MODEL:
+Real adult female model with exact face from IMAGE_0, tall 180cm representation, elegant posture, porcelain skin texture.
+
+HAIR & MAKEUP:
+Deep burgundy-red office bun. Refined Douyin-inspired makeup with polished eyes, soft glow, and elegant lips.
+
+GARMENT PRESERVATION:
+Use the referenced ao dai/qipao design exactly. Preserve collar height, frog buttons, brocade pattern, embroidery, piping, sleeve length, side slit construction, and hem shape. No redesign, no reinterpretation.
+
+FIT:
+Tall statuesque fashion-model profile with defined waist and refined hourglass silhouette. Fabric follows natural body contours while keeping the garment structure believable.
+
+SLIT & POSE:
+If the garment has side slits, model stands with one leg slightly forward or hips subtly shifted so the slit opens naturally and shows flap construction. Slits must be clearly separated, not fused.
+
+LAYOUT:
+Create a clean product demo with either:
+- Split-screen FRONT VIEW and BACK VIEW, or
+- Single full-body FRONT VIEW plus macro detail inserts for collar, buttons, embroidery, and side slit.
+
+LIGHTING:
+Texture-enhancing studio lighting, crisp rim light for embroidery and brocade relief, high-contrast background.
+
+NEGATIVE:
+No fused slits, no blurred embroidery, no extra bags, no random labels, no mannequin skin, no face mismatch.`,
+  },
+  {
+    id: 'body-hair-option-template',
+    title: 'Custom Body + Hair Option Template',
+    bodyOption: 'Choose from option list',
+    hairOption: 'Choose from option list',
+    outfitReference: 'Any product/outfit reference image set',
+    useCase: 'Reusable master prompt with swappable body, hair, makeup, and framing options.',
+    prompt: `Create a vertical portrait product demo image in TRUE 9:16 ratio, UHD 8K.
+
+VARIABLES:
+- FACE_REFERENCE: IMAGE_0
+- OUTFIT_REFERENCE: IMAGE_1, IMAGE_2, IMAGE_3
+- BODY_PROFILE: [Natural golden-ratio silhouette / Tall statuesque fashion model / Curvy hourglass product-fit profile / Lean athletic editorial profile / Soft feminine catalog profile]
+- HAIR_STYLE: [deep burgundy-red soft waves / deep burgundy-red elegant curled hair / deep burgundy-red office bun / soft black glossy waves / clean high ponytail]
+- MAKEUP_STYLE: [high-fashion beauty / Douyin-inspired glow / clean catalog makeup / luxury evening makeup]
+- FRAMING: [front-back split screen / full body single view / side profile / 3/4 front / 3/4 back / macro detail]
+
+CORE REQUIREMENTS:
+Use IMAGE_0 for exact facial likeness only. Use OUTFIT_REFERENCE for garment, fabric, accessories, and shoes. Do not reuse clothing from IMAGE_0 unless it is also the product reference.
+
+MODEL:
+Real adult female model with hyper-realistic skin texture and natural body behavior. Apply BODY_PROFILE while keeping believable human proportions.
+
+GARMENT:
+Preserve garment exactly. Render fabric texture, embroidery, lace, seams, buttons, trims, sheer panels, slits, pockets, waistband, and hardware in sharp detail. Remove labels, price tags, security devices, and accidental text.
+
+POSE:
+Choose a pose that reveals the product clearly. Keep face visible when required. Keep hands away from important garment details.
+
+LIGHTING:
+Clean studio light, texture rim light, high contrast background, premium product photography.
+
+NEGATIVE:
+No redesign, no extra handbags, no distorted face, no impossible proportions, no warped text, no fused garment cuts, no missing shoes.`,
+  },
+]
 
 const INTERN_PROMPT_LIBRARY: PromptLibraryItem[] = [
   {
@@ -9139,6 +9466,31 @@ function PromptLibraryPage() {
     `PROMPT LAYERING FORMULA: ${PROMPT_LAYERING_FORMULA}`,
   ].join('\n')
 
+  const shotCommandText = [
+    'SHOT COMMAND HEADLINES - FASHION PRODUCT FIT',
+    ...PROMPT_LIBRARY_SHOT_COMMANDS.map((item, index) => [
+      `${index + 1}. ${item.title}`,
+      `EN: ${item.english}`,
+      `PURPOSE: ${item.purpose}`,
+    ].join('\n')),
+  ].join('\n\n')
+
+  const productImageText = [
+    'PRODUCT IMAGE PROMPT LIBRARY - PORTRAIT INPUT TO REAL MODEL PRODUCT DEMO',
+    `BODY OPTIONS: ${PRODUCT_IMAGE_BODY_OPTIONS.join(' / ')}`,
+    `HAIR OPTIONS: ${PRODUCT_IMAGE_HAIR_OPTIONS.join(' / ')}`,
+    '',
+    ...PRODUCT_IMAGE_PROMPT_PRESETS.map((item, index) => [
+      `${index + 1}. ${item.title}`,
+      `BODY: ${item.bodyOption}`,
+      `HAIR: ${item.hairOption}`,
+      `REFERENCE: ${item.outfitReference}`,
+      `USE CASE: ${item.useCase}`,
+      '',
+      item.prompt,
+    ].join('\n')),
+  ].join('\n\n---\n\n')
+
   const fullLibraryText = INTERN_PROMPT_LIBRARY
     .map((item, index) => `${index + 1}. ${item.title}\nSTAGE: ${item.stage}\nOUTPUT: ${item.output}\n\n${item.prompt}`)
     .join('\n\n---\n\n')
@@ -9160,7 +9512,7 @@ function PromptLibraryPage() {
             </p>
           </div>
           <div className="prompt-library-actions">
-            <CopyButton text={`${frameworkText}\n\n---\n\n${fullLibraryText}`} />
+            <CopyButton text={`${frameworkText}\n\n---\n\n${productImageText}\n\n---\n\n${shotCommandText}\n\n---\n\n${fullLibraryText}`} />
             <span>Copy full toolkit</span>
           </div>
         </div>
@@ -9197,6 +9549,98 @@ function PromptLibraryPage() {
             Cong thuc nay giup intern dich brief nghe thuat thanh prompt co logic,
             giam loi bien dang va de handoff cho team san xuat.
           </p>
+        </div>
+      </section>
+
+      <section className="product-image-library-section">
+        <div className="prompt-library-section-head">
+          <div>
+            <div className="card-title">
+              <ImageIcon /> Product Image Prompt Library
+            </div>
+            <h3>Tu anh chan dung input tao model demo san pham</h3>
+            <p>
+              Thu vien nay dung IMAGE_0 lam face reference, IMAGE_1+ lam outfit/product reference,
+              co tuy chon body profile, kieu toc, makeup, front/back split-screen va product detail.
+            </p>
+          </div>
+          <div className="prompt-library-actions">
+            <CopyButton text={productImageText} />
+            <span>Copy product image library</span>
+          </div>
+        </div>
+
+        <div className="product-image-option-grid">
+          <div className="product-image-option-card">
+            <div className="card-title">
+              <Ratio /> Body Options
+            </div>
+            {PRODUCT_IMAGE_BODY_OPTIONS.map((option) => (
+              <span key={option}>{option}</span>
+            ))}
+          </div>
+
+          <div className="product-image-option-card">
+            <div className="card-title">
+              <Palette /> Hair Options
+            </div>
+            {PRODUCT_IMAGE_HAIR_OPTIONS.map((option) => (
+              <span key={option}>{option}</span>
+            ))}
+          </div>
+        </div>
+
+        <div className="product-image-preset-grid">
+          {PRODUCT_IMAGE_PROMPT_PRESETS.map((item) => (
+            <article key={item.id} className="product-image-preset-card">
+              <div className="product-image-preset-head">
+                <div>
+                  <p>{item.useCase}</p>
+                  <h4>{item.title}</h4>
+                </div>
+                <CopyButton text={item.prompt} />
+              </div>
+              <div className="product-image-preset-meta">
+                <span>{item.bodyOption}</span>
+                <span>{item.hairOption}</span>
+                <span>{item.outfitReference}</span>
+              </div>
+              <pre className="prompt-library-prompt product-image-preset-prompt">{item.prompt}</pre>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="prompt-library-shot-section">
+        <div className="prompt-library-section-head">
+          <div>
+            <div className="card-title">
+              <Camera /> Shot Command Headlines
+            </div>
+            <h3>To hop cau lenh goc may de ton phom dang va chi tiet san pham</h3>
+            <p>
+              Cac lenh nay dung cho lookbook, nghe si, fashion campaign va AI video 9:16.
+              Wording duoc viet theo huong product-fit, silhouette va chat lieu de giam rui ro bi AI tool chan.
+            </p>
+          </div>
+          <div className="prompt-library-actions">
+            <CopyButton text={shotCommandText} />
+            <span>Copy shot commands</span>
+          </div>
+        </div>
+
+        <div className="prompt-library-shot-grid">
+          {PROMPT_LIBRARY_SHOT_COMMANDS.map((item, index) => (
+            <article key={item.id} className="prompt-library-shot-card">
+              <div className="prompt-library-shot-index">{String(index + 1).padStart(2, '0')}</div>
+              <div className="prompt-library-shot-body">
+                <h4>{item.title}</h4>
+                <p className="prompt-library-shot-en">{item.english}</p>
+                <p>{item.purpose}</p>
+              </div>
+              <CopyButton text={`${item.title}\n(${item.english})\n\nMuc dich: ${item.purpose}`} />
+            </article>
+          ))}
         </div>
       </section>
 
