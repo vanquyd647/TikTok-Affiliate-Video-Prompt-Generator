@@ -44,6 +44,7 @@ interface GenerateResult {
   keyframes: KeyframePrompt[]
   scenes: ScenePrompt[]
   createImagePrompt?: string
+  musicVideoPromptMarkdown?: string
   lookbookImagePrompts?: LookbookImagePrompt[]
   resolvedContentType?: ResolvedContentType
   affiliateModeUsed?: AffiliateMode
@@ -131,6 +132,25 @@ interface RecentLocalImage {
   name: string
   dataUrl: string
   createdAt: number
+}
+
+interface MusicAudioReference {
+  name: string
+  dataUrl: string
+  mimeType: string
+  size: number
+  durationSec?: number
+}
+
+interface MusicImageReference {
+  id: string
+  name: string
+  dataUrl: string
+}
+
+interface MusicScriptReference {
+  name: string
+  text: string
 }
 
 interface RecentLocalImageBucket {
@@ -329,7 +349,7 @@ type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image' | 'storyboard_video' | 'music_video'
-type AppPageMode = 'core' | 'ootd_template' | 'prompt_library'
+type AppPageMode = 'core' | 'ootd_template' | 'storyboard_template' | 'music_video_template' | 'prompt_library'
 type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
@@ -766,6 +786,8 @@ const FIXED_SALES_TEMPLATE: SalesTemplate = 'soft'
 const FIXED_STRATEGY_LABEL = 'TikTok Shop Core (Strict AUTO + Soft Sell)'
 const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-first de ban ben vung.'
 const OOTD_TEMPLATE_ROUTE_PATH = '/ootd-template'
+const STORYBOARD_TEMPLATE_ROUTE_PATH = '/storyboard-template'
+const MUSIC_VIDEO_TEMPLATE_ROUTE_PATH = '/music-video-template'
 const PROMPT_LIBRARY_ROUTE_PATH = '/prompt-library'
 const OOTD_TEMPLATE_LOCKED_DURATION = 24
 const OOTD_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
@@ -6218,6 +6240,324 @@ function buildMusicVideoModeNotes(notes: string): string {
     : musicVideoDirective
 }
 
+function buildMusicVideoPromptMarkdown(input: {
+  audioReference: MusicAudioReference
+  scriptReference: MusicScriptReference
+  artistImages: MusicImageReference[]
+  locationImages: MusicImageReference[]
+  duration: number
+  aspectRatio: '9:16' | '16:9'
+  engineLabel: string
+  masterDNA: string
+  createImagePrompt: string
+  keyframes: KeyframePrompt[]
+  scenes: ScenePrompt[]
+  notes: string
+}): string {
+  const sceneCount = input.scenes.length
+  const keyframeCount = input.keyframes.length
+  const audioDuration = input.audioReference.durationSec
+    ? `~${input.audioReference.durationSec.toFixed(1)}s`
+    : 'unknown'
+  const artistList = input.artistImages.length > 0
+    ? input.artistImages.map((item, index) => `- ARTIST_IMAGE_${index}: ${item.name}`).join('\n')
+    : '- none'
+  const locationList = input.locationImages.length > 0
+    ? input.locationImages.map((item, index) => `- LOCATION_IMAGE_${index}: ${item.name}`).join('\n')
+    : '- none'
+  const keyframeText = input.keyframes.map((item) => `### KF${String(item.index + 1).padStart(2, '0')} - ${item.timestamp}
+
+\`\`\`text
+${item.fullPrompt.trim()}
+\`\`\``).join('\n\n')
+  const sceneText = input.scenes.map((item) => `### Scene ${String(item.index + 1).padStart(2, '0')} - ${item.timeRange}
+
+Use first frame: KF${String(item.index + 1).padStart(2, '0')}. Use last frame: KF${String(Math.min(item.index + 2, keyframeCount)).padStart(2, '0')}.
+
+\`\`\`text
+${item.fullPrompt.trim()}
+\`\`\``).join('\n\n')
+
+  return `# Music Video Prompt Package - Nano Banana Pro + ${input.engineLabel}
+
+Source files:
+- Script: \`${input.scriptReference.name}\`
+- Audio: \`${input.audioReference.name}\`
+- Audio length: ${audioDuration}
+
+Reference inputs:
+${artistList}
+${locationList}
+
+Production logic:
+- Output ratio: ${input.aspectRatio}
+- N+1 structure: ${sceneCount} scenes x 8s = ${input.duration}s, ${keyframeCount} keyframe images
+- Video flow: each scene uses \`first frame = KF[i]\` and \`last frame = KF[i+1]\`
+- Script logic: parse SCRIPT_0 by SCENE / LYRICS / VISUAL / CAMERA / GHI CHU, then preserve beat order
+- Audio logic: use AUDIO_0 for tempo, emotional rise/drop, pause, and vocal phrase timing
+- Reference lock: artist images define fictional character identity; location images guide mood/environment only
+- Safety: fictional adults, fully clothed, no real celebrity imitation, no readable random UI text, no logos, no watermark
+
+## Character / Artist Lock
+
+${input.masterDNA}
+
+## Music Video Motif Lock
+
+- Follow the uploaded script file as the main storyboard.
+- Follow the uploaded audio file as the emotional and pacing source.
+- Use music-video language: intro mood, verse loneliness, pre-chorus visual metaphor, emotional drop, outro resolution.
+- Acting should be restrained: eyes, breath, hand hesitation, small posture changes.
+- Keep continuity across keyframes: face, outfit, hair, location anchors, color palette, and emotional arc.
+
+## Master Artist / Reference Prompt
+
+\`\`\`text
+${input.createImagePrompt.trim()}
+\`\`\`
+
+## Nano Banana Pro - Keyframe Image Prompts
+
+${keyframeText}
+
+## ${input.engineLabel} - Scene Prompts
+
+${sceneText}
+
+## Editor Notes
+
+- Use exact lyrics/subtitles from \`${input.scriptReference.name}\` in post-production, not as generated image text.
+- Keep audio sync from \`${input.audioReference.name}\`.
+- If a location transition is too hard for video generation, render as separate clips and connect them with a music-video match cut.
+${input.notes.trim() ? `- User notes: ${input.notes.trim()}` : '- User notes: none'}
+`
+}
+
+async function generateMusicVideoWithGemini(
+  apiKey: string,
+  model: string,
+  audioReference: MusicAudioReference,
+  scriptReference: MusicScriptReference,
+  artistImages: MusicImageReference[],
+  locationImages: MusicImageReference[],
+  duration: number,
+  aspectRatio: '9:16' | '16:9',
+  notes: string,
+  engine: StoryboardVideoEngine,
+): Promise<GenerateResult> {
+  const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
+  const sceneCount = durationInfo.scenes
+  const keyframeCount = durationInfo.keyframes
+  const engineLabel = engine === 'omni_flash' ? 'Gemini Omni Flash' : 'Veo 3.1'
+  const normalizedNotes = normalizePromptWhitespace(notes)
+  const audioDuration = audioReference.durationSec
+  const parts: GeminiContentPart[] = [
+    {
+      text: `MUSIC VIDEO INPUT PACKAGE:
+- AUDIO_0: ${audioReference.name}${audioDuration ? ` (~${audioDuration.toFixed(1)}s)` : ''}
+- SCRIPT_0: ${scriptReference.name}
+- Artist reference images: ${artistImages.length}
+- Location reference images: ${locationImages.length}
+
+SCRIPT_0 CONTENT:
+${scriptReference.text}`,
+    },
+    {
+      inlineData: {
+        mimeType: audioReference.mimeType || inferMimeTypeFromDataUrl(audioReference.dataUrl, 'audio/mpeg'),
+        data: dataUrlPayload(audioReference.dataUrl),
+      },
+    },
+    { text: 'AUDIO_0 MUSIC REFERENCE: use for tempo, emotional rise, silence/drop timing, vocal phrase energy, and scene pacing. Do not transcribe as dialogue unless SCRIPT_0 provides lyrics.' },
+  ]
+
+  artistImages.forEach((item, index) => {
+    parts.push({
+      inlineData: {
+        mimeType: inferMimeTypeFromDataUrl(item.dataUrl, 'image/jpeg'),
+        data: dataUrlPayload(item.dataUrl),
+      },
+    })
+    parts.push({ text: `ARTIST_IMAGE_${index}: artist/character visual reference. Preserve fictional identity, face/hair/body/outfit cues only; do not imitate any real celebrity/public figure.` })
+  })
+
+  locationImages.forEach((item, index) => {
+    parts.push({
+      inlineData: {
+        mimeType: inferMimeTypeFromDataUrl(item.dataUrl, 'image/jpeg'),
+        data: dataUrlPayload(item.dataUrl),
+      },
+    })
+    parts.push({ text: `LOCATION_IMAGE_${index}: optional environment/mood/location reference. Use spatial anchors, light, weather, texture, and color palette only.` })
+  })
+
+  const enginePromptMode = engine === 'omni_flash'
+    ? `OMNI FLASH MODE:
+- Write scene prompts as natural-language video creation/editing instructions.
+- Name references clearly: AUDIO_0, SCRIPT_0, ARTIST_IMAGE_0..N, LOCATION_IMAGE_0..N.
+- Include audio intent, mood, motion, camera, edit rhythm, and subtitle timing.`
+    : `VEO 3 MODE:
+- Write scene prompts for first-frame -> last-frame interpolation.
+- Every scene is exactly 8 seconds and must name START FRAME, END FRAME, camera movement, emotional transition, audio sync, and continuity locks.
+- Keyframes must be usable as Nano Banana Pro image prompts before sending pairs into Veo.`
+
+  const systemPrompt = `You are a senior Korean music video storyboard director.
+
+Create a production-ready MUSIC VIDEO storyboard package for ${engineLabel}.
+
+PROJECT CONFIG:
+- Target engine: ${engineLabel}
+- Duration setting: ${duration}s
+- Detected audio duration: ${audioDuration ? `${audioDuration.toFixed(1)}s` : 'unknown; infer from AUDIO_0'}
+- Aspect ratio: ${aspectRatio}
+- Required output shape: ${keyframeCount} keyframes and ${sceneCount} scenes
+- User notes: ${normalizedNotes || 'none'}
+
+${enginePromptMode}
+
+SCRIPT PARSING RULE:
+- SCRIPT_0 may be CSV like: SCENE, LYRICS, VISUAL, CAMERA, GHI CHU.
+- Treat each script row as the primary beat source.
+- Preserve lyric meaning and visual intent from the script.
+- If script row count differs from required scene count, merge or split beats while preserving order.
+- Music video logic should follow the provided script flow: lyric line -> emotional state -> visual scene -> camera language -> notes.
+
+MUSIC VIDEO RULES:
+- This is a music video / MV workflow, not a product affiliate ad.
+- Use ARTIST_IMAGE references as artist/character identity anchors. If multiple artist images are provided, decide whether they are same artist multi-angle or multiple artists and state that in masterDNA.
+- Use LOCATION_IMAGE references only for environment/mood if provided.
+- Build keyframes as image prompts: SUBJECT / ACTION / FACING / LOCATION / CAMERA / LIGHTING / STYLE / ASPECT RATIO.
+- Build scenes as video prompts from keyframe i to keyframe i+1.
+- Include audio sync notes in every scene: lyric phrase, beat rise/drop, silence gap, rain ambience, piano/synth mood, or vocal emotion.
+- Keep adult characters fully clothed, modest, fictional, and policy-safe.
+- No real celebrity imitation, no readable random UI text, no logos, no unsafe distress, no explicit content.
+
+Return STRICT JSON only:
+{
+  "resolvedContentType": "fyp",
+  "masterDNA": "artist identity lock, music mood, script structure, visual motif, continuity",
+  "createImagePrompt": "master reference frame prompt",
+  "keyframes": [
+    {
+      "timestamp": "0s",
+      "subject": "...",
+      "action": "...",
+      "facingDirection": "front | back | left | right | three-quarter-left | three-quarter-right",
+      "location": "...",
+      "camera": "...",
+      "lighting": "...",
+      "style": "...",
+      "fullPrompt": "complete Nano Banana Pro style image prompt"
+    }
+  ],
+  "scenes": [
+    {
+      "timeRange": "0-8s",
+      "subject": "...",
+      "narrative": "...",
+      "startPose": "...",
+      "endPose": "...",
+      "composition": "...",
+      "cameraMovement": "Position: <Camera Position> | Motion: <Camera Motion>. ...",
+      "lighting": "...",
+      "locationFlow": "...",
+      "fullPrompt": "complete ${engineLabel} music video prompt using START FRAME and END FRAME"
+    }
+  ]
+}`
+
+  parts.push({ text: systemPrompt })
+
+  const parsed = await requestGeminiJsonWithParts(apiKey, model, parts, 0.76, 8192)
+  const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
+  const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : []
+  const resolvedContentType = normalizeHistoryResolvedContentType(parsed.resolvedContentType, 'fyp')
+
+  const keyframes: KeyframePrompt[] = Array.from({ length: keyframeCount }, (_, index) => {
+    const raw = (rawKeyframes[index] && typeof rawKeyframes[index] === 'object') ? rawKeyframes[index] as Record<string, unknown> : {}
+    const timestamp = typeof raw.timestamp === 'string' && raw.timestamp.trim() ? raw.timestamp.trim() : `${Math.round(index * (duration / Math.max(keyframeCount - 1, 1)))}s`
+    const subject = toHistoryString(raw.subject, `Music video artist/character from ARTIST_IMAGE references, beat ${index + 1}.`)
+    const action = toHistoryString(raw.action, index === 0 ? 'Opening emotional music-video pose synced to the first lyric.' : 'Continue the lyric-driven emotional progression.')
+    const facingCandidate = toHistoryString(raw.facingDirection, 'front') as PromptFacingDirection
+    const facingDirection = ['front', 'back', 'left', 'right', 'three-quarter-left', 'three-quarter-right'].includes(facingCandidate)
+      ? facingCandidate
+      : 'front'
+    const location = toHistoryString(raw.location, locationImages.length > 0 ? 'Location-reference inspired MV setting.' : 'Korean ballad MV setting matching the script.')
+    const camera = toHistoryString(raw.camera, 'Vertical MV framing, cinematic, artist readable.')
+    const lighting = toHistoryString(raw.lighting, 'Music-video lighting matching lyric emotion and audio mood.')
+    const style = toHistoryString(raw.style, `${engineLabel} Korean MV storyboard, lyric-driven, cinematic.`)
+    const fullPrompt = toHistoryString(raw.fullPrompt, [
+      `SUBJECT: ${subject}`,
+      `ACTION: ${action}`,
+      `FACING: ${facingDirection}`,
+      `LOCATION: ${location}`,
+      `CAMERA: ${camera}`,
+      `LIGHTING: ${lighting}`,
+      `STYLE: ${style}`,
+      `ASPECT RATIO: ${aspectRatio}`,
+    ].join('\n'))
+
+    return { index, timestamp, subject, action, facingDirection, location, camera, lighting, style, fullPrompt }
+  })
+
+  const scenes: ScenePrompt[] = Array.from({ length: sceneCount }, (_, index) => {
+    const raw = (rawScenes[index] && typeof rawScenes[index] === 'object') ? rawScenes[index] as Record<string, unknown> : {}
+    const startSec = index * 8
+    const endSec = Math.min(duration, startSec + 8)
+    const timeRange = toHistoryString(raw.timeRange, `${startSec}-${endSec}s`)
+    const subject = toHistoryString(raw.subject, keyframes[index]?.subject || keyframes[0]?.subject || '')
+    const narrative = toHistoryString(raw.narrative, `Music video beat ${index + 1}, following SCRIPT_0 in order and syncing to AUDIO_0.`)
+    const startPose = toHistoryString(raw.startPose, keyframes[index]?.action || 'Start from previous MV keyframe.')
+    const endPose = toHistoryString(raw.endPose, keyframes[index + 1]?.action || 'End on the next lyric-driven keyframe.')
+    const composition = toHistoryString(raw.composition, keyframes[index]?.camera || 'Vertical MV composition.')
+    const cameraMovement = toHistoryString(raw.cameraMovement, engine === 'omni_flash' ? 'Natural continuous MV edit with audio-synced camera intent.' : 'Position: Center | Motion: Dolly in. Smooth first-frame to last-frame interpolation synced to AUDIO_0.')
+    const lighting = toHistoryString(raw.lighting, keyframes[index]?.lighting || 'Music-video lighting transition.')
+    const locationFlow = toHistoryString(raw.locationFlow, 'Preserve continuity unless SCRIPT_0 requests a location transition.')
+    const fullPrompt = toHistoryString(raw.fullPrompt, [
+      `Use KEYFRAME ${index + 1} as START FRAME and KEYFRAME ${Math.min(index + 2, keyframes.length)} as END FRAME.`,
+      `Create an 8-second ${engineLabel} music video scene.`,
+      `Narrative: ${narrative}`,
+      `Start pose: ${startPose}`,
+      `End pose: ${endPose}`,
+      `Composition: ${composition}`,
+      `Camera movement: ${cameraMovement}`,
+      `Lighting: ${lighting}`,
+      `Location flow: ${locationFlow}`,
+      `Audio sync: follow AUDIO_0 and SCRIPT_0 lyric emotion for this beat.`,
+    ].join('\n'))
+
+    return { index, timeRange, subject, narrative, startPose, endPose, composition, cameraMovement, lighting, locationFlow, fullPrompt }
+  })
+
+  const masterDNA = toHistoryString(parsed.masterDNA, 'Music video artist identity, audio mood, script flow, and visual continuity lock.')
+  const createImagePrompt = toHistoryString(parsed.createImagePrompt, keyframes[0]?.fullPrompt || '')
+  const musicVideoPromptMarkdown = buildMusicVideoPromptMarkdown({
+    audioReference,
+    scriptReference,
+    artistImages,
+    locationImages,
+    duration,
+    aspectRatio,
+    engineLabel,
+    masterDNA,
+    createImagePrompt,
+    keyframes,
+    scenes,
+    notes,
+  })
+
+  return {
+    masterDNA,
+    createImagePrompt,
+    musicVideoPromptMarkdown,
+    keyframes,
+    scenes,
+    resolvedContentType,
+    storyboardEngineUsed: engine,
+    storyboardTemplateUsed: 'cinematic_story',
+  }
+}
+
 async function generateStoryboardVideoWithGemini(
   apiKey: string,
   model: string,
@@ -6601,6 +6941,65 @@ function parseGeminiJsonFromText(raw: string): Record<string, unknown> {
 }
 
 type GeminiContentPart = { text: string } | { inlineData: { mimeType: string; data: string } }
+
+function dataUrlPayload(dataUrl: string): string {
+  return dataUrl.split(',')[1] || dataUrl
+}
+
+function inferMimeTypeFromDataUrl(dataUrl: string, fallback: string): string {
+  const match = dataUrl.match(/^data:([^;,]+)[;,]/)
+  return match?.[1] || fallback
+}
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+      } else {
+        reject(new Error('Khong the doc file thanh data URL'))
+      }
+    }
+    reader.onerror = () => reject(new Error('Khong the doc file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+      } else {
+        reject(new Error('Khong the doc file text'))
+      }
+    }
+    reader.onerror = () => reject(new Error('Khong the doc file kich ban'))
+    reader.readAsText(file, 'utf-8')
+  })
+}
+
+function readAudioDuration(file: File): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const url = URL.createObjectURL(file)
+    const audio = new Audio()
+    const cleanup = () => URL.revokeObjectURL(url)
+    audio.onloadedmetadata = () => {
+      const value = Number.isFinite(audio.duration) && audio.duration > 0
+        ? audio.duration
+        : undefined
+      cleanup()
+      resolve(value)
+    }
+    audio.onerror = () => {
+      cleanup()
+      resolve(undefined)
+    }
+    audio.src = url
+  })
+}
 
 async function requestGeminiJsonWithParts(
   apiKey: string,
@@ -10183,7 +10582,27 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const [faceImage, setFaceImage] = useState<string | null>(null)
   const [productImage, setProductImage] = useState<string | null>(null)
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null)
-  const [pasteTarget, setPasteTarget] = useState<'face' | 'product' | 'background'>('face')
+  const [storyboardFaceImage, setStoryboardFaceImage] = useState<string | null>(null)
+  const [storyboardProductImage, setStoryboardProductImage] = useState<string | null>(null)
+  const [storyboardBackgroundImage, setStoryboardBackgroundImage] = useState<string | null>(null)
+  const [musicFaceImage, setMusicFaceImage] = useState<string | null>(null)
+  const [musicProductImage, setMusicProductImage] = useState<string | null>(null)
+  const [musicBackgroundImage, setMusicBackgroundImage] = useState<string | null>(null)
+  const [musicAudioReference, setMusicAudioReference] = useState<MusicAudioReference | null>(null)
+  const [musicScriptReference, setMusicScriptReference] = useState<MusicScriptReference | null>(null)
+  const [musicArtistImages, setMusicArtistImages] = useState<MusicImageReference[]>([])
+  const [musicLocationImages, setMusicLocationImages] = useState<MusicImageReference[]>([])
+  const [pasteTarget, setPasteTarget] = useState<
+    | 'face'
+    | 'product'
+    | 'background'
+    | 'storyboard_face'
+    | 'storyboard_product'
+    | 'storyboard_background'
+    | 'music_face'
+    | 'music_product'
+    | 'music_background'
+  >('face')
   const [duration, setDuration] = useState(32)
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16')
   const [generationMode, setGenerationMode] = useState<GenerationMode>(() => {
@@ -10301,6 +10720,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
   const isPromptLibraryPage = pageMode === 'prompt_library'
+  const isStoryboardTemplatePage = pageMode === 'storyboard_template'
+  const isMusicVideoTemplatePage = pageMode === 'music_video_template'
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -10308,6 +10729,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     const currentPath = window.location.pathname.replace(/\/+$/, '') || '/'
     const targetPath = pageMode === 'ootd_template'
       ? OOTD_TEMPLATE_ROUTE_PATH
+      : pageMode === 'storyboard_template'
+        ? STORYBOARD_TEMPLATE_ROUTE_PATH
+      : pageMode === 'music_video_template'
+        ? MUSIC_VIDEO_TEMPLATE_ROUTE_PATH
       : pageMode === 'prompt_library'
         ? PROMPT_LIBRARY_ROUTE_PATH
         : '/'
@@ -10353,6 +10778,25 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   ])
 
   useEffect(() => {
+    if (!isStoryboardTemplatePage) return
+
+    if (generationMode !== 'storyboard_video') {
+      setGenerationMode('storyboard_video')
+    }
+  }, [generationMode, isStoryboardTemplatePage])
+
+  useEffect(() => {
+    if (!isMusicVideoTemplatePage) return
+
+    if (generationMode !== 'music_video') {
+      setGenerationMode('music_video')
+    }
+    if (storyboardTemplate !== 'cinematic_story') {
+      setStoryboardTemplate('cinematic_story')
+    }
+  }, [generationMode, isMusicVideoTemplatePage, storyboardTemplate])
+
+  useEffect(() => {
     if (!loading) {
       setLoadingStageIndex(0)
       return
@@ -10379,6 +10823,88 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
 
     return () => window.clearTimeout(timer)
   }, [promptToast])
+
+  const handleMusicAudioFile = useCallback(async (file: File | null) => {
+    if (!file) return
+    if (!file.type.startsWith('audio/')) {
+      setError('Music Video chi ho tro file audio')
+      return
+    }
+
+    try {
+      const [dataUrl, durationSec] = await Promise.all([
+        readFileAsDataUrl(file),
+        readAudioDuration(file),
+      ])
+      setMusicAudioReference({
+        name: file.name,
+        dataUrl,
+        mimeType: file.type || 'audio/mpeg',
+        size: file.size,
+        durationSec,
+      })
+      setError('')
+    } catch (err: any) {
+      setError(err?.message || 'Khong the doc file nhac')
+    }
+  }, [])
+
+  const handleMusicScriptFile = useCallback(async (file: File | null) => {
+    if (!file) return
+
+    try {
+      const text = await readFileAsText(file)
+      setMusicScriptReference({
+        name: file.name,
+        text,
+      })
+      setError('')
+    } catch (err: any) {
+      setError(err?.message || 'Khong the doc file kich ban')
+    }
+  }, [])
+
+  const handleMusicArtistFiles = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'))
+    if (imageFiles.length === 0) {
+      setError('Anh nghe si chi ho tro file anh')
+      return
+    }
+
+    try {
+      const nextImages = await Promise.all(imageFiles.map(async (file) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: file.name,
+        dataUrl: await resizeImage(await readFileAsDataUrl(file)),
+      })))
+      setMusicArtistImages((prev) => [...prev, ...nextImages].slice(0, 12))
+      setError('')
+    } catch (err: any) {
+      setError(err?.message || 'Khong the doc anh nghe si')
+    }
+  }, [])
+
+  const handleMusicLocationFiles = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const imageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'))
+    if (imageFiles.length === 0) {
+      setError('Anh location chi ho tro file anh')
+      return
+    }
+
+    try {
+      const nextImages = await Promise.all(imageFiles.map(async (file) => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: file.name,
+        dataUrl: await resizeImage(await readFileAsDataUrl(file)),
+      })))
+      setMusicLocationImages((prev) => [...prev, ...nextImages].slice(0, 12))
+      setError('')
+    } catch (err: any) {
+      setError(err?.message || 'Khong the doc anh location')
+    }
+  }, [])
 
   const loadWorkHistory = useCallback(async (options?: {
     silent?: boolean
@@ -10593,7 +11119,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
 
   // Derived
   const durationInfo = DURATIONS.find(d => d.value === duration)!
-  const canGenerate = apiKey.trim().length > 0
+  const hasMusicVideoInputs = Boolean(musicAudioReference)
+    && Boolean(musicScriptReference?.text.trim())
+    && musicArtistImages.length > 0
+  const canGenerate = apiKey.trim().length > 0 && (!isMusicTemplateMode || hasMusicVideoInputs)
   const canGenerateSeo = canGenerate && seoProductName.trim().length > 0
   const canGenerateVoiceover = canGenerate && voiceoverProductName.trim().length > 0
   const hasPromptResult = result !== null
@@ -10750,6 +11279,87 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const lookbookThemeLabel = getLookbookThemeOption(lookbookTheme).label
   const storyboardEngineLabel = STORYBOARD_VIDEO_ENGINE_OPTIONS.find((item) => item.value === storyboardEngine)?.label || 'Veo 3.1'
   const storyboardTemplateLabel = STORYBOARD_TEMPLATE_OPTIONS.find((item) => item.value === storyboardTemplate)?.label || 'Product Launch'
+  const isMusicTemplateMode = generationMode === 'music_video' || isMusicVideoTemplatePage
+  const isStoryboardTemplateMode = !isMusicTemplateMode && (generationMode === 'storyboard_video' || isStoryboardTemplatePage)
+  const activeInputScope = isMusicTemplateMode
+    ? 'music'
+    : isStoryboardTemplateMode
+      ? 'storyboard'
+      : 'core'
+  const activeFaceImage = isMusicTemplateMode
+    ? musicFaceImage
+    : isStoryboardTemplateMode
+      ? storyboardFaceImage
+      : faceImage
+  const activeProductImage = isMusicTemplateMode
+    ? musicProductImage
+    : isStoryboardTemplateMode
+      ? storyboardProductImage
+      : productImage
+  const activeBackgroundImage = isMusicTemplateMode
+    ? musicBackgroundImage
+    : isStoryboardTemplateMode
+      ? storyboardBackgroundImage
+      : backgroundImage
+  const setActiveFaceImage = isMusicTemplateMode
+    ? setMusicFaceImage
+    : isStoryboardTemplateMode
+      ? setStoryboardFaceImage
+      : setFaceImage
+  const setActiveProductImage = isMusicTemplateMode
+    ? setMusicProductImage
+    : isStoryboardTemplateMode
+      ? setStoryboardProductImage
+      : setProductImage
+  const setActiveBackgroundImage = isMusicTemplateMode
+    ? setMusicBackgroundImage
+    : isStoryboardTemplateMode
+      ? setStoryboardBackgroundImage
+      : setBackgroundImage
+  const activeFacePasteTarget = isMusicTemplateMode
+    ? 'music_face'
+    : isStoryboardTemplateMode
+      ? 'storyboard_face'
+      : 'face'
+  const activeProductPasteTarget = isMusicTemplateMode
+    ? 'music_product'
+    : isStoryboardTemplateMode
+      ? 'storyboard_product'
+      : 'product'
+  const activeBackgroundPasteTarget = isMusicTemplateMode
+    ? 'music_background'
+    : isStoryboardTemplateMode
+      ? 'storyboard_background'
+      : 'background'
+  const activeImageInputTitle = isMusicTemplateMode
+    ? 'Ảnh đầu vào Music Video'
+    : isStoryboardTemplateMode
+      ? 'Ảnh đầu vào Storyboard'
+      : 'Ảnh đầu vào'
+  const activeFaceLabel = isMusicTemplateMode
+    ? 'Ảnh nhân vật / ca sĩ chính'
+    : isStoryboardTemplateMode
+      ? 'Ảnh nhân vật storyboard'
+      : 'Ảnh Face Model'
+  const activeProductLabel = isMusicTemplateMode
+    ? 'Ảnh outfit / character look MV'
+    : isStoryboardTemplateMode
+      ? 'Ảnh sản phẩm / outfit storyboard'
+      : 'Ảnh Sản phẩm (Model mặc sản phẩm)'
+  const activeBackgroundLabel = isMusicTemplateMode
+    ? 'Ảnh bối cảnh MV / mood location'
+    : isStoryboardTemplateMode
+      ? 'Ảnh bối cảnh storyboard'
+      : 'Ảnh Background (Location tham chiếu - tùy chọn)'
+  const activeFaceRecentKey = activeInputScope === 'core'
+    ? 'aff_recent_local_images_face'
+    : `aff_recent_local_images_${activeInputScope}_face`
+  const activeProductRecentKey = activeInputScope === 'core'
+    ? 'aff_recent_local_images_product'
+    : `aff_recent_local_images_${activeInputScope}_product`
+  const activeBackgroundRecentKey = activeInputScope === 'core'
+    ? 'aff_recent_local_images_background'
+    : `aff_recent_local_images_${activeInputScope}_background`
   const videoPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === videoPoseDirectionLock)?.label || 'Auto'
   const isMirrorPhoneTemplateScenario = activeOotdTemplateScenario.cameraFormat === 'mirror_phone'
   const isCozyTemplateScenario = activeOotdTemplateScenario.id === 'cozy_home_background'
@@ -10811,7 +11421,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
               : generationMode === 'music_video'
                 ? `San sang tao Music Video storyboard (${durationInfo.keyframes} keyframe + ${durationInfo.scenes} scene, co audio mood).`
               : `San sang tao Prompt Package (${FIXED_STRATEGY_DESC}).`
-            : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
+            : apiKey.trim().length > 0 && isMusicTemplateMode
+              ? 'Upload file nhac, file kich ban va it nhat 1 anh nghe si de tao Music Video.'
+              : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
   const selectedSeoVariant = seoResult
     ? seoResult.seoVariants[Math.min(selectedSeoVariantIndex, seoResult.seoVariants.length - 1)]
     : null
@@ -10823,7 +11435,11 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       ? `OOTD Template Output — ${duration}s / ${OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}`
     : result
       ? hasVideoPromptResult
-        ? `Prompt Package — ${duration}s / ${aspectRatio}`
+        ? generationMode === 'music_video'
+          ? `Music Video Output — ${duration}s / ${aspectRatio}`
+          : generationMode === 'storyboard_video'
+            ? `Storyboard Output — ${duration}s / ${aspectRatio}`
+            : `Prompt Package — ${duration}s / ${aspectRatio}`
         : `Lookbook Image Prompts — ${currentLookbookPrompts.length} pics / ${aspectRatio}`
       : activeTab === 'voiceover'
         ? 'Nhiệm vụ 2 — Kịch bản lồng tiếng'
@@ -10833,8 +11449,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const handleGenerate = async () => {
     const MAX_ATTEMPTS = 3
     const isLookbookImageMode = generationMode === 'lookbook_image'
-    const isMusicVideoMode = generationMode === 'music_video'
-    const isStoryboardVideoMode = generationMode === 'storyboard_video' || isMusicVideoMode
+    const isMusicVideoMode = generationMode === 'music_video' || isMusicVideoTemplatePage
+    const isStoryboardVideoMode = generationMode === 'storyboard_video' || isStoryboardTemplatePage || isMusicVideoMode
     const activeStoryboardTemplate = isMusicVideoMode ? 'cinematic_story' : storyboardTemplate
     const activeStoryboardTemplateLabel = isMusicVideoMode ? 'Music Video Story' : storyboardTemplateLabel
     setLoading(true)
@@ -10864,14 +11480,116 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         throw new Error('Vui long nhap Gemini API Key de AI phan tich anh va tao boi canh')
       }
 
+      if (isMusicVideoMode) {
+        if (!musicAudioReference) {
+          throw new Error('Vui long upload file nhac cho Music Video')
+        }
+        if (!musicScriptReference || musicScriptReference.text.trim().length === 0) {
+          throw new Error('Vui long upload file kich ban CSV/TXT cho Music Video')
+        }
+        if (musicArtistImages.length === 0) {
+          throw new Error('Vui long upload it nhat 1 anh nghe si/nhan vat cho Music Video')
+        }
+
+        pushLog(`[MODE] music_video engine=${storyboardEngine} script=${musicScriptReference.name} audio=${musicAudioReference.name} artists=${musicArtistImages.length} locations=${musicLocationImages.length}`)
+        const generated = await generateMusicVideoWithGemini(
+          apiKey,
+          model,
+          musicAudioReference,
+          musicScriptReference,
+          musicArtistImages,
+          musicLocationImages,
+          duration,
+          aspectRatio,
+          notes,
+          storyboardEngine,
+        )
+
+        setResult(generated)
+        setSelectedContentType(generated.resolvedContentType || 'fyp')
+        setActiveTab('keyframes')
+        setPromptToast({
+          kind: 'success',
+          message: `Da tao xong Music Video storyboard ${duration}s tu ${musicScriptReference.name} va ${musicAudioReference.name}.`,
+        })
+
+        const workHistoryGeneratedAt = Date.now()
+        const promptPackageForHistory = {
+          masterDNA: generated.masterDNA,
+          createImagePrompt: generated.createImagePrompt || '',
+          musicVideoPromptMarkdown: generated.musicVideoPromptMarkdown || '',
+          keyframes: generated.keyframes.map((keyframe) => ({
+            index: keyframe.index,
+            timestamp: keyframe.timestamp,
+            subject: keyframe.subject,
+            action: keyframe.action,
+            facingDirection: keyframe.facingDirection || '',
+            location: keyframe.location,
+            camera: keyframe.camera,
+            lighting: keyframe.lighting,
+            style: keyframe.style,
+            fullPrompt: keyframe.fullPrompt,
+          })),
+          scenes: generated.scenes.map((scene) => ({
+            index: scene.index,
+            timeRange: scene.timeRange,
+            narrative: scene.narrative,
+            startPose: scene.startPose,
+            endPose: scene.endPose,
+            cameraMovement: scene.cameraMovement,
+            locationFlow: scene.locationFlow || '',
+            fullPrompt: scene.fullPrompt,
+          })),
+        }
+
+        pushLog(`[OK] Music video generated successfully keyframes=${generated.keyframes.length} scenes=${generated.scenes.length}`)
+        setErrorLogLines([...logLines])
+
+        void persistWorkHistory({
+          action: 'prompt',
+          model,
+          contentType: generated.resolvedContentType || 'fyp',
+          notes: notes.trim(),
+          generatedAt: workHistoryGeneratedAt,
+          metadata: {
+            generationMode: 'music_video',
+            storyboardEngine,
+            storyboardTemplate: 'cinematic_story',
+            inputContentType: contentType,
+            resolvedContentType: generated.resolvedContentType || 'fyp',
+            duration,
+            aspectRatio,
+            keyframeCount: generated.keyframes.length,
+            sceneCount: generated.scenes.length,
+            musicAudioName: musicAudioReference.name,
+            musicAudioDurationSec: musicAudioReference.durationSec,
+            musicScriptName: musicScriptReference.name,
+            musicArtistImageCount: musicArtistImages.length,
+            musicLocationImageCount: musicLocationImages.length,
+            generatedLocations: generated.keyframes.map((keyframe) => keyframe.location).filter(Boolean).slice(0, 10),
+            musicVideoPromptMarkdown: generated.musicVideoPromptMarkdown || '',
+            promptPackage: promptPackageForHistory,
+          },
+        })
+          .then(() => loadWorkHistory({ silent: true }))
+          .catch((saveError) => {
+            console.warn(
+              'Could not save prompt work history:',
+              saveError instanceof Error ? saveError.message : saveError
+            )
+          })
+
+        return
+      }
+
       if (isStoryboardVideoMode) {
         pushLog(`[MODE] ${generationMode} engine=${storyboardEngine} template=${activeStoryboardTemplate}`)
         const generated = await generateStoryboardVideoWithGemini(
           apiKey,
           model,
-          faceImage,
-          productImage,
-          backgroundImage,
+          activeFaceImage,
+          activeProductImage,
+          activeBackgroundImage,
           duration,
           aspectRatio,
           isMusicVideoMode ? buildMusicVideoModeNotes(notes) : notes,
@@ -10940,9 +11658,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
             keyframeCount: generated.keyframes.length,
             sceneCount: generated.scenes.length,
             generatedLocations: generated.keyframes.map((keyframe) => keyframe.location).filter(Boolean).slice(0, 10),
-            hasFaceImage: Boolean(faceImage),
-            hasProductImage: Boolean(productImage),
-            hasBackgroundImage: Boolean(backgroundImage),
+            hasFaceImage: Boolean(activeFaceImage),
+            hasProductImage: Boolean(activeProductImage),
+            hasBackgroundImage: Boolean(activeBackgroundImage),
+            imageInputScope: activeInputScope,
             promptPackage: promptPackageForHistory,
           },
         })
@@ -11894,7 +12613,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     if (result) {
       const resultHasVideoFlow = result.keyframes.length > 0 && result.scenes.length > 0
 
-      if (resultHasVideoFlow) {
+      if (result.musicVideoPromptMarkdown) {
+        lines.push('', result.musicVideoPromptMarkdown)
+      } else if (resultHasVideoFlow) {
         lines.push(
           '',
           '── VIDEO PROMPT PACKAGE ──',
@@ -11995,7 +12716,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     if (result) {
       const resultHasVideoFlow = result.keyframes.length > 0 && result.scenes.length > 0
 
-      if (resultHasVideoFlow) {
+      if (result.musicVideoPromptMarkdown) {
+        lines.push(result.musicVideoPromptMarkdown)
+      } else if (resultHasVideoFlow) {
         lines.push(
           `RESOLVED TYPE: ${selectedContentType.toUpperCase()}`,
           `POSE DIRECTION LOCK: ${videoPoseDirectionLockLabel}`,
@@ -12079,6 +12802,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   ? 'AI Video Editor Intern Prompt Library'
                   : isOotdTemplatePage
                   ? `OOTD Template Page (Beat-flow lock theo video ${activeOotdTemplateScenario.referenceVideoFileName})`
+                  : isMusicVideoTemplatePage
+                  ? 'Music Video Template (audio + script + artist/location references)'
+                  : isStoryboardTemplatePage
+                  ? 'Storyboard Template Page (input rieng, khong dung chung core)'
                   : 'TikTok Affiliate Video Prompt Generator'}
               </p>
             </div>
@@ -12105,6 +12832,32 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                 } : {}}
               >
                 OOTD Template Page
+              </button>
+              <button
+                type="button"
+                className={`chip ${pageMode === 'storyboard_template' ? 'active' : ''}`}
+                onClick={() => setPageMode('storyboard_template')}
+                id="switch-page-storyboard-template"
+                style={pageMode === 'storyboard_template' ? {
+                  borderColor: 'var(--accent-amber)',
+                  color: 'var(--accent-amber)',
+                  background: 'color-mix(in srgb, var(--accent-amber) 14%, transparent)',
+                } : {}}
+              >
+                Storyboard Template
+              </button>
+              <button
+                type="button"
+                className={`chip ${pageMode === 'music_video_template' ? 'active' : ''}`}
+                onClick={() => setPageMode('music_video_template')}
+                id="switch-page-music-video-template"
+                style={pageMode === 'music_video_template' ? {
+                  borderColor: '#ec4899',
+                  color: '#ec4899',
+                  background: 'color-mix(in srgb, #ec4899 14%, transparent)',
+                } : {}}
+              >
+                Music Video Template
               </button>
               <button
                 type="button"
@@ -12273,38 +13026,148 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
             {/* Images */}
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title">
-                <Camera /> Ảnh đầu vào
+                <Camera /> {isMusicTemplateMode ? 'Input Music Video' : activeImageInputTitle}
               </div>
+              {isMusicTemplateMode ? (
+                <>
+                  <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+                    Music Video dung input rieng: file nhac, file kich ban CSV/TXT, anh nghe si 1-nhieu, va anh location tuy chon. Khong dung chung anh cua Core Page.
+                  </p>
+
+                  <div className="input-group">
+                    <label className="input-label">
+                      <Music size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      File nhac
+                    </label>
+                    <input
+                      type="file"
+                      accept="audio/*"
+                      className="input-field"
+                      onChange={(event) => void handleMusicAudioFile(event.target.files?.[0] || null)}
+                    />
+                    {musicAudioReference && (
+                      <p className="ai-task-hint" style={{ marginTop: 8, marginBottom: 0 }}>
+                        Da chon: {musicAudioReference.name}
+                        {musicAudioReference.durationSec ? ` • ~${musicAudioReference.durationSec.toFixed(1)}s` : ''}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="input-group">
+                    <label className="input-label">
+                      <FileText size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      File kich ban CSV/TXT
+                    </label>
+                    <input
+                      type="file"
+                      accept=".csv,.txt,text/csv,text/plain"
+                      className="input-field"
+                      onChange={(event) => void handleMusicScriptFile(event.target.files?.[0] || null)}
+                    />
+                    {musicScriptReference && (
+                      <p className="ai-task-hint" style={{ marginTop: 8, marginBottom: 0 }}>
+                        Da chon: {musicScriptReference.name} • {musicScriptReference.text.split(/\r?\n/).filter((line) => line.trim().length > 0).length} dong
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="input-group">
+                    <label className="input-label">
+                      <ImageIcon size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Anh nghe si / nhan vat (1 hoac nhieu)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="input-field"
+                      onChange={(event) => void handleMusicArtistFiles(event.target.files)}
+                    />
+                    {musicArtistImages.length > 0 && (
+                      <div className="chip-group" style={{ marginTop: 8 }}>
+                        {musicArtistImages.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="chip active"
+                            onClick={() => setMusicArtistImages((prev) => prev.filter((image) => image.id !== item.id))}
+                            title="Click de xoa anh nay"
+                          >
+                            {item.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: 0 }}>
+                    <label className="input-label">
+                      <Layers size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Anh location / mood location (tuy chon)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="input-field"
+                      onChange={(event) => void handleMusicLocationFiles(event.target.files)}
+                    />
+                    {musicLocationImages.length > 0 && (
+                      <div className="chip-group" style={{ marginTop: 8 }}>
+                        {musicLocationImages.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="chip active"
+                            onClick={() => setMusicLocationImages((prev) => prev.filter((image) => image.id !== item.id))}
+                            title="Click de xoa anh nay"
+                          >
+                            {item.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+              {isStoryboardTemplateMode && (
+                <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 12 }}>
+                  Bo anh nay tach rieng khoi Core Video Prompt. Chuyen qua mode khac se khong ghi de anh face/product/background cua core page.
+                </p>
+              )}
               <ImageUploader
-                label="Ảnh Face Model"
-                image={faceImage}
-                onImageChange={setFaceImage}
-                isPasteTarget={pasteTarget === 'face'}
-                onActivatePasteTarget={() => setPasteTarget('face')}
-                recentLocalStorageKey="aff_recent_local_images_face"
+                label={activeFaceLabel}
+                image={activeFaceImage}
+                onImageChange={setActiveFaceImage}
+                isPasteTarget={pasteTarget === activeFacePasteTarget}
+                onActivatePasteTarget={() => setPasteTarget(activeFacePasteTarget)}
+                recentLocalStorageKey={activeFaceRecentKey}
                 onLoadError={setError}
                 icon={ImageIcon}
               />
               <ImageUploader
-                label="Ảnh Sản phẩm (Model mặc sản phẩm)"
-                image={productImage}
-                onImageChange={setProductImage}
-                isPasteTarget={pasteTarget === 'product'}
-                onActivatePasteTarget={() => setPasteTarget('product')}
-                recentLocalStorageKey="aff_recent_local_images_product"
+                label={activeProductLabel}
+                image={activeProductImage}
+                onImageChange={setActiveProductImage}
+                isPasteTarget={pasteTarget === activeProductPasteTarget}
+                onActivatePasteTarget={() => setPasteTarget(activeProductPasteTarget)}
+                recentLocalStorageKey={activeProductRecentKey}
                 onLoadError={setError}
                 icon={Upload}
               />
               <ImageUploader
-                label="Ảnh Background (Location tham chiếu - tùy chọn)"
-                image={backgroundImage}
-                onImageChange={setBackgroundImage}
-                isPasteTarget={pasteTarget === 'background'}
-                onActivatePasteTarget={() => setPasteTarget('background')}
-                recentLocalStorageKey="aff_recent_local_images_background"
+                label={activeBackgroundLabel}
+                image={activeBackgroundImage}
+                onImageChange={setActiveBackgroundImage}
+                isPasteTarget={pasteTarget === activeBackgroundPasteTarget}
+                onActivatePasteTarget={() => setPasteTarget(activeBackgroundPasteTarget)}
+                recentLocalStorageKey={activeBackgroundRecentKey}
                 onLoadError={setError}
                 icon={Layers}
               />
+                </>
+              )}
             </div>
 
             {!isOotdTemplatePage && (
