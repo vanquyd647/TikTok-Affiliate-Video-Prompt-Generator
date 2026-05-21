@@ -1981,6 +1981,153 @@ textarea.input-field {
   white-space: normal;
 }
 
+.omni-flash-guide-section {
+  border: 1px solid color-mix(in srgb, var(--accent-emerald) 28%, var(--border-subtle));
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(16, 185, 129, 0.09), transparent 42%),
+    var(--bg-card);
+  padding: var(--space-xl);
+}
+
+.omni-flash-guide-section .prompt-library-actions a {
+  color: #a7f3d0;
+  font-size: 0.78rem;
+  font-weight: 750;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.omni-flash-guide-section .prompt-library-actions a:hover {
+  color: #ffffff;
+}
+
+.omni-flash-principle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-lg);
+}
+
+.omni-flash-principle-card {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent-emerald) 24%, var(--border-subtle));
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(180deg, rgba(16, 185, 129, 0.065), transparent 48%),
+    rgba(17, 17, 21, 0.72);
+}
+
+.omni-flash-principle-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-md);
+  align-items: start;
+  padding: var(--space-lg);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.omni-flash-principle-head > span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+  border-radius: var(--radius-sm);
+  color: #a7f3d0;
+  background: rgba(16, 185, 129, 0.1);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.omni-flash-principle-head p {
+  color: var(--accent-emerald);
+  font-size: 0.7rem;
+  font-weight: 760;
+  line-height: 1.5;
+  margin-bottom: var(--space-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.omni-flash-principle-head h4 {
+  color: var(--text-primary);
+  font-size: 1rem;
+  line-height: 1.3;
+}
+
+.omni-flash-principle-desc {
+  padding: var(--space-md) var(--space-lg) 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.omni-flash-prompt {
+  max-height: 260px;
+}
+
+.omni-flash-model-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-xl);
+}
+
+.omni-flash-model-card {
+  min-height: 246px;
+  padding: var(--space-lg);
+  border: 1px solid rgba(16, 185, 129, 0.16);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.032);
+}
+
+.omni-flash-model-card-head {
+  margin-bottom: var(--space-md);
+}
+
+.omni-flash-model-card-head p {
+  min-height: 34px;
+  color: #a7f3d0;
+  font-size: 0.68rem;
+  font-weight: 780;
+  line-height: 1.45;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.omni-flash-model-card-head h4 {
+  color: var(--text-primary);
+  font-size: 0.96rem;
+  line-height: 1.3;
+}
+
+.omni-flash-model-card ul {
+  display: grid;
+  gap: 7px;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.omni-flash-model-card li {
+  position: relative;
+  padding-left: 18px;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  line-height: 1.55;
+}
+
+.omni-flash-model-card li::before {
+  content: '';
+  position: absolute;
+  top: 0.68em;
+  left: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: rgba(16, 185, 129, 0.7);
+}
+
 .prompt-library-shot-section {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -2253,6 +2400,8 @@ textarea.input-field {
 
   .prompt-library-section-head,
   .prompt-library-shot-grid,
+  .omni-flash-principle-grid,
+  .omni-flash-model-card-grid,
   .product-image-preset-grid {
     grid-template-columns: 1fr;
   }
@@ -2276,6 +2425,10 @@ textarea.input-field {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
+  .omni-flash-principle-head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .product-image-option-grid,
   .product-image-preset-head {
     grid-template-columns: 1fr;
@@ -2288,6 +2441,12 @@ textarea.input-field {
   }
 
   .prompt-library-shot-card .copy-btn {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .omni-flash-principle-card .copy-btn {
     grid-column: 1 / -1;
     width: 100%;
     justify-content: center;

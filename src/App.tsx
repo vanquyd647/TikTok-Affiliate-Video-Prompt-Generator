@@ -48,6 +48,8 @@ interface GenerateResult {
   resolvedContentType?: ResolvedContentType
   affiliateModeUsed?: AffiliateMode
   salesTemplateUsed?: SalesTemplate
+  storyboardEngineUsed?: StoryboardVideoEngine
+  storyboardTemplateUsed?: StoryboardTemplate
 }
 
 interface LookbookImagePrompt {
@@ -326,13 +328,15 @@ type ContentType = typeof CONTENT_TYPES[number]['value']
 type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
-type GenerationMode = 'video_prompt' | 'lookbook_image'
+type GenerationMode = 'video_prompt' | 'lookbook_image' | 'storyboard_video'
 type AppPageMode = 'core' | 'ootd_template' | 'prompt_library'
 type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
 type LookbookTheme = 'auto' | 'minimal_studio' | 'street_casual' | 'office_chic' | 'party_night' | 'vacation_resort'
 type LookbookPoseDirectionLock = 'auto' | PromptFacingDirection
+type StoryboardVideoEngine = 'veo_3_1' | 'omni_flash'
+type StoryboardTemplate = 'product_launch' | 'ugc_review' | 'cinematic_story'
 type ProductCategoryGroup =
   | 'all'
   | 'tops'
@@ -369,6 +373,55 @@ const GENERATION_MODES: Array<{
     desc: 'Tao prompt anh lookbook, khong can video',
     icon: ImageIcon,
     color: '#22c55e',
+  },
+  {
+    value: 'storyboard_video',
+    label: 'Storyboard Video',
+    desc: 'Template storyboard cho Veo/Omni Flash',
+    icon: Clapperboard,
+    color: 'var(--accent-amber)',
+  },
+]
+
+const STORYBOARD_VIDEO_ENGINE_OPTIONS: Array<{
+  value: StoryboardVideoEngine
+  label: string
+  desc: string
+  color: string
+}> = [
+  {
+    value: 'veo_3_1',
+    label: 'Veo 3.1',
+    desc: 'Keyframe first-frame -> last-frame, scene 8s',
+    color: 'var(--accent-pink)',
+  },
+  {
+    value: 'omni_flash',
+    label: 'Omni Flash',
+    desc: 'Natural-language video edit, multi-input + audio intent',
+    color: 'var(--accent-emerald)',
+  },
+]
+
+const STORYBOARD_TEMPLATE_OPTIONS: Array<{
+  value: StoryboardTemplate
+  label: string
+  desc: string
+}> = [
+  {
+    value: 'product_launch',
+    label: 'Product Launch',
+    desc: 'Hook, proof, detail, style payoff, CTA',
+  },
+  {
+    value: 'ugc_review',
+    label: 'UGC Review',
+    desc: 'Problem, try-on, proof, reaction, recommendation',
+  },
+  {
+    value: 'cinematic_story',
+    label: 'Cinematic Story',
+    desc: 'Mood, character, location, motion, editorial closer',
   },
 ]
 
@@ -6141,6 +6194,197 @@ Return STRICT JSON only, same schema:
   }
 }
 
+async function generateStoryboardVideoWithGemini(
+  apiKey: string,
+  model: string,
+  faceImage: string | null,
+  productImage: string | null,
+  backgroundImage: string | null,
+  duration: number,
+  aspectRatio: '9:16' | '16:9',
+  notes: string,
+  contentType: ContentType,
+  engine: StoryboardVideoEngine,
+  template: StoryboardTemplate,
+  productCategory: ProductCategory,
+): Promise<GenerateResult> {
+  const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
+  const sceneCount = durationInfo.scenes
+  const keyframeCount = durationInfo.keyframes
+  const engineLabel = engine === 'omni_flash' ? 'Gemini Omni Flash' : 'Veo 3.1'
+  const enginePromptMode = engine === 'omni_flash'
+    ? `OMNI FLASH MODE:
+- Write scene prompts as natural-language video creation/editing instructions.
+- Use text/image/audio/video reference naming: IMAGE_0 face, IMAGE_1 product, IMAGE_2 background, VIDEO_0 motion reference if user provides it later, AUDIO_0 beat/sound if user provides it later.
+- Include audio intent when useful: music mood, SFX, pacing, caption timing, no unauthorized speech impersonation.
+- State what to preserve across edits: identity, outfit, background anchors, timing, and text accuracy.`
+    : `VEO 3.1 MODE:
+- Write scene prompts for first-frame -> last-frame interpolation.
+- Every scene is exactly 8 seconds and must name START FRAME, END FRAME, camera movement, transition logic, and continuity locks.
+- Keyframes must be usable as image-generation prompts before sending pairs into Veo.`
+  const templateBrief = STORYBOARD_TEMPLATE_OPTIONS.find((item) => item.value === template)?.desc || 'Hook, proof, detail, payoff, CTA'
+  const contentTypeForPrompt = contentType === 'auto' ? 'AUTO - choose best fashion affiliate type' : contentType.toUpperCase()
+  const selectedProductCategoryOption = PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === normalizeProductCategory(productCategory, 'auto'))
+  const productCategoryLine = selectedProductCategoryOption
+    ? `${selectedProductCategoryOption.label}: ${selectedProductCategoryOption.detailHint}`
+    : 'Auto Boutique: infer product category from product reference image.'
+  const normalizedNotes = normalizePromptWhitespace(notes)
+
+  const parts: GeminiContentPart[] = []
+  if (faceImage) {
+    parts.push({ inlineData: { mimeType: 'image/jpeg', data: faceImage.split(',')[1] || faceImage } })
+    parts.push({ text: 'IMAGE_0 FACE REFERENCE: identity-only. Preserve facial likeness; ignore old outfit/background.' })
+  }
+  if (productImage) {
+    parts.push({ inlineData: { mimeType: 'image/jpeg', data: productImage.split(',')[1] || productImage } })
+    parts.push({ text: 'IMAGE_1 PRODUCT REFERENCE: outfit/product source. Preserve garment color, material, silhouette, trims, seams, hardware, footwear, and accessories exactly.' })
+  }
+  if (backgroundImage) {
+    parts.push({ inlineData: { mimeType: 'image/jpeg', data: backgroundImage.split(',')[1] || backgroundImage } })
+    parts.push({ text: 'IMAGE_2 BACKGROUND REFERENCE: environment/location/lighting cues only. Preserve spatial anchors when requested.' })
+  }
+
+  const systemPrompt = `You are a senior AI video storyboard director for fashion affiliate videos.
+
+Create a production-ready storyboard package for ${engineLabel}.
+
+PROJECT CONFIG:
+- Target engine: ${engineLabel}
+- Template: ${template.toUpperCase()} (${templateBrief})
+- Duration: ${duration}s
+- Aspect ratio: ${aspectRatio}
+- Required storyboard shape: ${keyframeCount} keyframes and ${sceneCount} scenes
+- Content type: ${contentTypeForPrompt}
+- Product category: ${productCategoryLine}
+- User notes: ${normalizedNotes || 'none'}
+
+${enginePromptMode}
+
+STORYBOARD RULES:
+- Keep adult fashion/product presentation tasteful and platform-safe.
+- Anchor face identity to IMAGE_0 when provided.
+- Anchor product/outfit details to IMAGE_1 when provided.
+- Anchor background/location to IMAGE_2 only when provided.
+- Create a clear beat order: hook -> product proof -> detail -> motion/styling -> payoff/CTA.
+- Use stable full-body or medium-wide readability for garment proof before close-ups.
+- Avoid random logos, random text, extra bags, outfit redesign, warped hands, and impossible body proportions.
+- If on-screen text is used, keep it short, readable, and exact.
+
+Return STRICT JSON only:
+{
+  "resolvedContentType": "ootd | ootdmirror | tiktokshop | outfitideas | grwm | review | haul | styling | fyp | boutiquefeed | luxury | sunnyaura | streetstyle | athleisure | partyoutfit",
+  "masterDNA": "short identity, outfit, visual style, continuity and production direction",
+  "createImagePrompt": "one master hero/reference frame prompt for the first storyboard frame",
+  "keyframes": [
+    {
+      "timestamp": "0s",
+      "subject": "...",
+      "action": "...",
+      "facingDirection": "front | back | left | right | three-quarter-left | three-quarter-right",
+      "location": "...",
+      "camera": "...",
+      "lighting": "...",
+      "style": "...",
+      "fullPrompt": "complete image prompt for this storyboard panel"
+    }
+  ],
+  "scenes": [
+    {
+      "timeRange": "0-8s",
+      "subject": "...",
+      "narrative": "...",
+      "startPose": "...",
+      "endPose": "...",
+      "composition": "...",
+      "cameraMovement": "...",
+      "lighting": "...",
+      "locationFlow": "...",
+      "fullPrompt": "complete ${engineLabel} video prompt for this beat"
+    }
+  ]
+}`
+
+  parts.push({ text: systemPrompt })
+
+  const parsed = await requestGeminiJsonWithParts(apiKey, model, parts, 0.78, 8192)
+  const resolvedContentType = normalizeHistoryResolvedContentType(parsed.resolvedContentType, contentType === 'auto' ? 'outfitideas' : contentType as ResolvedContentType)
+  const rawKeyframes = Array.isArray(parsed.keyframes) ? parsed.keyframes : []
+  const rawScenes = Array.isArray(parsed.scenes) ? parsed.scenes : []
+
+  const keyframes: KeyframePrompt[] = Array.from({ length: keyframeCount }, (_, index) => {
+    const raw = (rawKeyframes[index] && typeof rawKeyframes[index] === 'object') ? rawKeyframes[index] as Record<string, unknown> : {}
+    const timestamp = typeof raw.timestamp === 'string' && raw.timestamp.trim() ? raw.timestamp.trim() : `${Math.round(index * (duration / Math.max(keyframeCount - 1, 1)))}s`
+    const subject = toHistoryString(raw.subject, `Adult fashion model wearing the exact referenced product for ${engineLabel} storyboard.`)
+    const action = toHistoryString(raw.action, index === 0 ? 'Clean hook pose with full outfit readability.' : 'Continue storyboard motion while preserving product details.')
+    const facingCandidate = toHistoryString(raw.facingDirection, 'front') as PromptFacingDirection
+    const facingDirection = ['front', 'back', 'left', 'right', 'three-quarter-left', 'three-quarter-right'].includes(facingCandidate)
+      ? facingCandidate
+      : 'front'
+    const location = toHistoryString(raw.location, backgroundImage ? 'Reference-inspired location with stable anchors.' : 'Clean fashion studio set.')
+    const camera = toHistoryString(raw.camera, 'Medium-wide vertical fashion framing, full outfit readable.')
+    const lighting = toHistoryString(raw.lighting, 'Soft premium lighting with texture-enhancing rim light.')
+    const style = toHistoryString(raw.style, `${engineLabel} fashion storyboard, realistic, product-first.`)
+    const fullPrompt = toHistoryString(raw.fullPrompt, [
+      `SUBJECT: ${subject}`,
+      `ACTION: ${action}`,
+      `FACING: ${facingDirection}`,
+      `LOCATION: ${location}`,
+      `CAMERA: ${camera}`,
+      `LIGHTING: ${lighting}`,
+      `STYLE: ${style}`,
+    ].join('\n'))
+
+    return { index, timestamp, subject, action, facingDirection, location, camera, lighting, style, fullPrompt }
+  })
+
+  const scenes: ScenePrompt[] = Array.from({ length: sceneCount }, (_, index) => {
+    const raw = (rawScenes[index] && typeof rawScenes[index] === 'object') ? rawScenes[index] as Record<string, unknown> : {}
+    const startSec = index * 8
+    const endSec = Math.min(duration, startSec + 8)
+    const timeRange = toHistoryString(raw.timeRange, `${startSec}-${endSec}s`)
+    const subject = toHistoryString(raw.subject, keyframes[index]?.subject || keyframes[0]?.subject || '')
+    const narrative = toHistoryString(raw.narrative, `Storyboard beat ${index + 1} for ${engineLabel}, preserving face, product, and background continuity.`)
+    const startPose = toHistoryString(raw.startPose, keyframes[index]?.action || 'Start from previous storyboard panel.')
+    const endPose = toHistoryString(raw.endPose, keyframes[index + 1]?.action || 'End with product-readable pose.')
+    const composition = toHistoryString(raw.composition, keyframes[index]?.camera || 'Vertical product-first composition.')
+    const cameraMovement = toHistoryString(raw.cameraMovement, engine === 'omni_flash' ? 'Natural continuous video edit with smooth camera intent.' : 'Smooth first-frame to last-frame interpolation.')
+    const lighting = toHistoryString(raw.lighting, keyframes[index]?.lighting || 'Consistent lighting across the beat.')
+    const locationFlow = toHistoryString(raw.locationFlow, 'Keep one coherent location with stable anchors.')
+    const fallbackPrompt = engine === 'omni_flash'
+      ? [
+        `Create/edit a ${timeRange} ${aspectRatio} video beat for Gemini Omni Flash.`,
+        `Subject: ${subject}`,
+        `Action: ${narrative}`,
+        `Preserve: face identity, exact product details, timing, background anchors, and readable on-screen text.`,
+        `Camera: ${cameraMovement}`,
+        `Lighting/location: ${lighting}; ${locationFlow}`,
+      ].join('\n')
+      : [
+        `Veo 3.1 scene ${index + 1}, ${timeRange}, ${aspectRatio}.`,
+        `START FRAME: ${startPose}`,
+        `END FRAME: ${endPose}`,
+        `ACTION: ${narrative}`,
+        `CAMERA: ${cameraMovement}`,
+        `CONTINUITY: preserve identity, exact product details, lighting, and location anchors.`,
+      ].join('\n')
+    const fullPrompt = toHistoryString(raw.fullPrompt, fallbackPrompt)
+
+    return { index, timeRange, subject, narrative, startPose, endPose, composition, cameraMovement, lighting, locationFlow, fullPrompt }
+  })
+
+  return {
+    masterDNA: toHistoryString(parsed.masterDNA, `${engineLabel} storyboard for ${templateBrief}, anchored to provided references.`),
+    keyframes,
+    scenes,
+    createImagePrompt: toHistoryString(parsed.createImagePrompt, keyframes[0]?.fullPrompt || ''),
+    resolvedContentType,
+    affiliateModeUsed: FIXED_AFFILIATE_MODE,
+    salesTemplateUsed: FIXED_SALES_TEMPLATE,
+    storyboardEngineUsed: engine,
+    storyboardTemplateUsed: template,
+  }
+}
+
 async function generateLookbookImagePromptWithGemini(
   apiKey: string,
   model: string,
@@ -6539,7 +6783,20 @@ function normalizeHistoryAspectRatio(value: unknown, fallback: '9:16' | '16:9' =
 
 function normalizeHistoryGenerationMode(value: unknown, fallback: GenerationMode = 'video_prompt'): GenerationMode {
   const candidate = toHistoryString(value, fallback).toLowerCase()
-  return candidate === 'lookbook_image' ? 'lookbook_image' : 'video_prompt'
+  if (candidate === 'lookbook_image') return 'lookbook_image'
+  if (candidate === 'storyboard_video') return 'storyboard_video'
+  return 'video_prompt'
+}
+
+function normalizeStoryboardVideoEngine(value: unknown, fallback: StoryboardVideoEngine = 'veo_3_1'): StoryboardVideoEngine {
+  const candidate = toHistoryString(value, fallback).toLowerCase()
+  return candidate === 'omni_flash' ? 'omni_flash' : 'veo_3_1'
+}
+
+function normalizeStoryboardTemplate(value: unknown, fallback: StoryboardTemplate = 'product_launch'): StoryboardTemplate {
+  const candidate = toHistoryString(value, fallback).toLowerCase()
+  if (candidate === 'ugc_review' || candidate === 'cinematic_story') return candidate
+  return 'product_launch'
 }
 
 function inferDurationFromPromptCounts(keyframeCount: number, sceneCount: number, fallback = 32): number {
@@ -6997,6 +7254,12 @@ function buildPromptResultFromHistoryItem(
     resolvedContentType: resolvedType,
     affiliateModeUsed: FIXED_AFFILIATE_MODE,
     salesTemplateUsed: FIXED_SALES_TEMPLATE,
+    storyboardEngineUsed: metadataGenerationMode === 'storyboard_video'
+      ? normalizeStoryboardVideoEngine(metadata.storyboardEngine, 'veo_3_1')
+      : undefined,
+    storyboardTemplateUsed: metadataGenerationMode === 'storyboard_video'
+      ? normalizeStoryboardTemplate(metadata.storyboardTemplate, 'product_launch')
+      : undefined,
   }
 }
 
@@ -8700,6 +8963,22 @@ type ProductImagePromptPreset = {
   prompt: string
 }
 
+type OmniFlashGuideItem = {
+  id: string
+  title: string
+  badge: string
+  desc: string
+  promptMove: string
+}
+
+type OmniFlashModelCardItem = {
+  id: string
+  title: string
+  label: string
+  desc: string
+  checklist: string[]
+}
+
 const PROMPT_LIBRARY_FRAMEWORK_STEPS = [
   {
     title: '1. Art Direction',
@@ -8716,6 +8995,113 @@ const PROMPT_LIBRARY_FRAMEWORK_STEPS = [
 ]
 
 const PROMPT_LAYERING_FORMULA = '[Subject/Artist Style] + [Outfit & Textures] + [Environment/Background] + [Camera Movement & Angle] + [Lighting & Render Engine]'
+
+const OMNI_FLASH_PROMPT_GUIDE_URL = 'https://deepmind.google/models/gemini-omni/prompt-guide/'
+const OMNI_FLASH_MODEL_CARD_URL = 'https://storage.googleapis.com/deepmind-media/Model-Cards/Gemini-Omni-Flash-Model-Card.pdf'
+
+const OMNI_FLASH_GUIDE_ITEMS: OmniFlashGuideItem[] = [
+  {
+    id: 'prompt-anatomy',
+    title: 'Prompt anatomy cho Omni Flash',
+    badge: 'Shot + Style + Light + Place + Action',
+    desc: 'Dien du chi tiet de co control, nhung khong can viet qua co hoc nhu Veo. Omni hieu y dinh tong the va tu suy luan them logic the gioi.',
+    promptMove: `Create a 9:16 fashion product video from the provided references.
+Subject: real model wearing the exact product reference.
+Action: slow confident walk, one clean turn, garment detail reveal.
+Shot framing and motion: medium-wide to full-body, smooth push-in, no aggressive zoom.
+Style: premium TikTok fashion editorial, realistic, clean product readability.
+Lighting: soft studio key light with texture-enhancing rim light.
+Location: minimal modern fitting room with consistent background anchors.`,
+  },
+  {
+    id: 'iterative-edit',
+    title: 'Sua bang hoi thoai tung buoc',
+    badge: 'Natural conversation edit',
+    desc: 'Dung Omni nhu editor: giu video goc, chi sua mot thu moi lan. Phu hop doi background, caption, camera angle, action, lighting hoac object.',
+    promptMove: `Keep the current video structure, model, outfit, timing, and background continuity.
+Only change this: make the camera angle a clean 3/4 front view, then gently push in toward the garment texture.
+Do not change the outfit design, face, body proportions, or location.`,
+  },
+  {
+    id: 'camera-action',
+    title: 'Dieu khien camera va action ro rang',
+    badge: 'Oner / push in / locked off',
+    desc: 'Omni nhan ngon ngu quay phim truc tiep: one continuous shot, static, locked off, push in, punch in, dolly zoom, over-shoulder, close-up.',
+    promptMove: `One continuous shot.
+Start locked-off full-body, then slow push in to medium shot while the model turns slightly left.
+End on a crisp close-up of seams, fabric texture, buttons, and neckline.
+Keep motion smooth and realistic, no jump cuts.`,
+  },
+  {
+    id: 'reference-anything',
+    title: 'Ket hop nhieu input de giu consistency',
+    badge: 'Image + Video + Text + Audio',
+    desc: 'Co the gan nhieu reference: face, outfit, motion, style, storyboard, audio beat. Prompt can noi ro vai tro cua tung input.',
+    promptMove: `Use IMAGE_0 only for facial likeness.
+Use IMAGE_1 and IMAGE_2 only for outfit design, fabric, trims, and footwear.
+Use VIDEO_0 only for walking rhythm and camera motion.
+Use AUDIO_0 only for edit pacing and beat sync.
+Create one cohesive 9:16 product video with stable identity, stable outfit, and beat-matched movement.`,
+  },
+  {
+    id: 'text-world-knowledge',
+    title: 'Text, world knowledge va logic that',
+    badge: 'Readable text + real-world physics',
+    desc: 'Omni tot cho caption/text dong bo voi hinh, explainer, physics/action logic, cultural style va cac yeu cau phuc tap khong can mo ta tung frame.',
+    promptMove: `Add short on-screen text in sync with the outfit reveal:
+"FIT CHECK" appears during the full-body shot.
+"FABRIC DETAIL" appears during the close-up.
+"READY TO STYLE" appears on the final pose.
+Keep typography clean, readable, and aligned with the action. No random extra text.`,
+  },
+]
+
+const OMNI_FLASH_MODEL_CARD_ITEMS: OmniFlashModelCardItem[] = [
+  {
+    id: 'model-io',
+    title: 'Model I/O chinh thuc',
+    label: 'Text + Image + Audio + Video -> Video with audio',
+    desc: 'Model card xac nhan Gemini Omni Flash nhan text prompt, image, audio va video file; output la high-quality, high-resolution video co audio.',
+    checklist: [
+      'Dat ten ro tung reference: IMAGE_0, IMAGE_1, VIDEO_0, AUDIO_0.',
+      'Noi vai tro cua tung input: face, outfit, motion, style, beat, voice or background.',
+      'Khi can audio, prompt them mood/pace/SFX thay vi chi mo ta hinh anh.',
+    ],
+  },
+  {
+    id: 'channel-rollout',
+    title: 'Kenh su dung hien tai',
+    label: 'Gemini App / YouTube / Google Flow / Flow Music',
+    desc: 'Model card liet ke cac kenh phan phoi hien tai; phan evaluation/API cho developer va enterprise se duoc chia se khi rollout qua API.',
+    checklist: [
+      'Dung section nay nhu prompt playbook cho Gemini/Flow truoc.',
+      'Chua gan thanh model id API trong app khi chua co API contract ro rang.',
+      'Neu dua vao workflow team, ghi ro kenh test: Gemini, Flow, YouTube hay Flow Music.',
+    ],
+  },
+  {
+    id: 'production-limits',
+    title: 'Limitations can QA',
+    label: 'Consistency / complex motion / exact text',
+    desc: 'Google ghi ro van con thach thuc ve consistency qua nhieu lan edit, motion phuc tap va text hoan toan chinh xac.',
+    checklist: [
+      'Moi lan edit chi sua mot bien: camera, action, text, background hoac style.',
+      'Voi motion phuc tap, chia thanh beat ngan va gan input motion reference neu co.',
+      'Kiem tra text onscreen o output cuoi; khong giao final neu caption/logo bi sai chu.',
+    ],
+  },
+  {
+    id: 'safety-integrity',
+    title: 'Safety va content integrity',
+    label: 'Policy filters + SynthID + restricted speech editing',
+    desc: 'Model card nhan manh safety/red teaming, production filters, SynthID watermark va viec tam han che kha nang thay doi loi noi cua con nguoi.',
+    checklist: [
+      'Khong dung cho noi dung nguy hiem, bat hop phap, bao luc, hateful, sexual explicit, harmful hoac misleading.',
+      'Tranh impersonation, misrepresentation, deepfake speech hoac thay doi loi noi cua nguoi that.',
+      'Ghi chu output AI-generated trong handoff khi dung cho campaign/public posting.',
+    ],
+  },
+]
 
 const PROMPT_LIBRARY_SHOT_COMMANDS: PromptShotCommand[] = [
   {
@@ -9491,6 +9877,31 @@ function PromptLibraryPage() {
     ].join('\n')),
   ].join('\n\n---\n\n')
 
+  const omniFlashText = [
+    'GEMINI OMNI FLASH PROMPT GUIDE - VIDEO CREATION AND EDITING',
+    `SOURCE: ${OMNI_FLASH_PROMPT_GUIDE_URL}`,
+    `MODEL CARD: ${OMNI_FLASH_MODEL_CARD_URL}`,
+    'USE CASE: create/edit video through natural language, combine image/video/text/audio references, and refine results across turns.',
+    'CORE SHIFT: with Veo, write precise first-frame to last-frame instructions; with Omni Flash, state intent clearly and let world knowledge fill realistic detail.',
+    '',
+    ...OMNI_FLASH_GUIDE_ITEMS.map((item, index) => [
+      `${index + 1}. ${item.title}`,
+      `MODE: ${item.badge}`,
+      `NOTE: ${item.desc}`,
+      '',
+      item.promptMove,
+    ].join('\n')),
+    '',
+    'MODEL CARD ADDENDUM',
+    ...OMNI_FLASH_MODEL_CARD_ITEMS.map((item, index) => [
+      `${index + 1}. ${item.title}`,
+      `LABEL: ${item.label}`,
+      `NOTE: ${item.desc}`,
+      'CHECKLIST:',
+      ...item.checklist.map((line) => `- ${line}`),
+    ].join('\n')),
+  ].join('\n\n---\n\n')
+
   const fullLibraryText = INTERN_PROMPT_LIBRARY
     .map((item, index) => `${index + 1}. ${item.title}\nSTAGE: ${item.stage}\nOUTPUT: ${item.output}\n\n${item.prompt}`)
     .join('\n\n---\n\n')
@@ -9512,7 +9923,7 @@ function PromptLibraryPage() {
             </p>
           </div>
           <div className="prompt-library-actions">
-            <CopyButton text={`${frameworkText}\n\n---\n\n${productImageText}\n\n---\n\n${shotCommandText}\n\n---\n\n${fullLibraryText}`} />
+            <CopyButton text={`${frameworkText}\n\n---\n\n${omniFlashText}\n\n---\n\n${productImageText}\n\n---\n\n${shotCommandText}\n\n---\n\n${fullLibraryText}`} />
             <span>Copy full toolkit</span>
           </div>
         </div>
@@ -9549,6 +9960,61 @@ function PromptLibraryPage() {
             Cong thuc nay giup intern dich brief nghe thuat thanh prompt co logic,
             giam loi bien dang va de handoff cho team san xuat.
           </p>
+        </div>
+      </section>
+
+      <section className="omni-flash-guide-section">
+        <div className="prompt-library-section-head">
+          <div>
+            <div className="card-title">
+              <RefreshCw /> Gemini Omni Flash Prompt Guide
+            </div>
+            <h3>Model moi cho tao va sua video bang hoi thoai tu nhien</h3>
+            <p>
+              Cap nhat theo guide cua Google DeepMind: Omni Flash phu hop de tao/sua video theo nhieu vong,
+              dung reference image/video/text/audio, dieu khien camera/action/text va dua tren world knowledge.
+              Dung section nay khi lam viec trong Gemini, Google Flow hoac quy trinh video AI can edit lien tuc.
+            </p>
+          </div>
+          <div className="prompt-library-actions">
+            <CopyButton text={omniFlashText} />
+            <a href={OMNI_FLASH_PROMPT_GUIDE_URL} target="_blank" rel="noreferrer">Prompt guide</a>
+            <a href={OMNI_FLASH_MODEL_CARD_URL} target="_blank" rel="noreferrer">Model card</a>
+          </div>
+        </div>
+
+        <div className="omni-flash-principle-grid">
+          {OMNI_FLASH_GUIDE_ITEMS.map((item, index) => (
+            <article key={item.id} className="omni-flash-principle-card">
+              <div className="omni-flash-principle-head">
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <div>
+                  <p>{item.badge}</p>
+                  <h4>{item.title}</h4>
+                </div>
+                <CopyButton text={item.promptMove} />
+              </div>
+              <p className="omni-flash-principle-desc">{item.desc}</p>
+              <pre className="prompt-library-prompt omni-flash-prompt">{item.promptMove}</pre>
+            </article>
+          ))}
+        </div>
+
+        <div className="omni-flash-model-card-grid" aria-label="Gemini Omni Flash model card additions">
+          {OMNI_FLASH_MODEL_CARD_ITEMS.map((item) => (
+            <article key={item.id} className="omni-flash-model-card">
+              <div className="omni-flash-model-card-head">
+                <p>{item.label}</p>
+                <h4>{item.title}</h4>
+              </div>
+              <p className="omni-flash-principle-desc">{item.desc}</p>
+              <ul>
+                {item.checklist.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -9697,7 +10163,15 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const [aspectRatio, setAspectRatio] = useState<'9:16' | '16:9'>('9:16')
   const [generationMode, setGenerationMode] = useState<GenerationMode>(() => {
     const saved = localStorage.getItem('aff_generation_mode')
-    return saved === 'lookbook_image' ? 'lookbook_image' : 'video_prompt'
+    return normalizeHistoryGenerationMode(saved, 'video_prompt')
+  })
+  const [storyboardEngine, setStoryboardEngine] = useState<StoryboardVideoEngine>(() => {
+    const saved = localStorage.getItem('aff_storyboard_engine')
+    return normalizeStoryboardVideoEngine(saved, 'veo_3_1')
+  })
+  const [storyboardTemplate, setStoryboardTemplate] = useState<StoryboardTemplate>(() => {
+    const saved = localStorage.getItem('aff_storyboard_template')
+    return normalizeStoryboardTemplate(saved, 'product_launch')
   })
   const [lookbookImageCount, setLookbookImageCount] = useState<LookbookImageCount>(() => {
     const saved = localStorage.getItem('aff_lookbook_image_count')
@@ -9790,6 +10264,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   useEffect(() => { localStorage.setItem('aff_api_key', apiKey) }, [apiKey])
   useEffect(() => { localStorage.setItem('aff_model', model) }, [model])
   useEffect(() => { localStorage.setItem('aff_generation_mode', generationMode) }, [generationMode])
+  useEffect(() => { localStorage.setItem('aff_storyboard_engine', storyboardEngine) }, [storyboardEngine])
+  useEffect(() => { localStorage.setItem('aff_storyboard_template', storyboardTemplate) }, [storyboardTemplate])
   useEffect(() => { localStorage.setItem('aff_lookbook_image_count', String(lookbookImageCount)) }, [lookbookImageCount])
   useEffect(() => { localStorage.setItem('aff_lookbook_style_tone', lookbookStyleTone) }, [lookbookStyleTone])
   useEffect(() => { localStorage.setItem('aff_lookbook_theme', lookbookTheme) }, [lookbookTheme])
@@ -9997,6 +10473,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       metadata.videoPoseDirectionLock ?? metadata.lookbookPoseDirectionLock,
       'auto',
     )
+    const restoredStoryboardEngine = normalizeStoryboardVideoEngine(metadata.storyboardEngine, 'veo_3_1')
+    const restoredStoryboardTemplate = normalizeStoryboardTemplate(metadata.storyboardTemplate, 'product_launch')
 
     if (item.model.trim().length > 0) {
       setModel(item.model.trim())
@@ -10024,6 +10502,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       setLookbookImageCount(restoredLookbookImageCount)
       setLookbookStyleTone(restoredLookbookStyleTone)
       setLookbookTheme(restoredLookbookTheme)
+      setStoryboardEngine(restoredStoryboardEngine)
+      setStoryboardTemplate(restoredStoryboardTemplate)
       setVideoPoseDirectionLock(restoredVideoPoseDirectionLock)
       setDuration(restoredDuration)
       setAspectRatio(restoredAspectRatio)
@@ -10093,6 +10573,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const canGenerateVoiceover = canGenerate && voiceoverProductName.trim().length > 0
   const hasPromptResult = result !== null
   const hasVideoPromptResult = result !== null && result.keyframes.length > 0 && result.scenes.length > 0
+  const resultVideoEngineLabel = result?.storyboardEngineUsed
+    ? STORYBOARD_VIDEO_ENGINE_OPTIONS.find((item) => item.value === result.storyboardEngineUsed)?.label || 'Veo 3.1'
+    : 'Veo 3.1'
   const currentLookbookPrompts: LookbookImagePrompt[] = (() => {
     if (!result) return []
     if (Array.isArray(result.lookbookImagePrompts) && result.lookbookImagePrompts.length > 0) {
@@ -10240,6 +10723,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     && activeProductCategoryOption.suggestedTypes.includes(contentType as ResolvedContentType)
   const lookbookStyleToneLabel = lookbookStyleTone === 'sexy' ? 'Sexy' : 'Classic'
   const lookbookThemeLabel = getLookbookThemeOption(lookbookTheme).label
+  const storyboardEngineLabel = STORYBOARD_VIDEO_ENGINE_OPTIONS.find((item) => item.value === storyboardEngine)?.label || 'Veo 3.1'
+  const storyboardTemplateLabel = STORYBOARD_TEMPLATE_OPTIONS.find((item) => item.value === storyboardTemplate)?.label || 'Product Launch'
   const videoPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === videoPoseDirectionLock)?.label || 'Auto'
   const isMirrorPhoneTemplateScenario = activeOotdTemplateScenario.cameraFormat === 'mirror_phone'
   const isCozyTemplateScenario = activeOotdTemplateScenario.id === 'cozy_home_background'
@@ -10262,6 +10747,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       : 'OFF (them background image de khoa)')
   const promptPrimaryLabel = isOotdTemplatePage
     ? 'Prompt OOTD Template'
+    : generationMode === 'storyboard_video'
+      ? 'Storyboard Video'
     : generationMode === 'lookbook_image'
       ? 'Anh Lookbook'
       : 'Prompt Package'
@@ -10315,14 +10802,17 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const handleGenerate = async () => {
     const MAX_ATTEMPTS = 3
     const isLookbookImageMode = generationMode === 'lookbook_image'
+    const isStoryboardVideoMode = generationMode === 'storyboard_video'
     setLoading(true)
     setSelectedHistoryId(null)
     setLoadingStageIndex(0)
     setPromptToast({
       kind: 'loading',
-      message: isLookbookImageMode
-        ? 'Dang tao prompt anh lookbook, vui long cho trong giay lat...'
-        : 'Dang tao Prompt Package, vui long cho trong giay lat...',
+      message: isStoryboardVideoMode
+        ? `Dang tao storyboard cho ${storyboardEngineLabel}, vui long cho trong giay lat...`
+        : isLookbookImageMode
+          ? 'Dang tao prompt anh lookbook, vui long cho trong giay lat...'
+          : 'Dang tao Prompt Package, vui long cho trong giay lat...',
     })
     setError('')
     setResult(null)
@@ -10336,6 +10826,96 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     try {
       if (!apiKey.trim()) {
         throw new Error('Vui long nhap Gemini API Key de AI phan tich anh va tao boi canh')
+      }
+
+      if (isStoryboardVideoMode) {
+        pushLog(`[MODE] storyboard_video engine=${storyboardEngine} template=${storyboardTemplate}`)
+        const generated = await generateStoryboardVideoWithGemini(
+          apiKey,
+          model,
+          faceImage,
+          productImage,
+          backgroundImage,
+          duration,
+          aspectRatio,
+          notes,
+          contentType,
+          storyboardEngine,
+          storyboardTemplate,
+          productCategory,
+        )
+
+        setResult(generated)
+        setSelectedContentType(generated.resolvedContentType || (contentType === 'auto' ? 'outfitideas' : contentType as ResolvedContentType))
+        setActiveTab('keyframes')
+        setPromptToast({
+          kind: 'success',
+          message: `Da tao xong storyboard ${duration}s cho ${storyboardEngineLabel}. Ban co the copy keyframe/scene prompt de dua vao ${storyboardEngineLabel}.`,
+        })
+
+        const workHistoryGeneratedAt = Date.now()
+        const promptPackageForHistory = {
+          masterDNA: generated.masterDNA,
+          createImagePrompt: generated.createImagePrompt || '',
+          keyframes: generated.keyframes.map((keyframe) => ({
+            index: keyframe.index,
+            timestamp: keyframe.timestamp,
+            subject: keyframe.subject,
+            action: keyframe.action,
+            facingDirection: keyframe.facingDirection || '',
+            location: keyframe.location,
+            camera: keyframe.camera,
+            lighting: keyframe.lighting,
+            style: keyframe.style,
+            fullPrompt: keyframe.fullPrompt,
+          })),
+          scenes: generated.scenes.map((scene) => ({
+            index: scene.index,
+            timeRange: scene.timeRange,
+            narrative: scene.narrative,
+            startPose: scene.startPose,
+            endPose: scene.endPose,
+            cameraMovement: scene.cameraMovement,
+            locationFlow: scene.locationFlow || '',
+            fullPrompt: scene.fullPrompt,
+          })),
+        }
+
+        pushLog(`[OK] Storyboard video generated successfully keyframes=${generated.keyframes.length} scenes=${generated.scenes.length}`)
+        setErrorLogLines([...logLines])
+
+        void persistWorkHistory({
+          action: 'prompt',
+          model,
+          contentType: generated.resolvedContentType || (contentType === 'auto' ? 'outfitideas' : contentType as ResolvedContentType),
+          notes: notes.trim(),
+          generatedAt: workHistoryGeneratedAt,
+          metadata: {
+            generationMode,
+            storyboardEngine,
+            storyboardTemplate,
+            inputContentType: contentType,
+            resolvedContentType: generated.resolvedContentType || (contentType === 'auto' ? 'outfitideas' : contentType as ResolvedContentType),
+            duration,
+            aspectRatio,
+            keyframeCount: generated.keyframes.length,
+            sceneCount: generated.scenes.length,
+            generatedLocations: generated.keyframes.map((keyframe) => keyframe.location).filter(Boolean).slice(0, 10),
+            hasFaceImage: Boolean(faceImage),
+            hasProductImage: Boolean(productImage),
+            hasBackgroundImage: Boolean(backgroundImage),
+            promptPackage: promptPackageForHistory,
+          },
+        })
+          .then(() => loadWorkHistory({ silent: true }))
+          .catch((saveError) => {
+            console.warn(
+              'Could not save prompt work history:',
+              saveError instanceof Error ? saveError.message : saveError
+            )
+          })
+
+        return
       }
 
       if (isLookbookImageMode) {
@@ -11291,7 +11871,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
           '── KEYFRAME IMAGE PROMPTS ──',
           ...result.keyframes.map(kf => `\n${kf.fullPrompt}`),
           '',
-          '── SCENE PROMPTS (Veo 3.1) ──',
+          `── SCENE PROMPTS (${resultVideoEngineLabel}) ──`,
           ...result.scenes.map(sc => `\n${sc.fullPrompt}`),
           ...(result.createImagePrompt
             ? ['', '── CREATE IMAGE PROMPT ──', result.createImagePrompt]
@@ -11726,7 +12306,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
             {/* Video/Image Config */}
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title">
-                <Clapperboard /> {generationMode === 'lookbook_image' ? 'Cau hinh anh Lookbook' : 'Cau hinh Video'}
+                <Clapperboard /> {generationMode === 'lookbook_image' ? 'Cau hinh anh Lookbook' : generationMode === 'storyboard_video' ? 'Cau hinh Storyboard Video' : 'Cau hinh Video'}
               </div>
 
               {generationMode === 'video_prompt' && (
@@ -11774,6 +12354,85 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                       ))}
                     </div>
                   </div>
+                </>
+              )}
+
+              {generationMode === 'storyboard_video' && (
+                <>
+                  <div className="input-group">
+                    <label className="input-label">
+                      <Clock size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Thoi luong storyboard
+                    </label>
+                    <div className="chip-group">
+                      {DURATIONS.map(d => (
+                        <button
+                          key={`storyboard-duration-${d.value}`}
+                          className={`chip ${duration === d.value ? 'active' : ''}`}
+                          onClick={() => setDuration(d.value)}
+                          id={`storyboard-duration-${d.value}`}
+                        >
+                          {d.label}
+                          <span style={{ fontSize: '0.65rem', opacity: 0.7, marginLeft: 4 }}>
+                            {d.scenes} beat/{d.keyframes} panel
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: 10 }}>
+                    <label className="input-label">
+                      <Clapperboard size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Engine tao video AI
+                    </label>
+                    <div className="chip-group">
+                      {STORYBOARD_VIDEO_ENGINE_OPTIONS.map((engineOption) => (
+                        <button
+                          key={`storyboard-engine-${engineOption.value}`}
+                          className={`chip ${storyboardEngine === engineOption.value ? 'active' : ''}`}
+                          onClick={() => setStoryboardEngine(engineOption.value)}
+                          id={`storyboard-engine-${engineOption.value}`}
+                          style={storyboardEngine === engineOption.value ? {
+                            background: `color-mix(in srgb, ${engineOption.color} 15%, transparent)`,
+                            borderColor: engineOption.color,
+                            color: engineOption.color,
+                          } : {}}
+                        >
+                          {engineOption.label}
+                          <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                            {engineOption.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="input-group" style={{ marginBottom: 10 }}>
+                    <label className="input-label">
+                      <FileText size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                      Template storyboard
+                    </label>
+                    <div className="chip-group">
+                      {STORYBOARD_TEMPLATE_OPTIONS.map((templateOption) => (
+                        <button
+                          key={`storyboard-template-${templateOption.value}`}
+                          className={`chip ${storyboardTemplate === templateOption.value ? 'active' : ''}`}
+                          onClick={() => setStoryboardTemplate(templateOption.value)}
+                          id={`storyboard-template-${templateOption.value}`}
+                        >
+                          {templateOption.label}
+                          <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                            {templateOption.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <p className="ai-task-hint" style={{ marginBottom: 0 }}>
+                    Mode nay tao storyboard co {durationInfo.keyframes} panel + {durationInfo.scenes} video beat. Chon Veo de lay first-frame/last-frame prompts; chon Omni Flash de lay prompt tao/sua video bang ngon ngu tu nhien, co reference va audio intent.
+                  </p>
                 </>
               )}
 
@@ -12361,6 +13020,26 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
               </div>
             )}
 
+            {generationMode === 'storyboard_video' && (
+              <div className="card" style={{
+                marginBottom: 16,
+                background: 'rgba(245, 158, 11, 0.06)',
+                borderColor: 'rgba(245, 158, 11, 0.2)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Clapperboard size={14} color="var(--accent-amber)" />
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-amber)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    Storyboard Template
+                  </span>
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                  Tao <strong>{durationInfo.keyframes} storyboard panels</strong> va <strong>{durationInfo.scenes} video beats</strong> cho <strong>{storyboardEngineLabel}</strong>.
+                  <br />
+                  Template hien tai: <strong>{storyboardTemplateLabel}</strong>. Veo uu tien cap keyframe; Omni Flash uu tien prompt tao/sua video bang hoi thoai tu nhien.
+                </p>
+              </div>
+            )}
+
             <div className={`prompt-inline-status prompt-inline-status-${promptStatusKind}`}>
               <div className="prompt-inline-status-head">
                 {loading ? (
@@ -12426,7 +13105,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   <Film className="results-empty-icon" />
                   <p className="results-empty-text">Chưa có prompt nào</p>
                   <p className="results-empty-hint">
-                    Upload ảnh face & sản phẩm, chọn cấu hình, rồi nhấn "{generationMode === 'lookbook_image' ? 'Tạo Ảnh Lookbook' : 'Tạo Prompt Package'}" để bắt đầu.
+                    Upload ảnh face & sản phẩm, chọn cấu hình, rồi nhấn "{generationMode === 'storyboard_video' ? 'Tạo Storyboard Video' : generationMode === 'lookbook_image' ? 'Tạo Ảnh Lookbook' : 'Tạo Prompt Package'}" để bắt đầu.
                   </p>
                   <div className="results-empty-steps">
                     <div className="results-empty-step">
@@ -12435,7 +13114,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                     </div>
                     <div className="results-empty-step">
                       <span className="results-empty-step-index">2</span>
-                      <p>{generationMode === 'lookbook_image' ? 'Chon mode Lookbook Image, so luong 5/10/20, tone classic/sexy va kieu noi dung' : 'Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp'}</p>
+                      <p>{generationMode === 'storyboard_video' ? 'Chon engine Veo/Omni Flash, template storyboard, thoi luong va ti le khung hinh' : generationMode === 'lookbook_image' ? 'Chon mode Lookbook Image, so luong 5/10/20, tone classic/sexy va kieu noi dung' : 'Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp'}</p>
                     </div>
                     <div className="results-empty-step">
                       <span className="results-empty-step-index">3</span>
@@ -12585,7 +13264,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                     <>
                       {activeTab === 'all' && (
                         <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-pink)', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                          🎬 Scene Prompts (Veo 3.1)
+                          🎬 Scene Prompts ({resultVideoEngineLabel})
                         </h3>
                       )}
                       {result.scenes.map((sc) => (
@@ -13081,7 +13760,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
             ? 'Tao Prompt OOTD Template'
             : generationMode === 'lookbook_image'
               ? 'Tao Anh Lookbook'
-              : 'Tao Prompt Package'}
+              : generationMode === 'storyboard_video'
+                ? 'Tao Storyboard Video'
+                : 'Tao Prompt Package'}
         >
           <div className={`prompt-floating-bar ${loading ? 'is-loading' : ''}`}>
             <div className="prompt-floating-meta">
@@ -13090,6 +13771,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   ? 'Tao Prompt OOTD Template'
                   : generationMode === 'lookbook_image'
                     ? 'Tao Anh Lookbook'
+                    : generationMode === 'storyboard_video'
+                      ? 'Tao Storyboard Video'
                     : 'Tao Prompt Package'}
               </p>
               <p className={`prompt-floating-subtitle ${promptStatusKind}`}>
@@ -13110,6 +13793,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                     ? 'Dang tao prompt OOTD template...'
                     : generationMode === 'lookbook_image'
                       ? 'Dang tao anh lookbook...'
+                      : generationMode === 'storyboard_video'
+                        ? 'Dang tao storyboard...'
                       : 'Dang tao prompt...'}
                 </>
               ) : (
@@ -13119,6 +13804,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                     ? 'Tao Prompt OOTD Template'
                     : generationMode === 'lookbook_image'
                       ? 'Tao Anh Lookbook'
+                      : generationMode === 'storyboard_video'
+                        ? 'Tao Storyboard Video'
                       : 'Tao Prompt Package'}
                   <ArrowRight size={16} />
                 </>
