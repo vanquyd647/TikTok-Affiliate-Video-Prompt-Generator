@@ -3,7 +3,7 @@ import {
   Upload, Image as ImageIcon, Sparkles, Film, Camera, Clock,
   Copy, Check, Download, X, Eye, EyeOff, Clapperboard,
   Layers, ArrowRight, Wand2, FileText, AlertCircle, Ratio,
-  Shirt, Star, TrendingUp, MessageSquare, Palette, History, RefreshCw
+  Shirt, Star, TrendingUp, MessageSquare, Palette, History, RefreshCw, Music
 } from 'lucide-react'
 import './index.css'
 
@@ -328,7 +328,7 @@ type ContentType = typeof CONTENT_TYPES[number]['value']
 type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
-type GenerationMode = 'video_prompt' | 'lookbook_image' | 'storyboard_video'
+type GenerationMode = 'video_prompt' | 'lookbook_image' | 'storyboard_video' | 'music_video'
 type AppPageMode = 'core' | 'ootd_template' | 'prompt_library'
 type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam'
 type LookbookImageCount = 5 | 10 | 20
@@ -380,6 +380,13 @@ const GENERATION_MODES: Array<{
     desc: 'Template storyboard cho Veo/Omni Flash',
     icon: Clapperboard,
     color: 'var(--accent-amber)',
+  },
+  {
+    value: 'music_video',
+    label: 'Music Video',
+    desc: 'MV ca nhac: image + scene + audio mood',
+    icon: Music,
+    color: '#ec4899',
   },
 ]
 
@@ -6194,6 +6201,23 @@ Return STRICT JSON only, same schema:
   }
 }
 
+function buildMusicVideoModeNotes(notes: string): string {
+  const base = normalizePromptWhitespace(notes)
+  const musicVideoDirective = `MUSIC VIDEO MODE LOCK:
+- Create a production-ready Korean ballad / pop MV storyboard, not a product-sales ad.
+- Use the user script/audio as the emotional spine: lyric beat -> character emotion -> visual metaphor -> camera move.
+- Output must still follow the app schema: N+1 keyframes and 8s video scenes.
+- Keyframes are Nano Banana Pro-style image prompts for stable character reference and first/last-frame generation.
+- Scenes are Veo-ready first-frame -> last-frame prompts with camera movement, lighting, emotion, continuity, and audio mood.
+- Prioritize music-video language: intro mood, verse loneliness, pre-chorus visual metaphor, emotional drop, outro resolution.
+- Include music/audio intent in each scene when useful: beat rise, vocal phrase, silence gap, rain ambience, soft piano/synth mood.
+- Keep all characters fictional adults, fully clothed, modest, no real celebrity imitation, no readable UI text, no unsafe distress.`
+
+  return base
+    ? `${base}\n\n${musicVideoDirective}`
+    : musicVideoDirective
+}
+
 async function generateStoryboardVideoWithGemini(
   apiKey: string,
   model: string,
@@ -6785,6 +6809,7 @@ function normalizeHistoryGenerationMode(value: unknown, fallback: GenerationMode
   const candidate = toHistoryString(value, fallback).toLowerCase()
   if (candidate === 'lookbook_image') return 'lookbook_image'
   if (candidate === 'storyboard_video') return 'storyboard_video'
+  if (candidate === 'music_video') return 'music_video'
   return 'video_prompt'
 }
 
@@ -7254,10 +7279,10 @@ function buildPromptResultFromHistoryItem(
     resolvedContentType: resolvedType,
     affiliateModeUsed: FIXED_AFFILIATE_MODE,
     salesTemplateUsed: FIXED_SALES_TEMPLATE,
-    storyboardEngineUsed: metadataGenerationMode === 'storyboard_video'
+    storyboardEngineUsed: metadataGenerationMode === 'storyboard_video' || metadataGenerationMode === 'music_video'
       ? normalizeStoryboardVideoEngine(metadata.storyboardEngine, 'veo_3_1')
       : undefined,
-    storyboardTemplateUsed: metadataGenerationMode === 'storyboard_video'
+    storyboardTemplateUsed: metadataGenerationMode === 'storyboard_video' || metadataGenerationMode === 'music_video'
       ? normalizeStoryboardTemplate(metadata.storyboardTemplate, 'product_launch')
       : undefined,
   }
@@ -9106,43 +9131,43 @@ const OMNI_FLASH_MODEL_CARD_ITEMS: OmniFlashModelCardItem[] = [
 const PROMPT_LIBRARY_SHOT_COMMANDS: PromptShotCommand[] = [
   {
     id: 'front-bodice',
-    title: 'Lenh 1: Goc truoc - Ton vong 1 va chi tiet mat truoc trang phuc',
-    english: 'Front View - Bust Line, Bodice Fit, and Front Outfit Detail Focus',
-    purpose: 'Dung cho anh/video mo dau de thay ro phom than tren, cau truc cup/nguc ao, corset, nut, khoa, hoa tiet va do om cua trang phuc.',
+    title: 'Lenh 1: Goc truoc - Kieu dang co ao va chi tiet mat truoc',
+    english: 'Front View - Bodice Fit, Neckline, and Front Outfit Detail Focus',
+    purpose: 'Dung cho anh/video mo dau de thay ro phom than tren, cau truc co ao, hoa tiet, nut, khoa, thiet ke mat truoc va do om cua trang phuc.',
   },
   {
     id: 'back-silhouette',
-    title: 'Lenh 2: Goc sau - Diem nhan duong cong vong 3 va phom dang phia sau',
-    english: 'Back View - Back Silhouette, Hip/Glute Contour, and Rear Outfit Construction Focus',
-    purpose: 'Dung de kiem tra phom dang phia sau, duong may, do om, day dan corset, khoa keo, tui sau va ty le eo-hong mot cach thoi trang, khong phan cam.',
+    title: 'Lenh 2: Goc sau - Diem nhan phom dang va thiet ke phia sau',
+    english: 'Back View - Back Silhouette, Hips/Waistline Contour, and Rear Outfit Construction Focus',
+    purpose: 'Dung de kiem tra phom dang phia sau, duong may, do om, day dan corset, khoa keo, tui sau va ty le eo-hong mot cach thoi trang, lich su.',
   },
   {
     id: 'side-profile',
-    title: 'Lenh 3: Goc nghieng 90 do - Toi da hoa duong cong chu S',
-    english: 'Full Side Profile - Maximizing the S-Curve, Posture, and Garment Fit',
-    purpose: 'Dung cho lookbook hoac video body profile, the hien tu the, do dung phom, do om eo-hong va cach chat lieu nam tren co the.',
+    title: 'Lenh 3: Goc nghieng 90 do - Ton vinh dang dung va kieu dang',
+    english: 'Full Side Profile - Sleek Silhouette, Posture, and Garment Fit',
+    purpose: 'Dung cho lookbook hoac video fashion profile, the hien tu the, do dung phom, kieu dang eo-hong va cach chat lieu nam tren co the.',
   },
   {
     id: 'front-three-quarter',
     title: 'Lenh 4: Goc cheo truoc 3/4 - Can bang than tren va hong',
-    english: 'Dynamic 3/4 Front View - Balanced Bust, Waist, and Hip Proportion Showcase',
+    english: 'Dynamic 3/4 Front View - Balanced Bodice, Waist, and Hip Proportion Showcase',
     purpose: 'Goc chuyen nghiep cho nghe si/model, giup thay dong thoi bieu cam, than tren, eo, hong va chuyen dong outfit.',
   },
   {
     id: 'back-three-quarter',
-    title: 'Lenh 5: Goc cheo sau 3/4 - Duong cong vong 3 va chi tiet lung',
-    english: 'Dynamic 3/4 Back View - Glute Curve, Waist-to-Hip Ratio, and Back Detail Focus',
-    purpose: 'Dung cho corset, vay om, quan jeans, do the thao hoac look co chi tiet mat sau nhu day dan, cat cup, tui, seam line.',
+    title: 'Lenh 5: Goc cheo sau 3/4 - Duong net hong-eo va chi tiet lung',
+    english: 'Dynamic 3/4 Back View - Hip Contour, Waist-to-Hip Ratio, and Back Detail Focus',
+    purpose: 'Dung cho corset, vay om, quan jeans, do the thao hoac look co chi tiet mat sau nhu day dan, duong cat may, tui, seam line.',
   },
   {
     id: 'top-closeup',
     title: 'Lenh 6: Can canh than tren - Chat lieu phan ao va corset/bodice',
     english: 'Close-up of the Top/Bodice - Fabric Texture, Fit, Neckline, and Corset Detail Focus',
-    purpose: 'Tap trung vao ren, lua, cup ao, neckline, vai, tay ao, day dan, nut, khoa va texture ma khong lam mat tong the thoi trang.',
+    purpose: 'Tap trung vao ren, lua, thiet ke co/nguc ao, neckline, vai, tay ao, day dan, nut, khoa va texture ma khong lam mat tong the thoi trang.',
   },
   {
     id: 'bottom-closeup',
-    title: 'Lenh 7: Can canh than duoi - Do om sat va duong net hong/vong 3',
+    title: 'Lenh 7: Can canh than duoi - Do om phom va duong net vung hong/eo',
     english: 'Close-up of the Bottom - Outfit Fit, Fabric Sheen, Hip Line, and Lower Silhouette Focus',
     purpose: 'Dung de khoe chat lieu satin, denim, da, thun co gian, do bong, do day vai va cach vay/quan giu phom o vung hong.',
   },
@@ -10747,6 +10772,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       : 'OFF (them background image de khoa)')
   const promptPrimaryLabel = isOotdTemplatePage
     ? 'Prompt OOTD Template'
+    : generationMode === 'music_video'
+      ? 'Music Video'
     : generationMode === 'storyboard_video'
       ? 'Storyboard Video'
     : generationMode === 'lookbook_image'
@@ -10764,7 +10791,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       : error
         ? 'Co loi khi tao prompt OOTD template. Kiem tra thong bao de thu lai.'
         : hasPromptResult
-          ? `Prompt OOTD template da san sang (${selectedContentType.toUpperCase()} • ${duration}s • scenario ${activeOotdTemplateScenario.label} • video ${activeOotdTemplateScenario.referenceVideoId}).`
+            ? `Prompt OOTD template da san sang (${selectedContentType.toUpperCase()} • ${duration}s • scenario ${activeOotdTemplateScenario.label} • video ${activeOotdTemplateScenario.referenceVideoId}).`
           : canGenerate
             ? `Page nay khoa beat script OOTD theo scenario ${activeOotdTemplateScenario.label}. Ban co the doi duration output, doi anh san pham roi bam Tao Prompt OOTD Template (khong can giong timeline tung giay).`
             : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
@@ -10774,11 +10801,15 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         ? 'Có lỗi khi tạo prompt. Kiểm tra thông báo để thử lại.'
         : hasPromptResult
           ? hasVideoPromptResult
-            ? `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL} • pose ${videoPoseDirectionLockLabel}).`
+            ? generationMode === 'music_video'
+              ? `Music Video storyboard da san sang (${duration}s • ${storyboardEngineLabel} • ${selectedContentType.toUpperCase()}).`
+              : `Prompt package da san sang (${selectedContentType.toUpperCase()} • ${FIXED_STRATEGY_LABEL} • pose ${videoPoseDirectionLockLabel}).`
               : `Prompt anh lookbook da san sang (${currentLookbookPrompts.length} pics • ${lookbookStyleToneLabel} • ${lookbookThemeLabel}).`
           : canGenerate
             ? generationMode === 'lookbook_image'
                 ? `San sang tao ${lookbookImageCount} prompt anh lookbook (${lookbookStyleToneLabel} • ${lookbookThemeLabel}, khong video).`
+              : generationMode === 'music_video'
+                ? `San sang tao Music Video storyboard (${durationInfo.keyframes} keyframe + ${durationInfo.scenes} scene, co audio mood).`
               : `San sang tao Prompt Package (${FIXED_STRATEGY_DESC}).`
             : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
   const selectedSeoVariant = seoResult
@@ -10802,14 +10833,19 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const handleGenerate = async () => {
     const MAX_ATTEMPTS = 3
     const isLookbookImageMode = generationMode === 'lookbook_image'
-    const isStoryboardVideoMode = generationMode === 'storyboard_video'
+    const isMusicVideoMode = generationMode === 'music_video'
+    const isStoryboardVideoMode = generationMode === 'storyboard_video' || isMusicVideoMode
+    const activeStoryboardTemplate = isMusicVideoMode ? 'cinematic_story' : storyboardTemplate
+    const activeStoryboardTemplateLabel = isMusicVideoMode ? 'Music Video Story' : storyboardTemplateLabel
     setLoading(true)
     setSelectedHistoryId(null)
     setLoadingStageIndex(0)
     setPromptToast({
       kind: 'loading',
       message: isStoryboardVideoMode
-        ? `Dang tao storyboard cho ${storyboardEngineLabel}, vui long cho trong giay lat...`
+        ? isMusicVideoMode
+          ? `Dang tao Music Video storyboard cho ${storyboardEngineLabel}, vui long cho trong giay lat...`
+          : `Dang tao storyboard cho ${storyboardEngineLabel}, vui long cho trong giay lat...`
         : isLookbookImageMode
           ? 'Dang tao prompt anh lookbook, vui long cho trong giay lat...'
           : 'Dang tao Prompt Package, vui long cho trong giay lat...',
@@ -10829,7 +10865,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       }
 
       if (isStoryboardVideoMode) {
-        pushLog(`[MODE] storyboard_video engine=${storyboardEngine} template=${storyboardTemplate}`)
+        pushLog(`[MODE] ${generationMode} engine=${storyboardEngine} template=${activeStoryboardTemplate}`)
         const generated = await generateStoryboardVideoWithGemini(
           apiKey,
           model,
@@ -10838,10 +10874,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
           backgroundImage,
           duration,
           aspectRatio,
-          notes,
+          isMusicVideoMode ? buildMusicVideoModeNotes(notes) : notes,
           contentType,
           storyboardEngine,
-          storyboardTemplate,
+          activeStoryboardTemplate,
           productCategory,
         )
 
@@ -10850,7 +10886,9 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         setActiveTab('keyframes')
         setPromptToast({
           kind: 'success',
-          message: `Da tao xong storyboard ${duration}s cho ${storyboardEngineLabel}. Ban co the copy keyframe/scene prompt de dua vao ${storyboardEngineLabel}.`,
+          message: isMusicVideoMode
+            ? `Da tao xong Music Video storyboard ${duration}s cho ${storyboardEngineLabel}. Ban co the copy keyframe/scene prompt de dung voi audio.`
+            : `Da tao xong storyboard ${duration}s cho ${storyboardEngineLabel}. Ban co the copy keyframe/scene prompt de dua vao ${storyboardEngineLabel}.`,
         })
 
         const workHistoryGeneratedAt = Date.now()
@@ -10893,7 +10931,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
           metadata: {
             generationMode,
             storyboardEngine,
-            storyboardTemplate,
+            storyboardTemplate: activeStoryboardTemplate,
+            storyboardTemplateLabel: activeStoryboardTemplateLabel,
             inputContentType: contentType,
             resolvedContentType: generated.resolvedContentType || (contentType === 'auto' ? 'outfitideas' : contentType as ResolvedContentType),
             duration,
@@ -12306,7 +12345,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
             {/* Video/Image Config */}
             <div className="card" style={{ marginBottom: 16 }}>
               <div className="card-title">
-                <Clapperboard /> {generationMode === 'lookbook_image' ? 'Cau hinh anh Lookbook' : generationMode === 'storyboard_video' ? 'Cau hinh Storyboard Video' : 'Cau hinh Video'}
+                <Clapperboard /> {generationMode === 'lookbook_image' ? 'Cau hinh anh Lookbook' : generationMode === 'music_video' ? 'Cau hinh Music Video' : generationMode === 'storyboard_video' ? 'Cau hinh Storyboard Video' : 'Cau hinh Video'}
               </div>
 
               {generationMode === 'video_prompt' && (
@@ -12357,12 +12396,12 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                 </>
               )}
 
-              {generationMode === 'storyboard_video' && (
+              {(generationMode === 'storyboard_video' || generationMode === 'music_video') && (
                 <>
                   <div className="input-group">
                     <label className="input-label">
                       <Clock size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-                      Thoi luong storyboard
+                      {generationMode === 'music_video' ? 'Thoi luong MV' : 'Thoi luong storyboard'}
                     </label>
                     <div className="chip-group">
                       {DURATIONS.map(d => (
@@ -12370,7 +12409,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                           key={`storyboard-duration-${d.value}`}
                           className={`chip ${duration === d.value ? 'active' : ''}`}
                           onClick={() => setDuration(d.value)}
-                          id={`storyboard-duration-${d.value}`}
+                          id={`${generationMode}-duration-${d.value}`}
                         >
                           {d.label}
                           <span style={{ fontSize: '0.65rem', opacity: 0.7, marginLeft: 4 }}>
@@ -12408,30 +12447,44 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                     </div>
                   </div>
 
-                  <div className="input-group" style={{ marginBottom: 10 }}>
-                    <label className="input-label">
-                      <FileText size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
-                      Template storyboard
-                    </label>
-                    <div className="chip-group">
-                      {STORYBOARD_TEMPLATE_OPTIONS.map((templateOption) => (
-                        <button
-                          key={`storyboard-template-${templateOption.value}`}
-                          className={`chip ${storyboardTemplate === templateOption.value ? 'active' : ''}`}
-                          onClick={() => setStoryboardTemplate(templateOption.value)}
-                          id={`storyboard-template-${templateOption.value}`}
-                        >
-                          {templateOption.label}
-                          <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
-                            {templateOption.desc}
-                          </span>
-                        </button>
-                      ))}
+                  {generationMode === 'storyboard_video' ? (
+                    <div className="input-group" style={{ marginBottom: 10 }}>
+                      <label className="input-label">
+                        <FileText size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                        Template storyboard
+                      </label>
+                      <div className="chip-group">
+                        {STORYBOARD_TEMPLATE_OPTIONS.map((templateOption) => (
+                          <button
+                            key={`storyboard-template-${templateOption.value}`}
+                            className={`chip ${storyboardTemplate === templateOption.value ? 'active' : ''}`}
+                            onClick={() => setStoryboardTemplate(templateOption.value)}
+                            id={`storyboard-template-${templateOption.value}`}
+                          >
+                            {templateOption.label}
+                            <span style={{ fontSize: '0.62rem', opacity: 0.75, marginLeft: 4 }}>
+                              {templateOption.desc}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="input-group" style={{ marginBottom: 10 }}>
+                      <label className="input-label">
+                        <Music size={12} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                        Music video preset
+                      </label>
+                      <p className="ai-task-hint" style={{ marginBottom: 0 }}>
+                        Khoa template Cinematic Story: intro mood → verse loneliness → visual metaphor → emotional drop → outro resolution. Notes nen dan loi bai hat, beat, mood nhac, reference nhan vat.
+                      </p>
+                    </div>
+                  )}
 
                   <p className="ai-task-hint" style={{ marginBottom: 0 }}>
-                    Mode nay tao storyboard co {durationInfo.keyframes} panel + {durationInfo.scenes} video beat. Chon Veo de lay first-frame/last-frame prompts; chon Omni Flash de lay prompt tao/sua video bang ngon ngu tu nhien, co reference va audio intent.
+                    {generationMode === 'music_video'
+                      ? `Mode nay tao MV co ${durationInfo.keyframes} keyframe anh va ${durationInfo.scenes} scene video, toi uu theo lyric/audio mood va Veo first-frame -> last-frame.`
+                      : `Mode nay tao storyboard co ${durationInfo.keyframes} panel + ${durationInfo.scenes} video beat. Chon Veo de lay first-frame/last-frame prompts; chon Omni Flash de lay prompt tao/sua video bang ngon ngu tu nhien, co reference va audio intent.`}
                   </p>
                 </>
               )}
@@ -13020,22 +13073,36 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
               </div>
             )}
 
-            {generationMode === 'storyboard_video' && (
+            {(generationMode === 'storyboard_video' || generationMode === 'music_video') && (
               <div className="card" style={{
                 marginBottom: 16,
-                background: 'rgba(245, 158, 11, 0.06)',
-                borderColor: 'rgba(245, 158, 11, 0.2)',
+                background: generationMode === 'music_video' ? 'rgba(236, 72, 153, 0.06)' : 'rgba(245, 158, 11, 0.06)',
+                borderColor: generationMode === 'music_video' ? 'rgba(236, 72, 153, 0.22)' : 'rgba(245, 158, 11, 0.2)',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <Clapperboard size={14} color="var(--accent-amber)" />
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--accent-amber)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                    Storyboard Template
+                  {generationMode === 'music_video' ? (
+                    <Music size={14} color="#ec4899" />
+                  ) : (
+                    <Clapperboard size={14} color="var(--accent-amber)" />
+                  )}
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: generationMode === 'music_video' ? '#ec4899' : 'var(--accent-amber)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {generationMode === 'music_video' ? 'Music Video Mode' : 'Storyboard Template'}
                   </span>
                 </div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  Tao <strong>{durationInfo.keyframes} storyboard panels</strong> va <strong>{durationInfo.scenes} video beats</strong> cho <strong>{storyboardEngineLabel}</strong>.
-                  <br />
-                  Template hien tai: <strong>{storyboardTemplateLabel}</strong>. Veo uu tien cap keyframe; Omni Flash uu tien prompt tao/sua video bang hoi thoai tu nhien.
+                  {generationMode === 'music_video' ? (
+                    <>
+                      Tao <strong>{durationInfo.keyframes} MV keyframes</strong> va <strong>{durationInfo.scenes} music-video scenes</strong> cho <strong>{storyboardEngineLabel}</strong>.
+                      <br />
+                      Preset: <strong>Cinematic Story</strong>, uu tien lyric beat, audio mood, visual metaphor, emotional drop va outro resolution.
+                    </>
+                  ) : (
+                    <>
+                      Tao <strong>{durationInfo.keyframes} storyboard panels</strong> va <strong>{durationInfo.scenes} video beats</strong> cho <strong>{storyboardEngineLabel}</strong>.
+                      <br />
+                      Template hien tai: <strong>{storyboardTemplateLabel}</strong>. Veo uu tien cap keyframe; Omni Flash uu tien prompt tao/sua video bang hoi thoai tu nhien.
+                    </>
+                  )}
                 </p>
               </div>
             )}
@@ -13105,7 +13172,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   <Film className="results-empty-icon" />
                   <p className="results-empty-text">Chưa có prompt nào</p>
                   <p className="results-empty-hint">
-                    Upload ảnh face & sản phẩm, chọn cấu hình, rồi nhấn "{generationMode === 'storyboard_video' ? 'Tạo Storyboard Video' : generationMode === 'lookbook_image' ? 'Tạo Ảnh Lookbook' : 'Tạo Prompt Package'}" để bắt đầu.
+                    Upload ảnh face & sản phẩm, chọn cấu hình, rồi nhấn "{generationMode === 'music_video' ? 'Tạo Music Video' : generationMode === 'storyboard_video' ? 'Tạo Storyboard Video' : generationMode === 'lookbook_image' ? 'Tạo Ảnh Lookbook' : 'Tạo Prompt Package'}" để bắt đầu.
                   </p>
                   <div className="results-empty-steps">
                     <div className="results-empty-step">
@@ -13114,7 +13181,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                     </div>
                     <div className="results-empty-step">
                       <span className="results-empty-step-index">2</span>
-                      <p>{generationMode === 'storyboard_video' ? 'Chon engine Veo/Omni Flash, template storyboard, thoi luong va ti le khung hinh' : generationMode === 'lookbook_image' ? 'Chon mode Lookbook Image, so luong 5/10/20, tone classic/sexy va kieu noi dung' : 'Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp'}</p>
+                      <p>{generationMode === 'music_video' ? 'Chon engine, thoi luong, ti le khung hinh va dan lyric/audio mood vao ghi chu' : generationMode === 'storyboard_video' ? 'Chon engine Veo/Omni Flash, template storyboard, thoi luong va ti le khung hinh' : generationMode === 'lookbook_image' ? 'Chon mode Lookbook Image, so luong 5/10/20, tone classic/sexy va kieu noi dung' : 'Chọn thời lượng, tỉ lệ và kiểu nội dung phù hợp'}</p>
                     </div>
                     <div className="results-empty-step">
                       <span className="results-empty-step-index">3</span>
@@ -13760,6 +13827,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
             ? 'Tao Prompt OOTD Template'
             : generationMode === 'lookbook_image'
               ? 'Tao Anh Lookbook'
+              : generationMode === 'music_video'
+                ? 'Tao Music Video'
               : generationMode === 'storyboard_video'
                 ? 'Tao Storyboard Video'
                 : 'Tao Prompt Package'}
@@ -13771,6 +13840,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   ? 'Tao Prompt OOTD Template'
                   : generationMode === 'lookbook_image'
                     ? 'Tao Anh Lookbook'
+                    : generationMode === 'music_video'
+                      ? 'Tao Music Video'
                     : generationMode === 'storyboard_video'
                       ? 'Tao Storyboard Video'
                     : 'Tao Prompt Package'}
@@ -13793,6 +13864,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                     ? 'Dang tao prompt OOTD template...'
                     : generationMode === 'lookbook_image'
                       ? 'Dang tao anh lookbook...'
+                      : generationMode === 'music_video'
+                        ? 'Dang tao music video...'
                       : generationMode === 'storyboard_video'
                         ? 'Dang tao storyboard...'
                       : 'Dang tao prompt...'}
@@ -13804,6 +13877,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                     ? 'Tao Prompt OOTD Template'
                     : generationMode === 'lookbook_image'
                       ? 'Tao Anh Lookbook'
+                      : generationMode === 'music_video'
+                        ? 'Tao Music Video'
                       : generationMode === 'storyboard_video'
                         ? 'Tao Storyboard Video'
                       : 'Tao Prompt Package'}
