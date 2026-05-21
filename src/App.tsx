@@ -11118,6 +11118,90 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   }
 
   // Derived
+  const isMusicTemplateMode = generationMode === 'music_video' || isMusicVideoTemplatePage
+  const isStoryboardTemplateMode = !isMusicTemplateMode && (generationMode === 'storyboard_video' || isStoryboardTemplatePage)
+  const activeInputScope = isMusicTemplateMode
+    ? 'music'
+    : isStoryboardTemplateMode
+      ? 'storyboard'
+      : 'core'
+  const activeFaceImage = isMusicTemplateMode
+    ? musicFaceImage
+    : isStoryboardTemplateMode
+      ? storyboardFaceImage
+      : faceImage
+  const activeProductImage = isMusicTemplateMode
+    ? musicProductImage
+    : isStoryboardTemplateMode
+      ? storyboardProductImage
+      : productImage
+  const activeBackgroundImage = isMusicTemplateMode
+    ? musicBackgroundImage
+    : isStoryboardTemplateMode
+      ? storyboardBackgroundImage
+      : backgroundImage
+  const setActiveFaceImage = isMusicTemplateMode
+    ? setMusicFaceImage
+    : isStoryboardTemplateMode
+      ? setStoryboardFaceImage
+      : setFaceImage
+  const setActiveProductImage = isMusicTemplateMode
+    ? setMusicProductImage
+    : isStoryboardTemplateMode
+      ? setStoryboardProductImage
+      : setProductImage
+  const setActiveBackgroundImage = isMusicTemplateMode
+    ? setMusicBackgroundImage
+    : isStoryboardTemplateMode
+      ? setStoryboardBackgroundImage
+      : setBackgroundImage
+  const activeFacePasteTarget = isMusicTemplateMode
+    ? 'music_face'
+    : isStoryboardTemplateMode
+      ? 'storyboard_face'
+      : 'face'
+  const activeProductPasteTarget = isMusicTemplateMode
+    ? 'music_product'
+    : isStoryboardTemplateMode
+      ? 'storyboard_product'
+      : 'product'
+  const activeBackgroundPasteTarget = isMusicTemplateMode
+    ? 'music_background'
+    : isStoryboardTemplateMode
+      ? 'storyboard_background'
+      : 'background'
+  const activeImageInputTitle = isMusicTemplateMode
+    ? 'Ảnh đầu vào Music Video'
+    : isStoryboardTemplateMode
+      ? 'Ảnh đầu vào Storyboard'
+      : 'Ảnh đầu vào'
+  const activeFaceLabel = isMusicTemplateMode
+    ? 'Ảnh nhân vật / ca sĩ chính'
+    : isStoryboardTemplateMode
+      ? 'Ảnh nhân vật storyboard'
+      : 'Ảnh Face Model'
+  const activeProductLabel = isMusicTemplateMode
+    ? 'Ảnh outfit / character look MV'
+    : isStoryboardTemplateMode
+      ? 'Ảnh sản phẩm / outfit storyboard'
+      : 'Ảnh Sản phẩm (Model mặc sản phẩm)'
+  const activeBackgroundLabel = isMusicTemplateMode
+    ? 'Ảnh bối cảnh MV / mood location'
+    : isStoryboardTemplateMode
+      ? 'Ảnh bối cảnh storyboard'
+      : 'Ảnh Background (Location tham chiếu - tùy chọn)'
+  const activeFaceRecentKey = activeInputScope === 'core'
+    ? 'aff_recent_local_images_face'
+    : `aff_recent_local_images_${activeInputScope}_face`
+  const activeProductRecentKey = activeInputScope === 'core'
+    ? 'aff_recent_local_images_product'
+    : `aff_recent_local_images_${activeInputScope}_product`
+  const activeBackgroundRecentKey = activeInputScope === 'core'
+    ? 'aff_recent_local_images_background'
+    : `aff_recent_local_images_${activeInputScope}_background`
+  const storyboardEngineLabel = STORYBOARD_VIDEO_ENGINE_OPTIONS.find((item) => item.value === storyboardEngine)?.label || 'Veo 3.1'
+  const storyboardTemplateLabel = STORYBOARD_TEMPLATE_OPTIONS.find((item) => item.value === storyboardTemplate)?.label || 'Product Launch'
+
   const durationInfo = DURATIONS.find(d => d.value === duration)!
   const hasMusicVideoInputs = Boolean(musicAudioReference)
     && Boolean(musicScriptReference?.text.trim())
@@ -11277,89 +11361,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     && activeProductCategoryOption.suggestedTypes.includes(contentType as ResolvedContentType)
   const lookbookStyleToneLabel = lookbookStyleTone === 'sexy' ? 'Sexy' : 'Classic'
   const lookbookThemeLabel = getLookbookThemeOption(lookbookTheme).label
-  const storyboardEngineLabel = STORYBOARD_VIDEO_ENGINE_OPTIONS.find((item) => item.value === storyboardEngine)?.label || 'Veo 3.1'
-  const storyboardTemplateLabel = STORYBOARD_TEMPLATE_OPTIONS.find((item) => item.value === storyboardTemplate)?.label || 'Product Launch'
-  const isMusicTemplateMode = generationMode === 'music_video' || isMusicVideoTemplatePage
-  const isStoryboardTemplateMode = !isMusicTemplateMode && (generationMode === 'storyboard_video' || isStoryboardTemplatePage)
-  const activeInputScope = isMusicTemplateMode
-    ? 'music'
-    : isStoryboardTemplateMode
-      ? 'storyboard'
-      : 'core'
-  const activeFaceImage = isMusicTemplateMode
-    ? musicFaceImage
-    : isStoryboardTemplateMode
-      ? storyboardFaceImage
-      : faceImage
-  const activeProductImage = isMusicTemplateMode
-    ? musicProductImage
-    : isStoryboardTemplateMode
-      ? storyboardProductImage
-      : productImage
-  const activeBackgroundImage = isMusicTemplateMode
-    ? musicBackgroundImage
-    : isStoryboardTemplateMode
-      ? storyboardBackgroundImage
-      : backgroundImage
-  const setActiveFaceImage = isMusicTemplateMode
-    ? setMusicFaceImage
-    : isStoryboardTemplateMode
-      ? setStoryboardFaceImage
-      : setFaceImage
-  const setActiveProductImage = isMusicTemplateMode
-    ? setMusicProductImage
-    : isStoryboardTemplateMode
-      ? setStoryboardProductImage
-      : setProductImage
-  const setActiveBackgroundImage = isMusicTemplateMode
-    ? setMusicBackgroundImage
-    : isStoryboardTemplateMode
-      ? setStoryboardBackgroundImage
-      : setBackgroundImage
-  const activeFacePasteTarget = isMusicTemplateMode
-    ? 'music_face'
-    : isStoryboardTemplateMode
-      ? 'storyboard_face'
-      : 'face'
-  const activeProductPasteTarget = isMusicTemplateMode
-    ? 'music_product'
-    : isStoryboardTemplateMode
-      ? 'storyboard_product'
-      : 'product'
-  const activeBackgroundPasteTarget = isMusicTemplateMode
-    ? 'music_background'
-    : isStoryboardTemplateMode
-      ? 'storyboard_background'
-      : 'background'
-  const activeImageInputTitle = isMusicTemplateMode
-    ? 'Ảnh đầu vào Music Video'
-    : isStoryboardTemplateMode
-      ? 'Ảnh đầu vào Storyboard'
-      : 'Ảnh đầu vào'
-  const activeFaceLabel = isMusicTemplateMode
-    ? 'Ảnh nhân vật / ca sĩ chính'
-    : isStoryboardTemplateMode
-      ? 'Ảnh nhân vật storyboard'
-      : 'Ảnh Face Model'
-  const activeProductLabel = isMusicTemplateMode
-    ? 'Ảnh outfit / character look MV'
-    : isStoryboardTemplateMode
-      ? 'Ảnh sản phẩm / outfit storyboard'
-      : 'Ảnh Sản phẩm (Model mặc sản phẩm)'
-  const activeBackgroundLabel = isMusicTemplateMode
-    ? 'Ảnh bối cảnh MV / mood location'
-    : isStoryboardTemplateMode
-      ? 'Ảnh bối cảnh storyboard'
-      : 'Ảnh Background (Location tham chiếu - tùy chọn)'
-  const activeFaceRecentKey = activeInputScope === 'core'
-    ? 'aff_recent_local_images_face'
-    : `aff_recent_local_images_${activeInputScope}_face`
-  const activeProductRecentKey = activeInputScope === 'core'
-    ? 'aff_recent_local_images_product'
-    : `aff_recent_local_images_${activeInputScope}_product`
-  const activeBackgroundRecentKey = activeInputScope === 'core'
-    ? 'aff_recent_local_images_background'
-    : `aff_recent_local_images_${activeInputScope}_background`
+
   const videoPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === videoPoseDirectionLock)?.label || 'Auto'
   const isMirrorPhoneTemplateScenario = activeOotdTemplateScenario.cameraFormat === 'mirror_phone'
   const isCozyTemplateScenario = activeOotdTemplateScenario.id === 'cozy_home_background'
