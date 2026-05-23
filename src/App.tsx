@@ -1027,21 +1027,21 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_REFERENCE_VIDEO_FILE_NAME = 'tiktok_video.m
 const OOTD_TEMPLATE_RELAXED_BOUTIQUE_SOURCE_DURATION_SEC = 39
 const OOTD_TEMPLATE_RELAXED_BOUTIQUE_PRODUCT_BRIEF = `Keep the relaxed non-mirror front-camera boutique fit-check progression from the reference video.
 - Preserve observer-camera framing: model stands in front of the filming camera, no phone-in-hand mirror framing.
-- Keep progression: smooth walk-in / hair-flip hook -> relaxed full-fit proof -> hanger/product comparison proof -> soft side/three-quarter silhouette turn -> confident front reset / close.
+- Keep progression: smooth walk-in / hair-flip hook -> relaxed full-fit proof -> product-detail motion proof -> soft side/three-quarter silhouette turn -> confident front reset / close.
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
-- Maintain full-body readability while keeping product details visible in every beat.
+- Maintain full-body readability while keeping product details visible in every beat; make the template usable for dresses, skirts, tops, bottoms, outerwear, sets, shoes, and accessories.
 - Background style lock: dark grey boutique wall, arched display niches, floating shelf, LED strip accents, ceiling curve, and warm wood floor in one continuous venue.
 - Camera lock: fixed or very gently stabilized front-lens observer camera; no mirror, no selfie, no phone in hand, no aggressive zoom.
-- Framing lock: begin medium/full-body, step back to show full head-to-toe, allow natural medium framing for comparison, then return to full/three-quarter readability.
-- Prop rule: optional hanger/product comparison moment is allowed only as fit/material proof; do not let extra garments become the hero product.
+- Framing lock: begin medium/full-body, step back to show full head-to-toe, allow natural medium framing for product-detail proof, then return to full/three-quarter readability.
+- Prop rule: do not bring hand-held product props or extra loose garments into frame; use the worn product, body movement, hand styling, fabric touch, hem/collar/waist/strap/closure detail, and natural pose changes as proof.
 - Direction rule: face stays mostly front toward camera; allow gentle side/three-quarter turns for silhouette proof; avoid prolonged back-facing hold.
 - Voice rule: visual-only relaxed fit-check, no voiceover/spoken dialogue, no lip-sync behavior.`
 const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootd',
   detectedDurationSec: OOTD_TEMPLATE_RELAXED_BOUTIQUE_SOURCE_DURATION_SEC,
   hookStyle: 'Relaxed front-camera boutique hook with smooth hair flip / walk-in energy and immediate outfit presence.',
-  narrativeStructure: 'Front-camera hook -> relaxed full-fit proof -> hanger/product comparison -> smooth side/three-quarter silhouette proof -> confident front reset close (order lock, timeline-flex).',
+  narrativeStructure: 'Front-camera hook -> relaxed full-fit proof -> product-detail motion proof -> smooth side/three-quarter silhouette proof -> confident front reset close (order lock, timeline-flex).',
   ctaStyle: 'Soft boutique recommendation close, no hard sell, visual proof first.',
   colorGrade: 'clean boutique lighting, dark grey textured wall, warm wood floor, soft LED accent highlights, natural skin tone',
   pacing: 'smooth relaxed fit-check pacing with graceful pose holds, soft turns, and no rushed mirror/selfie energy',
@@ -1067,11 +1067,11 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
     {
       index: 2,
       timestamp: 'Step 3',
-      beatName: 'HANGER COMPARISON PROOF',
-      description: 'Bring one or two hanger garments into frame as comparison/material proof while keeping the currently selected product as hero.',
-      contextHint: 'Same boutique set; hanger motion should stay centered and not block the model face for long.',
-      cameraHint: 'Stable observer-camera medium/full frame; garment swing is smooth, not chaotic.',
-      narrationHint: 'No spoken line; comparison is visual only.',
+      beatName: 'PRODUCT DETAIL MOTION PROOF',
+      description: 'Use the worn product for proof: gentle fabric touch, hem/collar/waist/strap/closure adjustment, small step, or hand styling based on the selected fashion category.',
+      contextHint: 'Same boutique set; no extra loose garment or hand-held product prop enters the frame.',
+      cameraHint: 'Stable observer-camera medium/full frame; product detail remains readable without cropping the overall outfit for too long.',
+      narrationHint: 'No spoken line; detail proof is visual only.',
     },
     {
       index: 3,
@@ -1093,8 +1093,8 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
     },
   ],
   generatedScript: `Open with a relaxed front-camera walk-in or hair-flip hook in the boutique set.
-Settle into a full-body fit proof so silhouette, waistline, length, and footwear are readable.
-Bring hanger garments into frame for comparison/material proof without changing the hero product.
+Settle into a full-body fit proof so silhouette, waistline, length, footwear, and category-specific details are readable.
+Use hands and small body movement to show product details on the worn item; do not bring extra loose garments into frame.
 Turn smoothly into a side or three-quarter pose with relaxed hand styling for drape and body-line proof.
 Return to front/three-quarter hero stance and close with calm boutique confidence.`,
   generatedAt: 0,
@@ -8531,14 +8531,14 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const frontCameraNaturalActionFallback = isNightCityTemplateScenario
     ? 'Natural front-camera glam fit-check flow with smooth step-in, gentle turn-return, and clear outfit readability.'
     : (isRelaxedBoutiqueTemplateScenario
-      ? 'Relaxed non-mirror front-camera boutique fit-check flow with smooth walk-in, hair-flip energy, full-fit proof, optional hanger comparison, soft side turn, and calm front reset.'
+      ? 'Relaxed non-mirror front-camera boutique fit-check flow with smooth walk-in, hair-flip energy, full-fit proof, worn-product detail motion, soft side turn, and calm front reset.'
     : (isCozyTemplateScenario
       ? 'Natural front-camera fit-check flow with subtle weight shifts, gentle turn-return, and clear full-body outfit readability.'
       : 'Natural front-camera fit-check movement with relaxed micro-poses and clear outfit readability.'))
   const frontCameraAnchoredActionSentence = isNightCityTemplateScenario
     ? 'Model performs a natural front-camera glam fit-check flow in the provided background scene with smooth step-in, shoulder-line turns, and confident close posture.'
     : (isRelaxedBoutiqueTemplateScenario
-      ? 'Model performs a relaxed non-mirror front-camera boutique fit-check in the provided background scene with smooth hair movement, full-fit proof, optional hanger comparison, soft side/three-quarter turn, and calm front reset.'
+      ? 'Model performs a relaxed non-mirror front-camera boutique fit-check in the provided background scene with smooth hair movement, full-fit proof, category-appropriate detail motion on the worn product, soft side/three-quarter turn, and calm front reset.'
     : (isCozyTemplateScenario
       ? 'Model performs a natural front-camera fit-check flow in the provided background scene with subtle weight shifts, gentle turn-return, and relaxed hand-to-hip pose changes.'
       : 'Model performs a natural front-camera fit-check flow in the provided background scene with relaxed micro-poses and smooth turn-return continuity.'))
@@ -8982,7 +8982,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           ? (isNightCityTemplateScenario
             ? 'Natural glam fit-check flow: full-look hero, smooth turn-return, upper-body detail pass, and confident close.'
             : (isRelaxedBoutiqueTemplateScenario
-              ? 'Relaxed boutique fit-check flow: smooth walk-in or hair-flip hook, full-fit proof, hanger comparison, soft side/three-quarter turn, and calm front reset.'
+              ? 'Relaxed boutique fit-check flow: smooth walk-in or hair-flip hook, full-fit proof, worn-product detail motion, soft side/three-quarter turn, and calm front reset.'
             : 'Natural fit-check flow: full-look pose, gentle turn-return, detail-check, and relaxed close with clear outfit visibility.'))
           : 'Hold full-fit front pose, then detail-check and gentle side-angle confirmation with clear outfit visibility.'))
         : scriptBeat.length > 0
