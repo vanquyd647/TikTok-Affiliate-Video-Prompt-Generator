@@ -1,0 +1,310 @@
+export type GeminiAgentSkillStage =
+  | 'visual_extract'
+  | 'creative_plan'
+  | 'package_generation'
+  | 'qa_repair'
+  | 'location_repair'
+  | 'motion_repair'
+  | 'storyboard_video'
+  | 'music_video'
+  | 'lookbook_image'
+  | 'seo_copy'
+  | 'voiceover'
+  | 'tiktok_analysis'
+  | 'detached_tiktok_remix'
+
+export type GeminiAgentSkillId =
+  | 'reference-lock'
+  | 'user-intent-priority'
+  | 'fashion-affiliate-strategy'
+  | 'nano-banana-image-framework'
+  | 'image-text-localization'
+  | 'creative-director-controls'
+  | 'veo-prompting-guide'
+  | 'realtime-web-visualization'
+  | 'veo-continuity'
+  | 'image-to-video-handoff'
+  | 'veo-fast-iteration'
+  | 'veo-native-audio-localization'
+  | 'location-context'
+  | 'safety-policy'
+  | 'schema-qa'
+  | 'storyboard-engine'
+  | 'music-video-storyboard'
+  | 'lookbook-image'
+  | 'commerce-copy'
+  | 'tiktok-analysis-transfer'
+
+interface GeminiAgentSkill {
+  id: GeminiAgentSkillId
+  name: string
+  mission: string
+  prompt: string
+}
+
+export interface BuildGeminiAgentSkillBlockOptions {
+  stage: GeminiAgentSkillStage
+  skillIds: GeminiAgentSkillId[]
+  engineLabel?: string
+  outputContract?: string
+  runtimeNotes?: string[]
+}
+
+export const GEMINI_AGENT_SKILLS: readonly GeminiAgentSkill[] = [
+  {
+    id: 'reference-lock',
+    name: 'Reference Lock Agent',
+    mission: 'Separate identity, product, and background references so Gemini never mixes source responsibilities.',
+    prompt: `- FACE reference is identity-only: preserve face, skin tone, hair, and body proportion; ignore old outfit, props, and location.
+- PRODUCT reference is garment/product-only: preserve exact color, material, silhouette, trims, seams, hardware, fit cues, and category.
+- BACKGROUND reference is environment-only: use location, lighting, spatial anchors, weather, and mood; never copy people, garments, logos, or product identity from it.
+- If references conflict, preserve identity from FACE, product from PRODUCT, and environment from BACKGROUND.
+- When a product category is locked, make that category the hero product and treat other visible garments as styling context only.`,
+  },
+  {
+    id: 'user-intent-priority',
+    name: 'User Intent Priority Agent',
+    mission: 'Apply user notes before default creative heuristics while preserving hard safety and schema constraints.',
+    prompt: `- Read USER NOTES before default style, trend, type, or template rules.
+- Conflict order: USER NOTES > explicit product category lock > selected template/type defaults > fallback heuristics.
+- Defaults may fill only dimensions the user did not specify.
+- Non-negotiable constraints remain: output schema, exact counts, reference fidelity, interpolation continuity, location/source locks, and real-person safety.
+- When user notes request slower pacing, different location flow, alternate framing, or a specific mood, honor it unless it violates a non-negotiable constraint.`,
+  },
+  {
+    id: 'fashion-affiliate-strategy',
+    name: 'Fashion Affiliate Strategy Agent',
+    mission: 'Turn visual assets into conversion-oriented women-fashion short-video concepts without losing product readability.',
+    prompt: `- Product/garment is the hero in every frame; keep purchase-relevant details readable.
+- Build a short-form arc: hook -> value -> proof -> payoff/close.
+- Prefer trust-first creator-native behavior: natural pauses, fabric touch, fit proof, movement test, practical styling, and believable reactions.
+- Avoid abstract cinematic filler that hides the garment or makes the output feel like a generic ad.
+- Fit-model framing should match content type: full-body for fitcheck/party/detail-sensitive outputs, mixed full-body and medium proof for reviews/shop content, practical styling variety for outfit ideas.`,
+  },
+  {
+    id: 'nano-banana-image-framework',
+    name: 'Nano Banana Image Framework Agent',
+    mission: 'Write Nano Banana image-generation and image-edit prompts using the correct framework for blank-canvas, reference-based, and editing workflows.',
+    prompt: `- For text-to-image without references, use: [Subject] + [Action] + [Location/context] + [Composition] + [Style].
+- For multimodal generation with references, use: [Reference images] + [Relationship instruction] + [New scenario].
+- For image editing, state what changes and what stays exactly the same; use semantic masking language when editing a specific part.
+- For composition transfer, identify the base image, the object/style reference, and the final combined result.
+- Start prompts with a strong operation verb: create, transform, replace, preserve, localize, upscale, restyle, compose, or render.
+- When using many reference images, assign explicit roles such as FACE_REFERENCE, PRODUCT_REFERENCE, FABRIC_REFERENCE, BACKGROUND_REFERENCE, LOGO_REFERENCE, and TEXT_REFERENCE.
+- Preserve materiality: name fabric, finish, texture, surface, seams, trim, hardware, transparency/opacity, and product scale.
+- Include target aspect ratio and quality intent when known: 1:1, 4:5, 9:16, 16:9, 21:9, 2K, 4K, product mockup, poster, storyboard panel, or ad creative.`,
+  },
+  {
+    id: 'image-text-localization',
+    name: 'Image Text Localization Agent',
+    mission: 'Make generated image text sharp, quoted, styled, translated, and safe for posters, mockups, UI, and ads.',
+    prompt: `- Use exact quotes around text that must appear in the image.
+- Specify text hierarchy: headline, subhead, price/offer, CTA, disclaimer, date, weather label, product label, or UI caption.
+- Specify typography: font family or style, size, weight, case, color, alignment, placement, spacing, and contrast.
+- For multilingual output, write source text and target language explicitly; request natural localization rather than literal word-for-word translation when appropriate.
+- For text-heavy images, first create the copy/concept, then request the image using the approved exact text.
+- Keep visible text short enough to render cleanly; avoid dense paragraphs inside the image.
+- Block random/unrequested text, watermarks, broken letters, misspellings, and unreadable UI labels.`,
+  },
+  {
+    id: 'creative-director-controls',
+    name: 'Creative Director Controls Agent',
+    mission: 'Add professional photographic direction for lighting, camera, lens, color grade, film stock, material, and texture.',
+    prompt: `- Design lighting explicitly: three-point softbox, golden-hour backlight, window light, high-key, low-key, chiaroscuro, rim light, volumetric rays, or soft product glow.
+- Choose camera/lens language intentionally: medium-format editorial, Fujifilm color science, disposable-camera flash, GoPro action distortion, wide-angle lens, telephoto lens, macro lens, shallow depth of field, or deep focus.
+- Define color grade and film texture: muted teal cinematic grade, warm commercial grade, 1980s color film, subtle grain, high contrast, glossy studio, matte editorial, or clean ecommerce.
+- Emphasize materiality and surface detail: satin sheen, tweed weave, ribbed knit, leather grain, metal hardware, ceramic glaze, glass reflection, printed label, embroidered trim.
+- Do not over-decorate; every visual control must support product readability, mood, or story.`,
+  },
+  {
+    id: 'veo-prompting-guide',
+    name: 'Vertex AI Veo Prompting Agent',
+    mission: 'Structure video prompts with the official Veo prompt anatomy: subject, action, scene, cinematography, style, ambiance, audio, and exclusions.',
+    prompt: `- Every Veo scene prompt should include these components when relevant: SUBJECT, ACTION, SCENE/CONTEXT, CINEMATOGRAPHY, VISUAL STYLE, AMBIANCE, AUDIO, and NEGATIVE PROMPT.
+- Be specific. Prefer "eye-level medium shot of the model adjusting the exact satin dress in warm window light" over generic movement.
+- Cinematography should name camera angle and shot scale when useful: eye-level, low-angle, high-angle, top-down, Dutch angle, close-up, extreme close-up, wide/establishing, over-the-shoulder, or POV.
+- Camera movement should be explicit and singular: static, pan left/right, tilt up/down, dolly in/out, zoom in/out, truck left/right, pedestal up/down, crane/aerial/drone, handheld, or whip pan.
+- Lens and optical language should be intentional: wide-angle 24mm, telephoto 85mm, shallow depth of field, deep depth of field, bokeh, lens flare, rack focus, or dolly zoom/vertigo effect.
+- Visual style should specify aesthetic, lighting, and mood: photorealistic, cinematic, vintage, film noir, anime, 3D cartoon, stop-motion, high-key, low-key, golden hour, volumetric light, backlighting, or silhouette.
+- Temporal language should specify pacing and evolution: slow motion, fast-paced action, time-lapse, hyperlapse, rhythmic movement, or pulsing light.
+- Audio should be clear and optional: natural ambience, fabric rustle, footsteps, rain, music mood, sound effects, or exact spoken line only when speech is requested and safe.
+- Include negative prompts when useful: blurry, distorted anatomy, warped hands, random text, watermark, logo, flicker, jump cut, inconsistent outfit, extra limbs, camera/tripod reflection.`,
+  },
+  {
+    id: 'realtime-web-visualization',
+    name: 'Realtime Web Visualization Agent',
+    mission: 'Convert user notes that request current web/search facts into a safe visual prompt formula for Gemini Image-capable workflows.',
+    prompt: `- Trigger this skill when USER NOTES ask for current, latest, today, real-time, web search, weather, events, trend data, market data, local conditions, or factual context that may change.
+- Do not invent real-time facts inside the prompt package. If the active model/tool can search the web, instruct it to retrieve the facts first; if not, keep the user request as a SEARCH REQUEST placeholder and state that external retrieval is required.
+- Use this formula: [SOURCE / SEARCH REQUEST] + [ANALYSIS TASK] + [VISUAL TRANSLATION].
+- SOURCE / SEARCH REQUEST should name exactly what to retrieve, for example: current date and weather in San Francisco, current fashion trend in Seoul, latest event atmosphere near a named venue, or today's market/news signal.
+- ANALYSIS TASK should explain how the retrieved data changes the image/video mood, lighting, wardrobe, props, environment, weather, color, text labels, or UI state.
+- VISUAL TRANSLATION should describe the final visible scene in concrete image language, for example: a photorealistic miniature city inside a cup embedded in a modern smartphone UI, rain if current weather is rainy, warm sun if clear, exact date/weather card only when data is retrieved.
+- Preserve reference locks while using web data: web facts may alter context, mood, environment, props, and UI overlays, but must not override face identity, product fidelity, or safety policy.
+- For generated prompts, include a concise line like: "REALTIME DATA INSTRUCTION: Search/retrieve <source>; analyze <condition>; visualize <scene adaptation>."`,
+  },
+  {
+    id: 'veo-continuity',
+    name: 'Veo Continuity Agent',
+    mission: 'Keep N+1 keyframes and scene interpolation physically continuous for Veo-style first-frame to last-frame video generation.',
+    prompt: `- Use N+1 ordered keyframes for N scenes; scene i always moves from KEYFRAME i to KEYFRAME i+1.
+- Adjacent keyframes must be micro-progression, not a sudden body jump.
+- Preserve identity, garment details, lighting tone, camera axis, and location anchors across adjacent keyframes.
+- Use one dominant camera move per scene and avoid opposing movement directions unless the scene explicitly includes a turnaround beat.
+- Avoid discontinuity wording: teleport, jump cut, hard cut, instant morph, abrupt switch, chaotic random.
+- Make body facing explicit on every keyframe: front, back, left, right, three-quarter-left, or three-quarter-right.
+- For detail-sensitive garments, do not force a full 360-degree cycle; use stable facing holds and small pivots when needed.`,
+  },
+  {
+    id: 'image-to-video-handoff',
+    name: 'Image To Video Handoff Agent',
+    mission: 'Prepare still images or Nano Banana keyframes so Veo can animate them into short clips without identity, product, or motion drift.',
+    prompt: `- Treat still images as source frames to animate; do not redesign identity, outfit, product, background, logo, or key composition.
+- For each video scene, specify source image role: START FRAME, END FRAME, hero image, product still, avatar still, or background plate.
+- Describe the motion you want from the still image: hair flutter, fabric movement, camera pan, small body pivot, product turntable, light change, environmental motion, or hand gesture.
+- Keep the default clip logic short and controllable; when a single still image is used, write an 8-second animation instruction unless runtime config says otherwise.
+- Use image-to-video for product demos from still images, animated social assets, catalog demonstrations, and storyboard-panel animation.
+- Explicitly preserve source-frame composition and avoid new objects, outfit swaps, face changes, or sudden background changes.`,
+  },
+  {
+    id: 'veo-fast-iteration',
+    name: 'Veo Fast Iteration Agent',
+    mission: 'Use Veo 3 Fast-style prompting for rapid variants, product-catalog demos, explainers, and market-trend creative testing.',
+    prompt: `- Use this skill when the user wants many quick variants, rapid iteration, ad concept testing, catalog-scale demonstrations, explainers, or training modules.
+- Keep prompts modular so variants can change one variable at a time: hook, location, camera angle, product benefit, pacing, audio mood, language, or CTA.
+- Prefer concise scene briefs over heavy cinematic prose when speed and iteration matter.
+- For product catalogs, keep a reusable demo template and swap product-specific facts, still images, category proof, and benefit language.
+- For trend-response ads, connect current/market/user-provided trend signal to one clear visual change, not a full concept rewrite.
+- Keep brand/product standards stable across variants: identity, product fidelity, aspect ratio, duration, safety, and schema.`,
+  },
+  {
+    id: 'veo-native-audio-localization',
+    name: 'Veo Native Audio Localization Agent',
+    mission: 'Write Veo prompts that use native audio, sound effects, dialogue, lip sync, and multilingual localization only when appropriate.',
+    prompt: `- If speech is requested, write the exact spoken line and target language; keep it short enough for accurate lip sync.
+- For localized videos, preserve the same visual scene while changing dialogue language and culturally appropriate phrasing.
+- Specify audio separately from visuals: ambience, SFX, music mood, footsteps, traffic, wind, fabric rustle, room tone, or dialogue.
+- Do not add speech when the workflow says visual-only, no voiceover, no lip-sync, or silent-first.
+- Avoid fake celebrity/influencer voice, imitation, endorsement, or identifiable-person dialogue.
+- For product/fashion prompts, use audio to support mood and clarity, not to carry the core product proof unless the user explicitly requests narration.`,
+  },
+  {
+    id: 'location-context',
+    name: 'Location Context Agent',
+    mission: 'Choose real, contextual locations and keep background continuity stable.',
+    prompt: `- Prefer real contextual sets with depth: mirror corner, fitting room, boutique, cafe frontage, apartment, street, showroom, sofa corner, textured wall, rack, stool, shelf, plant, or window light.
+- Avoid plain/blank/seamless/solid-color backgrounds unless the user explicitly requests a pure product render.
+- Keep one primary location unless USER NOTES explicitly request a location transition.
+- When a locked location library is provided, choose exact strings from that library and do not paraphrase them.
+- Avoid reusing locations listed in runtime history for the same product or outfit type.`,
+  },
+  {
+    id: 'safety-policy',
+    name: 'Safety Policy Agent',
+    mission: 'Keep outputs policy-safe for people, bodies, hands, copy, and platform use.',
+    prompt: `- Do not depict, imitate, name, or imply endorsement from a real celebrity, public figure, influencer, or identifiable person.
+- If the user requests a real person, rewrite as a fictional archetype with similar general mood only.
+- Keep adult fashion subjects tasteful, fully clothed, and product-focused.
+- Preserve natural anatomy: two hands, five fingers per hand, plausible wrist/arm orientation, no fused or duplicated fingers.
+- Avoid random readable text, logos, fake endorsements, fabricated quotes, and UI artifacts.`,
+  },
+  {
+    id: 'schema-qa',
+    name: 'Schema QA Agent',
+    mission: 'Return compact valid JSON that matches the exact schema and count contract.',
+    prompt: `- Return JSON only; no markdown fences, comments, or explanation.
+- Match requested keyframe/scene/image/variant counts exactly.
+- Do not add fields unless the requested schema includes them.
+- Keep strings concise but complete enough for direct copy into downstream image/video tools.
+- If repairing a draft, change only fields needed to satisfy schema, continuity, source lock, or safety constraints.`,
+  },
+  {
+    id: 'storyboard-engine',
+    name: 'Storyboard Engine Agent',
+    mission: 'Adapt prompts to the selected video engine without mixing Veo and Omni Flash contracts.',
+    prompt: `- For Veo, write first-frame -> last-frame scene prompts with START FRAME, END FRAME, continuity locks, and one clear camera movement.
+- For Omni Flash, write natural-language create/edit instructions using reference names such as IMAGE_0, IMAGE_1, IMAGE_2, VIDEO_0, and AUDIO_0 when available.
+- Keep every storyboard beat tied to face identity, product fidelity, background anchors, timing, and exact text requirements.
+- Avoid engine-specific terms from the other mode unless they are useful as plain context.`,
+  },
+  {
+    id: 'music-video-storyboard',
+    name: 'Music Video Storyboard Agent',
+    mission: 'Convert script, audio, artist references, and location references into a lyric-driven MV prompt package.',
+    prompt: `- Treat SCRIPT_0 as the primary beat order and AUDIO_0 as timing, mood, silence, drop, and vocal-energy reference.
+- Use artist images only as fictional identity/style anchors; do not imitate real celebrities or public figures.
+- Keyframes are image prompts; scenes bridge keyframe i to keyframe i+1 with audio sync and emotional progression.
+- Lyrics should drive intent, mood, and timing; do not paste long lyric lines into video prompts unless the output field is explicitly a script field.
+- Preserve ordered emotional progression instead of optimizing each scene independently.`,
+  },
+  {
+    id: 'lookbook-image',
+    name: 'Lookbook Image Agent',
+    mission: 'Create standalone image prompts for fashion lookbooks without leaking video timeline logic.',
+    prompt: `- Produce standalone still-image prompts only; do not mention scenes, transitions, interpolation, or video timing.
+- Use field order SUBJECT / ACTION / FACING / LOCATION / CAMERA / LIGHTING / STYLE / ASPECT RATIO when requested.
+- Preserve exact identity and garment details from references.
+- Vary pose, camera angle, and styling proof while keeping outfit readability and tasteful fashion tone.
+- If a pose direction is locked, every prompt must reinforce that body-facing direction.`,
+  },
+  {
+    id: 'commerce-copy',
+    name: 'Commerce Copy Agent',
+    mission: 'Write TikTok Shop copy and voiceover with natural conversion logic and safe claims.',
+    prompt: `- Keep copy Vietnamese, natural, trust-building, and commerce-ready.
+- Lead with concrete product intent, fit/material/value proof, then a concise purchase cue.
+- Avoid spammy overclaims, fake scarcity unless user supplies it, medical/body transformation promises, celebrity endorsements, and impersonation.
+- Hashtags should be distinct, relevant, and readable.
+- Voiceover should follow a short hook -> proof -> use-case -> CTA rhythm.`,
+  },
+  {
+    id: 'tiktok-analysis-transfer',
+    name: 'TikTok Analysis Transfer Agent',
+    mission: 'Extract reusable structure from a source TikTok without copying identity, garment, or protected details.',
+    prompt: `- Use source video only for hook logic, beat order, pacing, camera rhythm, context type, and CTA structure.
+- Never preserve source person identity, exact outfit, logos, text, voice identity, or product claims.
+- Generated remix scripts must stay product-agnostic with placeholders until current product inputs are supplied.
+- When building a detached remix, current user/product/background inputs override all source-video details.
+- Express pacing as visual beat flow, not as dialogue or lip-sync requirements unless explicitly requested.`,
+  },
+]
+
+const AGENT_SKILL_BY_ID = new Map(GEMINI_AGENT_SKILLS.map((skill) => [skill.id, skill]))
+
+function uniqueSkillIds(skillIds: GeminiAgentSkillId[]): GeminiAgentSkillId[] {
+  return Array.from(new Set(skillIds))
+}
+
+export function buildGeminiAgentSkillBlock({
+  stage,
+  skillIds,
+  engineLabel,
+  outputContract,
+  runtimeNotes = [],
+}: BuildGeminiAgentSkillBlockOptions): string {
+  const selectedSkills = uniqueSkillIds(skillIds)
+    .map((id) => AGENT_SKILL_BY_ID.get(id))
+    .filter((skill): skill is GeminiAgentSkill => Boolean(skill))
+
+  if (selectedSkills.length === 0) return ''
+
+  const runtimeBlock = runtimeNotes
+    .map((note) => note.trim())
+    .filter((note) => note.length > 0)
+    .map((note) => `- ${note}`)
+    .join('\n')
+
+  return [
+    `GEMINI AGENT SKILL STACK (${stage.toUpperCase()}):`,
+    engineLabel ? `Target engine: ${engineLabel}` : '',
+    outputContract ? `Output contract: ${outputContract}` : '',
+    runtimeBlock ? `Runtime priorities:\n${runtimeBlock}` : '',
+    selectedSkills
+      .map((skill, index) => [
+        `${index + 1}. ${skill.name}`,
+        `Mission: ${skill.mission}`,
+        skill.prompt,
+      ].join('\n'))
+      .join('\n\n'),
+  ].filter((part) => part.length > 0).join('\n\n')
+}

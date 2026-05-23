@@ -5,6 +5,7 @@ import {
   Layers, ArrowRight, Wand2, FileText, AlertCircle, Ratio,
   Shirt, Star, TrendingUp, MessageSquare, Palette, History, RefreshCw, Music
 } from 'lucide-react'
+import { buildGeminiAgentSkillBlock } from './agentSkills'
 import './index.css'
 
 // ═══════════════════════════════════════════════
@@ -4137,6 +4138,40 @@ ${buildFitModelRuleLockMatrix()}`
       return '{}'
     }
   }
+  const sharedGeminiAgentRuntimeNotes = [
+    `Duration ${duration}s, aspect ratio ${aspectRatio}, requested content type ${contentTypeForPrompt}.`,
+    `Product category mode: ${hasExplicitProductCategoryLock ? `LOCKED ${productCategoryLabel}` : 'AUTO'}.`,
+    hasBackgroundLocationReference
+      ? 'Background image is available as environment guidance only.'
+      : 'No background image; select contextual locations from library/defaults.',
+    hasUserNotesIntentLock
+      ? 'User notes are active and must drive creative decisions before defaults.'
+      : 'No user notes; use skill defaults and selected content type.',
+  ]
+  const visualExtractAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'visual_extract',
+    skillIds: ['reference-lock', 'safety-policy', 'schema-qa'],
+    outputContract: 'strict garment/identity/background analysis JSON',
+    runtimeNotes: sharedGeminiAgentRuntimeNotes,
+  })
+  const creativePlanAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'creative_plan',
+    skillIds: [
+      'reference-lock',
+      'user-intent-priority',
+      'fashion-affiliate-strategy',
+      'creative-director-controls',
+      'location-context',
+      'veo-prompting-guide',
+      'realtime-web-visualization',
+      'veo-fast-iteration',
+      'veo-continuity',
+      'safety-policy',
+      'schema-qa',
+    ],
+    outputContract: 'strict planning JSON with recommended content type, story arc, location candidates, camera, lighting, mustInclude, avoid',
+    runtimeNotes: sharedGeminiAgentRuntimeNotes,
+  })
 
   const pipelineStartedAt = Date.now()
   const stageMetrics: Array<{ stage: string; attempt: number; durationMs: number; ok: boolean; note?: string }> = []
@@ -4443,6 +4478,8 @@ Analyze the provided face + garment + optional background-location references an
   "riskFlags": ["..."]
 }
 
+${visualExtractAgentSkillBlock}
+
 Rules:
 - Be concrete and concise.
 - Do not invent unavailable details.
@@ -4505,6 +4542,8 @@ INPUT CONTEXT:
 - Product category lock state: ${hasExplicitProductCategoryLock ? 'LOCKED' : 'AUTO'}
 - Background location reference: ${hasBackgroundLocationReference ? 'PROVIDED (environment/location guidance only)' : 'NOT PROVIDED'}
 - Diversity seed: ${diversitySeed}
+
+${creativePlanAgentSkillBlock}
 
 ${productCategoryFocusRules}
 ${tiktokAnalysisReferenceLockRules}
@@ -5219,6 +5258,68 @@ Output STRICT JSON only:
     }
 
     // STAGE 3 — PACKAGE GENERATION
+    const finalGeminiAgentRuntimeNotes = [
+      ...sharedGeminiAgentRuntimeNotes,
+      `Final resolved content type: ${finalContentType.toUpperCase()}.`,
+      `Fit-model lock mode: ${fitModelRuleLockModeLabel}.`,
+      `Style lock mode: ${finalStyleLock.toUpperCase()}${isStyleLockOverriddenByNotes ? ' from user notes' : ' default'}.`,
+      `Location continuity: ${enforceSinglePrimaryLocation ? 'single primary location' : 'controlled user-requested transition'}.`,
+      `Required output shape: ${keyframeCount} keyframes and ${sceneCount} scenes.`,
+    ]
+    const packageGenerationAgentSkillBlock = buildGeminiAgentSkillBlock({
+      stage: 'package_generation',
+      skillIds: [
+        'reference-lock',
+        'user-intent-priority',
+        'fashion-affiliate-strategy',
+        'nano-banana-image-framework',
+        'creative-director-controls',
+        'veo-prompting-guide',
+        'realtime-web-visualization',
+        'image-to-video-handoff',
+        'veo-fast-iteration',
+        'veo-native-audio-localization',
+        'veo-continuity',
+        'location-context',
+        'safety-policy',
+        'schema-qa',
+      ],
+      engineLabel: 'Veo 3.1 via Gemini API prompt package',
+      outputContract: `${keyframeCount} compact keyframes + ${sceneCount} compact scenes JSON`,
+      runtimeNotes: finalGeminiAgentRuntimeNotes,
+    })
+    const qaRepairAgentSkillBlock = buildGeminiAgentSkillBlock({
+      stage: 'qa_repair',
+      skillIds: [
+        'reference-lock',
+        'user-intent-priority',
+        'realtime-web-visualization',
+        'creative-director-controls',
+        'veo-prompting-guide',
+        'veo-native-audio-localization',
+        'veo-continuity',
+        'location-context',
+        'safety-policy',
+        'schema-qa',
+      ],
+      engineLabel: 'Veo 3.1 repair',
+      outputContract: 'same package schema, repaired only where needed',
+      runtimeNotes: finalGeminiAgentRuntimeNotes,
+    })
+    const locationRepairAgentSkillBlock = buildGeminiAgentSkillBlock({
+      stage: 'location_repair',
+      skillIds: ['reference-lock', 'user-intent-priority', 'location-context', 'safety-policy', 'schema-qa'],
+      outputContract: 'same package schema with location-only fixes',
+      runtimeNotes: finalGeminiAgentRuntimeNotes,
+    })
+    const motionRepairAgentSkillBlock = buildGeminiAgentSkillBlock({
+      stage: 'motion_repair',
+      skillIds: ['reference-lock', 'user-intent-priority', 'veo-prompting-guide', 'image-to-video-handoff', 'veo-continuity', 'safety-policy', 'schema-qa'],
+      engineLabel: 'Veo 3.1 interpolation repair',
+      outputContract: 'same package schema with continuity-only fixes',
+      runtimeNotes: finalGeminiAgentRuntimeNotes,
+    })
+
     const generationPrompt = `You are an expert AI video prompt engineer specializing in TikTok affiliate fashion videos.
 
 Generate a COMPLETE prompt package for a ${duration}-second video with:
@@ -5236,6 +5337,8 @@ Generate a COMPLETE prompt package for a ${duration}-second video with:
 - User-notes hard-rule relaxation: ${relaxHardRulesByNotes ? 'ACTIVE' : 'INACTIVE'}
 - Style lock mode: ${finalStyleLock.toUpperCase()}${isStyleLockOverriddenByNotes ? ' (USER-NOTES OVERRIDE)' : ' (DEFAULT)'}
 - Location continuity mode: ${enforceSinglePrimaryLocation ? 'SINGLE PRIMARY LOCATION' : 'USER-NOTES MULTI-LOCATION'}
+
+${packageGenerationAgentSkillBlock}
 
 ${productCategoryFocusRules}
 ${tiktokAnalysisReferenceLockRules}
@@ -5418,6 +5521,8 @@ Keep output compact. Omit fields that can be deterministically rebuilt later (su
     } else {
       const qaRepairPrompt = `You are a strict QA + repair model for TikTok fashion video prompt packages.
 
+${qaRepairAgentSkillBlock}
+
   Validate and repair the draft package to satisfy all constraints below:
   - Enforce CRITICAL RULES with Rule 30 precedence exactly as defined in package generation stage.
   - Keep every location strictly inside LOCKED LOCATION LIBRARY only.
@@ -5518,6 +5623,8 @@ Return STRICT JSON only, same schema:
     if (!strictLocationValidation.ok) {
       const locationRepairPrompt = `You are a strict location-only repair model for TikTok fashion video prompt packages.
 
+${locationRepairAgentSkillBlock}
+
 TASK:
 - Repair ONLY location-related fields so the package satisfies constraints.
 - Keep masterDNA, actions, camera, lighting, style, and scene pacing unchanged unless absolutely necessary for continuity.
@@ -5585,6 +5692,8 @@ Return STRICT JSON only, same schema:
     const strictMotionValidation = validatePackageTemporalContinuity(parsed, true)
     if (!strictMotionValidation.ok) {
       const motionRepairPrompt = `You are a strict interpolation-continuity repair model for Veo 3.1 first-frame -> last-frame fashion videos.
+
+${motionRepairAgentSkillBlock}
 
 TASK:
 - Repair ONLY motion/camera continuity fields so interpolation between keyframes is physically plausible.
@@ -6400,6 +6509,30 @@ ${scriptReference.text}`,
 - Write scene prompts for first-frame -> last-frame interpolation.
 - Every scene is exactly 8 seconds and must name START FRAME, END FRAME, camera movement, emotional transition, audio sync, and continuity locks.
 - Keyframes must be usable as Nano Banana Pro image prompts before sending pairs into Veo.`
+  const musicVideoAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'music_video',
+    skillIds: [
+      'reference-lock',
+      'nano-banana-image-framework',
+      'creative-director-controls',
+      'music-video-storyboard',
+      'storyboard-engine',
+      'veo-prompting-guide',
+      'image-to-video-handoff',
+      'veo-fast-iteration',
+      'veo-native-audio-localization',
+      'veo-continuity',
+      'safety-policy',
+      'schema-qa',
+    ],
+    engineLabel,
+    outputContract: `${keyframeCount} MV keyframes + ${sceneCount} MV scenes JSON`,
+    runtimeNotes: [
+      `Duration setting ${duration}s, detected audio ${audioDuration ? `${audioDuration.toFixed(1)}s` : 'unknown'}.`,
+      `Artist reference images: ${artistImages.length}. Location reference images: ${locationImages.length}.`,
+      normalizedNotes ? `User notes: ${normalizedNotes}` : 'No user notes.',
+    ],
+  })
 
   const systemPrompt = `You are a senior Korean music video storyboard director.
 
@@ -6412,6 +6545,8 @@ PROJECT CONFIG:
 - Aspect ratio: ${aspectRatio}
 - Required output shape: ${keyframeCount} keyframes and ${sceneCount} scenes
 - User notes: ${normalizedNotes || 'none'}
+
+${musicVideoAgentSkillBlock}
 
 ${enginePromptMode}
 
@@ -6607,6 +6742,31 @@ async function generateStoryboardVideoWithGemini(
     parts.push({ inlineData: { mimeType: 'image/jpeg', data: backgroundImage.split(',')[1] || backgroundImage } })
     parts.push({ text: 'IMAGE_2 BACKGROUND REFERENCE: environment/location/lighting cues only. Preserve spatial anchors when requested.' })
   }
+  const storyboardAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'storyboard_video',
+    skillIds: [
+      'reference-lock',
+      'nano-banana-image-framework',
+      'creative-director-controls',
+      'storyboard-engine',
+      'fashion-affiliate-strategy',
+      'realtime-web-visualization',
+      'veo-prompting-guide',
+      'image-to-video-handoff',
+      'veo-fast-iteration',
+      'veo-native-audio-localization',
+      'veo-continuity',
+      'safety-policy',
+      'schema-qa',
+    ],
+    engineLabel,
+    outputContract: `${keyframeCount} storyboard keyframes + ${sceneCount} storyboard scenes JSON`,
+    runtimeNotes: [
+      `Template ${template.toUpperCase()}: ${templateBrief}.`,
+      `Content type ${contentTypeForPrompt}; product category ${productCategoryLine}.`,
+      normalizedNotes ? `User notes: ${normalizedNotes}` : 'No user notes.',
+    ],
+  })
 
   const systemPrompt = `You are a senior AI video storyboard director for fashion affiliate videos.
 
@@ -6621,6 +6781,8 @@ PROJECT CONFIG:
 - Content type: ${contentTypeForPrompt}
 - Product category: ${productCategoryLine}
 - User notes: ${normalizedNotes || 'none'}
+
+${storyboardAgentSkillBlock}
 
 ${enginePromptMode}
 
@@ -6813,6 +6975,26 @@ async function generateLookbookImagePromptWithGemini(
     })
     parts.push({ text: 'BACKGROUND LOCATION REFERENCE: use environment/location cues only; do not copy people/garments/logos as identity.' })
   }
+  const lookbookAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'lookbook_image',
+    skillIds: [
+      'reference-lock',
+      'nano-banana-image-framework',
+      'image-text-localization',
+      'creative-director-controls',
+      'lookbook-image',
+      'fashion-affiliate-strategy',
+      'realtime-web-visualization',
+      'safety-policy',
+      'schema-qa',
+    ],
+    outputContract: `${imageCount} standalone lookbook image prompts JSON`,
+    runtimeNotes: [
+      `Content style ${resolvedContentType.toUpperCase()}, aspect ratio ${aspectRatio}.`,
+      `Theme ${themeOption.label}; tone ${styleTone.toUpperCase()}; pose direction ${poseDirectionLock.toUpperCase()}.`,
+      notes.trim() ? `User notes: ${notes.trim()}` : 'No user notes.',
+    ],
+  })
 
   const prompt = `You are an expert fashion creative director for affiliate lookbook imagery.
 
@@ -6829,6 +7011,8 @@ INPUT:
 - Pose direction lock: ${poseDirectionLock.toUpperCase()}
 - Background location reference: ${backgroundImage ? 'provided (use as environment guidance only)' : 'not provided'}
 ${notes ? `- User notes: ${notes}` : '- User notes: none'}
+
+${lookbookAgentSkillBlock}
 
 TIKTOK SIGNAL REFERENCE:
 ${LOOKBOOK_TIKTOK_SIGNAL_HINT}
@@ -7809,6 +7993,16 @@ async function generateSeoWithGemini(
   const trimmedNotes = extraNotes.trim()
   const contentHint = contentType === 'auto' ? 'AUTO' : contentType.toUpperCase()
   const salesTemplateHint = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
+  const seoAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'seo_copy',
+    skillIds: ['commerce-copy', 'safety-policy', 'schema-qa'],
+    outputContract: '3 TikTok Shop SEO variants JSON',
+    runtimeNotes: [
+      `Product name: ${trimmedProductName}.`,
+      `Preferred content type: ${contentHint}; sales template: ${salesTemplateHint}.`,
+      trimmedNotes ? `Additional notes: ${trimmedNotes}` : 'No additional notes.',
+    ],
+  })
 
   const systemPrompt = `You are a senior TikTok Shop content strategist and copywriter.
 
@@ -7817,6 +8011,8 @@ INPUT:
 - Preferred content type: ${contentHint}
 - Sales template: ${salesTemplateHint}
 ${trimmedNotes ? `- Additional notes: ${trimmedNotes}` : '- Additional notes: none'}
+
+${seoAgentSkillBlock}
 
 TASK:
 - Create exactly 3 DISTINCT SEO variants for TikTok Shop.
@@ -7961,6 +8157,16 @@ async function generateVoiceoverWithGemini(
   const trimmedNotes = extraNotes.trim()
   const contentHint = contentType === 'auto' ? 'AUTO' : contentType.toUpperCase()
   const salesTemplateHint = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
+  const voiceoverAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'voiceover',
+    skillIds: ['commerce-copy', 'safety-policy', 'schema-qa'],
+    outputContract: 'one 25-35 second voiceover script JSON',
+    runtimeNotes: [
+      `Product name: ${trimmedProductName}.`,
+      `Preferred content type: ${contentHint}; sales template: ${salesTemplateHint}.`,
+      trimmedNotes ? `Additional notes: ${trimmedNotes}` : 'No additional notes.',
+    ],
+  })
 
   const systemPrompt = `You are a senior TikTok Shop video script writer.
 
@@ -7969,6 +8175,8 @@ INPUT:
 - Preferred content type: ${contentHint}
 - Sales template: ${salesTemplateHint}
 ${trimmedNotes ? `- Additional notes: ${trimmedNotes}` : '- Additional notes: none'}
+
+${voiceoverAgentSkillBlock}
 
 TASK:
 - Create one Vietnamese sample voiceover script for a short product video.
@@ -8067,12 +8275,23 @@ async function analyzeTikTokWithGemini(
   extraNotes: string,
 ): Promise<TikTokAnalysisResult> {
   const trimmedNotes = extraNotes.trim()
+  const tiktokAnalysisAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'tiktok_analysis',
+    skillIds: ['tiktok-analysis-transfer', 'safety-policy', 'schema-qa'],
+    outputContract: 'detached TikTok analysis JSON with reusable beats and product-agnostic script',
+    runtimeNotes: [
+      'Source video is structure-only reference.',
+      trimmedNotes ? `Additional context: ${trimmedNotes}` : 'No additional context.',
+    ],
+  })
 
   const analyzePrompt = `You are a senior TikTok content strategist and video director.
 
 Analyze the provided TikTok video carefully and return STRICT JSON only.
 
 ${trimmedNotes ? `Additional context from user: ${trimmedNotes}` : ''}
+
+${tiktokAnalysisAgentSkillBlock}
 
 ANALYSIS TASKS:
 1. Identify the content type (ootd, grwm, review, haul, tiktokshop, boutiquefeed, fyp, styling, athleisure, outfitideas, luxury, partyoutfit, streetstyle, sunnyaura, or describe a custom type).
@@ -8302,6 +8521,30 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     })
     parts.push({ text: 'BACKGROUND LOCATION INPUT LOCK: use this image for context/location cues only; do not copy people/garments/logos from it as product identity.' })
   }
+  const detachedRemixAgentSkillBlock = buildGeminiAgentSkillBlock({
+    stage: 'detached_tiktok_remix',
+    skillIds: [
+      'reference-lock',
+      'tiktok-analysis-transfer',
+      'user-intent-priority',
+      'realtime-web-visualization',
+      'nano-banana-image-framework',
+      'creative-director-controls',
+      'veo-prompting-guide',
+      'image-to-video-handoff',
+      'veo-fast-iteration',
+      'veo-native-audio-localization',
+      'veo-continuity',
+      'safety-policy',
+      'schema-qa',
+    ],
+    outputContract: `${keyframeCount} detached remix keyframes + ${sceneCount} scenes JSON`,
+    runtimeNotes: [
+      `Detected content type ${analysis.detectedContentType}; target duration ${duration}s; aspect ratio ${aspectRatio}.`,
+      `Background reference ${hasBackgroundLocationReference ? 'provided' : 'not provided'}.`,
+      shouldEnforceConciseVisualOnlyAction ? 'Concise visual-only action mode is active.' : 'Standard visual action mode is active.',
+    ],
+  })
 
   const prompt = `You are a TikTok prompt-packaging specialist in DETACHED ANALYSIS MODE.
 
@@ -8316,6 +8559,8 @@ VIDEO CONFIG:
 - Required scenes: ${sceneCount}
 - Required keyframes: ${keyframeCount}
 - Background location reference: ${hasBackgroundLocationReference ? 'provided (environment/location guidance only)' : 'not provided'}
+
+${detachedRemixAgentSkillBlock}
 
 REVIEW PRODUCT SOURCE (MANDATORY):
 - Review product context must come from REVIEW NOTES below.
