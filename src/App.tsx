@@ -351,7 +351,7 @@ type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image' | 'storyboard_video' | 'music_video'
 type AppPageMode = 'core' | 'ootd_template' | 'storyboard_template' | 'music_video_template' | 'prompt_library'
-type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam'
+type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam' | 'relaxed_boutique_camera'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
 type LookbookTheme = 'auto' | 'minimal_studio' | 'street_casual' | 'office_chic' | 'party_night' | 'vacation_resort'
@@ -1022,6 +1022,84 @@ End in centered glam close with a brief nightlife glow transition at the final m
   generatedAt: 0,
 }
 
+const OOTD_TEMPLATE_RELAXED_BOUTIQUE_REFERENCE_VIDEO_ID = 'tiktok_video_front_camera_fitcheck'
+const OOTD_TEMPLATE_RELAXED_BOUTIQUE_REFERENCE_VIDEO_FILE_NAME = 'tiktok_video.mp4'
+const OOTD_TEMPLATE_RELAXED_BOUTIQUE_SOURCE_DURATION_SEC = 39
+const OOTD_TEMPLATE_RELAXED_BOUTIQUE_PRODUCT_BRIEF = `Keep the relaxed non-mirror front-camera boutique fit-check progression from the reference video.
+- Preserve observer-camera framing: model stands in front of the filming camera, no phone-in-hand mirror framing.
+- Keep progression: smooth walk-in / hair-flip hook -> relaxed full-fit proof -> hanger/product comparison proof -> soft side/three-quarter silhouette turn -> confident front reset / close.
+- Keep beat order, but do not clone exact second-by-second timeline from the reference.
+- The only variable is the outfit/product from current PRODUCT input image.
+- Maintain full-body readability while keeping product details visible in every beat.
+- Background style lock: dark grey boutique wall, arched display niches, floating shelf, LED strip accents, ceiling curve, and warm wood floor in one continuous venue.
+- Camera lock: fixed or very gently stabilized front-lens observer camera; no mirror, no selfie, no phone in hand, no aggressive zoom.
+- Framing lock: begin medium/full-body, step back to show full head-to-toe, allow natural medium framing for comparison, then return to full/three-quarter readability.
+- Prop rule: optional hanger/product comparison moment is allowed only as fit/material proof; do not let extra garments become the hero product.
+- Direction rule: face stays mostly front toward camera; allow gentle side/three-quarter turns for silhouette proof; avoid prolonged back-facing hold.
+- Voice rule: visual-only relaxed fit-check, no voiceover/spoken dialogue, no lip-sync behavior.`
+const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
+  detectedContentType: 'ootd',
+  detectedDurationSec: OOTD_TEMPLATE_RELAXED_BOUTIQUE_SOURCE_DURATION_SEC,
+  hookStyle: 'Relaxed front-camera boutique hook with smooth hair flip / walk-in energy and immediate outfit presence.',
+  narrativeStructure: 'Front-camera hook -> relaxed full-fit proof -> hanger/product comparison -> smooth side/three-quarter silhouette proof -> confident front reset close (order lock, timeline-flex).',
+  ctaStyle: 'Soft boutique recommendation close, no hard sell, visual proof first.',
+  colorGrade: 'clean boutique lighting, dark grey textured wall, warm wood floor, soft LED accent highlights, natural skin tone',
+  pacing: 'smooth relaxed fit-check pacing with graceful pose holds, soft turns, and no rushed mirror/selfie energy',
+  sceneBeats: [
+    {
+      index: 0,
+      timestamp: 'Step 1',
+      beatName: 'RELAXED CAMERA HOOK',
+      description: 'Open standing close to the front camera with a smooth hair flip or walk-in gesture to establish relaxed fit-check confidence.',
+      contextHint: 'Dark grey boutique wall, arched display niches, floating shelf, LED strip accents, curved ceiling, warm wood floor.',
+      cameraHint: 'Stable front-lens observer camera, medium-to-full framing, no phone or mirror framing.',
+      narrationHint: 'No spoken line; visual hook and optional short on-screen text only.',
+    },
+    {
+      index: 1,
+      timestamp: 'Step 2',
+      beatName: 'RELAXED FULL-FIT PROOF',
+      description: 'Step or settle back into a full-body pose so viewers can read silhouette, length, waistline, and footwear.',
+      contextHint: 'Keep same boutique venue and shelf/niche/floor anchors stable.',
+      cameraHint: 'Locked-off front-camera full-body frame with minimal empty margin and smooth posture changes.',
+      narrationHint: 'No spoken line; outfit readability carries the beat.',
+    },
+    {
+      index: 2,
+      timestamp: 'Step 3',
+      beatName: 'HANGER COMPARISON PROOF',
+      description: 'Bring one or two hanger garments into frame as comparison/material proof while keeping the currently selected product as hero.',
+      contextHint: 'Same boutique set; hanger motion should stay centered and not block the model face for long.',
+      cameraHint: 'Stable observer-camera medium/full frame; garment swing is smooth, not chaotic.',
+      narrationHint: 'No spoken line; comparison is visual only.',
+    },
+    {
+      index: 3,
+      timestamp: 'Step 4',
+      beatName: 'SMOOTH SIDE SILHOUETTE',
+      description: 'Turn into a soft side or three-quarter pose with one relaxed hand-to-hip/hand-to-thigh gesture to prove drape and body line.',
+      contextHint: 'No venue switch; keep dark grey boutique anchors visible.',
+      cameraHint: 'Fixed front camera while subject pivots smoothly; no abrupt shake or close-up takeover.',
+      narrationHint: 'No spoken line; relaxed pose and silhouette proof carry the beat.',
+    },
+    {
+      index: 4,
+      timestamp: 'Step 5',
+      beatName: 'CONFIDENT FRONT RESET CLOSE',
+      description: 'Return toward front/three-quarter hero stance and close with a calm boutique recommendation-style hold.',
+      contextHint: 'End in the same boutique set with clean product readability and no final location jump.',
+      cameraHint: 'Stable centered frame, optional tiny push-in only if full outfit remains readable.',
+      narrationHint: 'Optional concise on-screen CTA text only; no spoken CTA.',
+    },
+  ],
+  generatedScript: `Open with a relaxed front-camera walk-in or hair-flip hook in the boutique set.
+Settle into a full-body fit proof so silhouette, waistline, length, and footwear are readable.
+Bring hanger garments into frame for comparison/material proof without changing the hero product.
+Turn smoothly into a side or three-quarter pose with relaxed hand styling for drape and body-line proof.
+Return to front/three-quarter hero stance and close with calm boutique confidence.`,
+  generatedAt: 0,
+}
+
 const OOTD_TEMPLATE_SCENARIOS: Array<{
   id: OotdTemplateScenarioId
   label: string
@@ -1073,6 +1151,19 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
     cameraFormat: 'front_camera',
     productBrief: OOTD_TEMPLATE_NIGHT_GLOW_PRODUCT_BRIEF,
     lockedAnalysis: OOTD_TEMPLATE_NIGHT_GLOW_LOCKED_ANALYSIS,
+  },
+  {
+    id: 'relaxed_boutique_camera',
+    label: 'Relaxed Boutique Camera',
+    desc: 'Front-camera fitcheck khong guong, thoai mai va muot',
+    referenceVideoId: OOTD_TEMPLATE_RELAXED_BOUTIQUE_REFERENCE_VIDEO_ID,
+    referenceVideoFileName: OOTD_TEMPLATE_RELAXED_BOUTIQUE_REFERENCE_VIDEO_FILE_NAME,
+    referenceVideoUrl: new URL(`../${OOTD_TEMPLATE_RELAXED_BOUTIQUE_REFERENCE_VIDEO_FILE_NAME}`, import.meta.url).href,
+    sourceDurationSec: OOTD_TEMPLATE_RELAXED_BOUTIQUE_SOURCE_DURATION_SEC,
+    lockedContentType: 'ootd',
+    cameraFormat: 'front_camera',
+    productBrief: OOTD_TEMPLATE_RELAXED_BOUTIQUE_PRODUCT_BRIEF,
+    lockedAnalysis: OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS,
   },
 ]
 
@@ -8436,16 +8527,21 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const templateScenarioId = options?.templateScenarioId
   const isCozyTemplateScenario = templateScenarioId === 'cozy_home_background'
   const isNightCityTemplateScenario = templateScenarioId === 'night_city_glam'
+  const isRelaxedBoutiqueTemplateScenario = templateScenarioId === 'relaxed_boutique_camera'
   const frontCameraNaturalActionFallback = isNightCityTemplateScenario
     ? 'Natural front-camera glam fit-check flow with smooth step-in, gentle turn-return, and clear outfit readability.'
+    : (isRelaxedBoutiqueTemplateScenario
+      ? 'Relaxed non-mirror front-camera boutique fit-check flow with smooth walk-in, hair-flip energy, full-fit proof, optional hanger comparison, soft side turn, and calm front reset.'
     : (isCozyTemplateScenario
       ? 'Natural front-camera fit-check flow with subtle weight shifts, gentle turn-return, and clear full-body outfit readability.'
-      : 'Natural front-camera fit-check movement with relaxed micro-poses and clear outfit readability.')
+      : 'Natural front-camera fit-check movement with relaxed micro-poses and clear outfit readability.'))
   const frontCameraAnchoredActionSentence = isNightCityTemplateScenario
     ? 'Model performs a natural front-camera glam fit-check flow in the provided background scene with smooth step-in, shoulder-line turns, and confident close posture.'
+    : (isRelaxedBoutiqueTemplateScenario
+      ? 'Model performs a relaxed non-mirror front-camera boutique fit-check in the provided background scene with smooth hair movement, full-fit proof, optional hanger comparison, soft side/three-quarter turn, and calm front reset.'
     : (isCozyTemplateScenario
       ? 'Model performs a natural front-camera fit-check flow in the provided background scene with subtle weight shifts, gentle turn-return, and relaxed hand-to-hip pose changes.'
-      : 'Model performs a natural front-camera fit-check flow in the provided background scene with relaxed micro-poses and smooth turn-return continuity.')
+      : 'Model performs a natural front-camera fit-check flow in the provided background scene with relaxed micro-poses and smooth turn-return continuity.'))
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
   const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
@@ -8470,7 +8566,9 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
         ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement + rear mirror anchor), and treat this image as environment anchor only (not identity/product source).'
         : (isNightCityTemplateScenario
           ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep strong outfit readability, preserve key background anchors (window frame/citylight/floor/decor placement), and treat this image as environment anchor only (not identity/product source).'
-          : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement), and treat this image as environment anchor only (not identity/product source).'))
+          : (isRelaxedBoutiqueTemplateScenario
+            ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same boutique-style scene across all keyframes/scenes, avoid venue switching, keep full-body outfit readability, preserve grey wall, arched display niches, shelf line, LED strips, ceiling curve, and wood floor anchors, and treat this image as environment only.'
+          : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement), and treat this image as environment anchor only (not identity/product source).')))
       : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing for mirror phone fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).')
     : 'BACKGROUND LOCATION LOCK: no background input image provided.'
 
@@ -8748,7 +8846,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
             : 'provided cozy home front-camera zone (exact uploaded background scene)')
           : (isNightCityTemplateScenario
             ? 'provided night city glam front-camera zone (exact uploaded background scene)'
-            : 'provided selected front-camera scenario zone (exact uploaded background scene)'))
+            : (isRelaxedBoutiqueTemplateScenario
+              ? 'provided relaxed boutique front-camera zone (exact uploaded background scene)'
+            : 'provided selected front-camera scenario zone (exact uploaded background scene)')))
         : 'provided background mirror phone fit-check zone (exact uploaded background scene)')
       : ''
 
@@ -8791,7 +8891,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           isFrontCameraTemplate
             ? (isNightCityTemplateScenario
               ? 'Maintain background continuity via key anchors (window frame/citylight/floor/decor placement) with no venue drift.'
-              : 'Maintain background continuity via key anchors (wall/floor/decor placement) with no venue drift.')
+              : (isRelaxedBoutiqueTemplateScenario
+                ? 'Maintain relaxed boutique background continuity via grey wall, arched display niches, shelf line, LED strips, ceiling curve, and wood floor anchors with no venue drift.'
+              : 'Maintain background continuity via key anchors (wall/floor/decor placement) with no venue drift.'))
             : 'Maintain background continuity via key anchors (mirror edges, floor line, decor placement) with no venue drift.',
         )
 
@@ -8831,7 +8933,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
             ? 'Hands-free front-camera outfit presentation with stable cozy-room continuity.'
             : (isNightCityTemplateScenario
               ? 'Hands-free front-camera outfit presentation with stable night-city continuity.'
-              : 'Hands-free front-camera outfit presentation with stable scenario continuity.'),
+              : (isRelaxedBoutiqueTemplateScenario
+                ? 'Hands-free non-mirror front-camera boutique fit-check with relaxed smooth movement and stable grey boutique set continuity.'
+              : 'Hands-free front-camera outfit presentation with stable scenario continuity.')),
         )
       }
 
@@ -8877,7 +8981,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         ? (conciseNarrativeSeed || (isFrontCameraTemplate
           ? (isNightCityTemplateScenario
             ? 'Natural glam fit-check flow: full-look hero, smooth turn-return, upper-body detail pass, and confident close.'
-            : 'Natural fit-check flow: full-look pose, gentle turn-return, detail-check, and relaxed close with clear outfit visibility.')
+            : (isRelaxedBoutiqueTemplateScenario
+              ? 'Relaxed boutique fit-check flow: smooth walk-in or hair-flip hook, full-fit proof, hanger comparison, soft side/three-quarter turn, and calm front reset.'
+            : 'Natural fit-check flow: full-look pose, gentle turn-return, detail-check, and relaxed close with clear outfit visibility.'))
           : 'Hold full-fit front pose, then detail-check and gentle side-angle confirmation with clear outfit visibility.'))
         : scriptBeat.length > 0
           ? `Follow visual beat flow: ${scriptBeat}`
@@ -12643,12 +12749,15 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     const activeTemplateScenario = activeOotdTemplateScenario
     const usesMirrorPhoneTemplate = activeTemplateScenario.cameraFormat === 'mirror_phone'
     const isCozyTemplateScenario = activeTemplateScenario.id === 'cozy_home_background'
-    const shouldEnforceFrontFaceNoBackLock = usesMirrorPhoneTemplate || isCozyTemplateScenario
+    const isRelaxedBoutiqueTemplateScenario = activeTemplateScenario.id === 'relaxed_boutique_camera'
+    const shouldEnforceFrontFaceNoBackLock = usesMirrorPhoneTemplate || isCozyTemplateScenario || isRelaxedBoutiqueTemplateScenario
     const shouldEnforceRearMirrorReflection = usesMirrorPhoneTemplate || isCozyTemplateScenario
     const directionRule = shouldEnforceFrontFaceNoBackLock
       ? (usesMirrorPhoneTemplate
         ? 'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.'
-        : 'Direction rule: face must stay FRONT toward camera; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation; keep the camera frame stable.')
+        : (isRelaxedBoutiqueTemplateScenario
+          ? 'Direction rule: non-mirror front-camera fitcheck; face stays mostly FRONT toward camera, body only FRONT, soft SIDE, 3/4 LEFT, or 3/4 RIGHT; no prolonged BACK body orientation; keep movement relaxed and smooth.'
+          : 'Direction rule: face must stay FRONT toward camera; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation; keep the camera frame stable.'))
       : 'Direction rule: allow FRONT, 3/4 LEFT, 3/4 RIGHT, and one short BACK reveal beat when the selected scenario requires it; avoid prolonged back-facing hold and return to FRONT/3/4 for closing.'
     const voiceRule = usesMirrorPhoneTemplate
       ? 'Voice rule: no voiceover/dialogue. Keep visual-only mirror phone fit-check storytelling with optional on-screen text.'
@@ -12658,12 +12767,16 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         ? 'Background anchor lock: model must stand closer to mirror and perform mirror phone fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
         : (isCozyTemplateScenario
           ? 'Background anchor lock: model must stand in front of filming camera inside the provided cozy home background, keep full-body head-to-toe framing, preserve key background anchors including rear mirror placement, hold the same venue across beats, and avoid aggressive push-in/zoom behavior.'
-          : 'Background anchor lock: model must stay in front of filming camera inside the provided selected-scenario background, preserve key venue anchors (window frame/citylight/floor line/decor), keep continuity across all beats, and allow only smooth full-body-to-medium push-in progression when needed.'))
+          : (isRelaxedBoutiqueTemplateScenario
+            ? 'Background anchor lock: model must stand in front of filming camera inside the provided relaxed boutique background, keep full-body readability, preserve grey wall, arched display niches, shelf line, LED strip, ceiling curve, and wood floor anchors, hold the same venue across beats, and avoid mirror/selfie framing.'
+          : 'Background anchor lock: model must stay in front of filming camera inside the provided selected-scenario background, preserve key venue anchors (window frame/citylight/floor line/decor), keep continuity across all beats, and allow only smooth full-body-to-medium push-in progression when needed.')))
       : (usesMirrorPhoneTemplate
         ? 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.'
         : (isCozyTemplateScenario
           ? 'Background anchor lock: no background image provided, so keep one cozy home venue continuity with observer-camera framing, rear mirror behind model, and stable full-body composition.'
-          : 'Background anchor lock: no background image provided, so keep one selected-scenario venue continuity with observer-camera framing and stable anchor composition.'))
+          : (isRelaxedBoutiqueTemplateScenario
+            ? 'Background anchor lock: no background image provided, so keep one relaxed boutique venue with dark grey wall, arched display niches, shelf accents, LED strips, wood floor, stable observer-camera framing, and no mirror/selfie behavior.'
+          : 'Background anchor lock: no background image provided, so keep one selected-scenario venue continuity with observer-camera framing and stable anchor composition.')))
     const rearMirrorReflectionRule = shouldEnforceRearMirrorReflection
       ? 'Rear mirror reflection lock: keep mirror behind model visible as reflection proof across all beats; never show camera/tripod/operator in mirror reflection.'
       : 'Rear mirror reflection lock: inactive.'
