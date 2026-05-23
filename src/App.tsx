@@ -8525,6 +8525,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     stage: 'detached_tiktok_remix',
     skillIds: [
       'reference-lock',
+      ...(templateScenarioId ? ['ootd-fit-check-template' as const] : []),
       'tiktok-analysis-transfer',
       'user-intent-priority',
       'realtime-web-visualization',
@@ -8541,6 +8542,9 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     outputContract: `${keyframeCount} detached remix keyframes + ${sceneCount} scenes JSON`,
     runtimeNotes: [
       `Detected content type ${analysis.detectedContentType}; target duration ${duration}s; aspect ratio ${aspectRatio}.`,
+      templateScenarioId ? `OOTD template scenario is active: ${templateScenarioId}.` : '',
+      `Template camera format: ${templateCameraFormat}.`,
+      shouldEnforceRearMirrorReflection ? 'Rear mirror/reflection lock is active.' : '',
       `Background reference ${hasBackgroundLocationReference ? 'provided' : 'not provided'}.`,
       shouldEnforceConciseVisualOnlyAction ? 'Concise visual-only action mode is active.' : 'Standard visual action mode is active.',
     ],

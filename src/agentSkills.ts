@@ -17,6 +17,7 @@ export type GeminiAgentSkillId =
   | 'reference-lock'
   | 'user-intent-priority'
   | 'fashion-affiliate-strategy'
+  | 'ootd-fit-check-template'
   | 'nano-banana-image-framework'
   | 'image-text-localization'
   | 'creative-director-controls'
@@ -80,6 +81,23 @@ export const GEMINI_AGENT_SKILLS: readonly GeminiAgentSkill[] = [
 - Prefer trust-first creator-native behavior: natural pauses, fabric touch, fit proof, movement test, practical styling, and believable reactions.
 - Avoid abstract cinematic filler that hides the garment or makes the output feel like a generic ad.
 - Fit-model framing should match content type: full-body for fitcheck/party/detail-sensitive outputs, mixed full-body and medium proof for reviews/shop content, practical styling variety for outfit ideas.`,
+  },
+  {
+    id: 'ootd-fit-check-template',
+    name: 'OOTD Fit Check Template Agent',
+    mission: 'Protect the current OOTD Template mode: mirror-phone and front-camera fit-check videos with locked beat order, full-body readability, visual-only performance, and reference-safe product swaps.',
+    prompt: `- Use this skill only for OOTD Template / fit-check video generation, especially templateScenarioId classic_mirror_phone, cozy_home_background, or night_city_glam.
+- Treat the reference video as beat-flow only: preserve pacing logic, shot order, camera grammar, and fit-check proof structure; never copy source person identity, source outfit, logo, text, or product details.
+- Current PRODUCT input is the only product/outfit source. Current FACE input is identity-only. Current BACKGROUND input is environment-only.
+- Keep the template output visual-only: no voiceover, no dialogue, no lip-sync, no speaking mouth movement, no presenter/talking-to-camera behavior. Optional on-screen text may be concise.
+- Fit-check proof order should stay readable: hook/full outfit visibility -> full-fit proof -> detail or side-angle proof -> controlled return/close.
+- Keep full-body head-to-toe outfit readability before detail shots. Detail shots must not replace the required full-fit proof.
+- For mirror-phone scenario: preserve phone-in-hand mirror fit-check framing, closer mirror distance, subject occupancy around 70-85%, stable indoor mirror continuity, face front toward mirror/camera, body only front or gentle 3/4 angles, no back-facing.
+- For front-camera cozy scenario: use observer-camera framing, stable tripod-like composition, rear mirror visible behind model as reflection proof, full-body head-to-toe framing, no phone-in-hand capture, no aggressive zoom.
+- For night-city glam scenario: use observer-camera framing, full-body hero start, allow one short controlled back-reveal only when scenario requires it, return to front/3/4, then upper-body texture proof and centered glam close.
+- Background anchors are locked. Preserve mirror edges, floor line, decor, rear mirror, city-window frame, city bokeh, or room layout as applicable; do not switch venue unless the scenario explicitly asks for a final glow transition.
+- Motion must be small and physically plausible: gentle pivot, hand-to-hip adjustment, fabric touch, hemline movement, weight shift, smooth push-in only where scenario allows.
+- Block common failures: prolonged back-facing, cropped feet/head, outfit redesign, hidden waist/hemline, close-up takeover, jumpy handheld shake, mouth speaking, camera/tripod/operator in mirror reflection, and mismatched mirror/reflection geometry.`,
   },
   {
     id: 'nano-banana-image-framework',
