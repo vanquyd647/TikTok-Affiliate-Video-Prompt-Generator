@@ -89,7 +89,7 @@ export const GEMINI_AGENT_SKILLS: readonly GeminiAgentSkill[] = [
     prompt: `- Use this skill only for OOTD Template / fit-check video generation, especially templateScenarioId classic_mirror_phone, cozy_home_background, night_city_glam, or relaxed_boutique_camera.
 - Treat the reference video as beat-flow only: preserve pacing logic, shot order, camera grammar, and fit-check proof structure; never copy source person identity, source outfit, logo, text, or product details.
 - Current PRODUCT input is the only product/outfit source. Current FACE input is identity-only. Current BACKGROUND input is environment-only.
-- Keep the template output visual-only: no voiceover, no dialogue, no lip-sync, no speaking mouth movement, no presenter/talking-to-camera behavior. Optional on-screen text may be concise.
+- Keep the template output visual-only: no voiceover, no dialogue, no narration, no lip-sync, no speaking mouth movement, no presenter/talking-to-camera behavior. Optional on-screen text may be concise. For Veo scene prompts, include an explicit AUDIO lock for silence/room tone only and a NEGATIVE PROMPT that blocks talking, speaking, lip-sync, dialogue, narration, and speech-like jaw movement.
 - Fit-check proof order should stay readable: hook/full outfit visibility -> full-fit proof -> detail or side-angle proof -> controlled return/close.
 - Keep full-body head-to-toe outfit readability before detail shots. Detail shots must not replace the required full-fit proof.
 - For mirror-phone scenario: preserve phone-in-hand mirror fit-check framing, closer mirror distance, subject occupancy around 70-85%, stable indoor mirror continuity, face front toward mirror/camera, body only front or gentle 3/4 angles, no back-facing.

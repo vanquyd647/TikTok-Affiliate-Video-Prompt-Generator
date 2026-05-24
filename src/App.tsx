@@ -3893,6 +3893,28 @@ function sanitizeVisualOnlyConciseSubject(value: string): string {
   return firstSentence && firstSentence.length > 0 ? firstSentence : fallback
 }
 
+const OOTD_TEMPLATE_SILENT_FIT_CHECK_PERFORMANCE_LOCK = 'PERFORMANCE: Fit-check only; mouth stays relaxed and closed at rest, expression stays calm, and the model does not perform talking-to-camera behavior.'
+const OOTD_TEMPLATE_SILENT_FIT_CHECK_AUDIO_LOCK = 'AUDIO: Silent video or natural room tone and light fabric rustle only; no voice, no dialogue, no narration, no lip-sync, and no spoken CTA.'
+const OOTD_TEMPLATE_SILENT_FIT_CHECK_NEGATIVE_PROMPT = 'NEGATIVE PROMPT: talking, speaking, lip-sync, dialogue, voiceover, narration, presenter monologue, speech-like mouth movement, jaw-talking motion, camera-facing speech performance.'
+
+function appendOotdTemplateSilentFitCheckPerformance(value: string): string {
+  return appendSentenceIfMissing(
+    value,
+    'Fit-check only performance: mouth stays relaxed and closed at rest, with calm visual posing instead of speech-like delivery.',
+  )
+}
+
+function buildOotdTemplateSilentFitCheckVeoLocks(isMirrorPhoneTemplate: boolean): string[] {
+  return [
+    OOTD_TEMPLATE_SILENT_FIT_CHECK_PERFORMANCE_LOCK,
+    isMirrorPhoneTemplate
+      ? 'FORMAT LOCK: mirror phone outfit fit-check only, focused on outfit readability, fabric/detail proof, and controlled mirror posing.'
+      : 'FORMAT LOCK: front-camera outfit fit-check only, focused on outfit readability, fabric/detail proof, and controlled body posing.',
+    OOTD_TEMPLATE_SILENT_FIT_CHECK_AUDIO_LOCK,
+    OOTD_TEMPLATE_SILENT_FIT_CHECK_NEGATIVE_PROMPT,
+  ]
+}
+
 function createProductImageId(dataUrl: string): string {
   const normalized = dataUrl.trim()
   const sample = normalized.length > 12000
@@ -8577,8 +8599,8 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     : 'REAR MIRROR REFLECTION LOCK: inactive.'
 
   const noVoiceTrackPrompt = isFrontCameraTemplate
-    ? 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual front-camera outfit presentation actions and optional on-screen text only.'
-    : 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual mirror phone fit-check actions and optional on-screen text only.'
+    ? 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual front-camera outfit presentation actions and optional on-screen text only. Keep the mouth relaxed/closed at rest and block talking-to-camera behavior.'
+    : 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual mirror phone fit-check actions and optional on-screen text only. Keep the mouth relaxed/closed at rest and block talking-to-camera behavior.'
 
   const cameraMotionLockPrompt = shouldEnforceConciseVisualOnlyAction
     ? (isFrontCameraTemplate
@@ -8911,6 +8933,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
       if (shouldEnforceConciseVisualOnlyAction) {
         finalAction = sanitizeVisualOnlyConciseAction(finalAction)
+        if (templateScenarioId) {
+          finalAction = appendOotdTemplateSilentFitCheckPerformance(finalAction)
+        }
         finalCamera = sanitizeVisualOnlyConciseCamera(finalCamera)
         finalStyle = sanitizeVisualOnlyConciseSceneNarrative(finalStyle)
       }
@@ -9023,6 +9048,10 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         )
       }
 
+      if (shouldEnforceConciseVisualOnlyAction && templateScenarioId) {
+        narrative = appendOotdTemplateSilentFitCheckPerformance(narrative)
+      }
+
       if (isFrontCameraTemplate) {
         narrative = removeOotdMirrorHandheldDevicePhrases(narrative)
       }
@@ -9080,6 +9109,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           finalComposition ? `COMPOSITION: ${finalComposition}` : '',
           `CAMERA: ${cameraMovement}`,
           lighting ? `LIGHTING: ${lighting}` : '',
+          ...(shouldEnforceConciseVisualOnlyAction && templateScenarioId
+            ? buildOotdTemplateSilentFitCheckVeoLocks(!isFrontCameraTemplate)
+            : []),
         ].filter(Boolean).join('\n'),
       }
     })
@@ -12760,8 +12792,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
           : 'Direction rule: face must stay FRONT toward camera; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation; keep the camera frame stable.'))
       : 'Direction rule: allow FRONT, 3/4 LEFT, 3/4 RIGHT, and one short BACK reveal beat when the selected scenario requires it; avoid prolonged back-facing hold and return to FRONT/3/4 for closing.'
     const voiceRule = usesMirrorPhoneTemplate
-      ? 'Voice rule: no voiceover/dialogue. Keep visual-only mirror phone fit-check storytelling with optional on-screen text.'
-      : 'Voice rule: no voiceover/dialogue. Keep visual-only front-camera outfit presentation storytelling with optional on-screen text.'
+      ? 'Voice rule: no voiceover/dialogue/narration/lip-sync. Keep visual-only mirror phone fit-check storytelling with optional on-screen text only; mouth stays relaxed and closed at rest.'
+      : 'Voice rule: no voiceover/dialogue/narration/lip-sync. Keep visual-only front-camera outfit presentation storytelling with optional on-screen text only; mouth stays relaxed and closed at rest.'
     const backgroundAnchorRule = backgroundImage
       ? (usesMirrorPhoneTemplate
         ? 'Background anchor lock: model must stand closer to mirror and perform mirror phone fit-check inside the provided background image, keep full-body head-to-toe framing, make outfit larger in frame (~70-85%), preserve key background anchors, and hold the same venue across beats.'
@@ -12791,7 +12823,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       `Target output duration: ${lockedDuration}s (reference source ${activeTemplateScenario.sourceDurationSec}s). Expand/compress beat timing proportionally without changing beat order.`,
       directionRule,
       'Action + scene writing rule: concise visual description only, no beat labels, no speaking/lip cues.',
-      'Performance rule: keep mouth closed at rest, jaw stable, no speech-like head nods, and no talking-presenter behavior.',
+      'Performance rule: fit-check only. Keep mouth relaxed and closed at rest, jaw stable, no speech-like head nods, no talking-presenter behavior, and no camera-facing monologue.',
       voiceRule,
       backgroundAnchorRule,
       rearMirrorReflectionRule,
