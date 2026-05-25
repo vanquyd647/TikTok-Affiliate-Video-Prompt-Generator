@@ -1031,7 +1031,8 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_PRODUCT_BRIEF = `Keep the relaxed non-mirro
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat; make the template usable for dresses, skirts, tops, bottoms, outerwear, sets, shoes, and accessories.
-- Background style lock: dark grey boutique wall, arched display niches, floating shelf, LED strip accents, ceiling curve, and warm wood floor in one continuous venue.
+- Background style lock: clean neutral-grey boutique wall, arched display niches, floating shelf, LED strip accents, ceiling curve, and warm wood floor in one continuous venue.
+- Lighting lock: bright, clear boutique key light with soft frontal fill; face, body line, fabric texture, color, seams, waist/hem/strap/collar details, and footwear must stay easy to read. Avoid dim/moody/low-key lighting, crushed shadows, silhouette, or underexposed product details.
 - Camera lock: fixed or very gently stabilized front-lens observer camera; no mirror, no selfie, no phone in hand, no aggressive zoom.
 - Framing lock: begin medium/full-body, step back to show full head-to-toe, allow natural medium framing for product-detail proof, then return to full/three-quarter readability.
 - Prop rule: do not bring hand-held product props or extra loose garments into frame; use the worn product, body movement, hand styling, fabric touch, hem/collar/waist/strap/closure detail, and natural pose changes as proof.
@@ -1043,7 +1044,7 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   hookStyle: 'Relaxed front-camera boutique hook with smooth hair flip / walk-in energy and immediate outfit presence.',
   narrativeStructure: 'Front-camera hook -> relaxed full-fit proof -> product-detail motion proof -> smooth side/three-quarter silhouette proof -> confident front reset close (order lock, timeline-flex).',
   ctaStyle: 'Soft boutique recommendation close, no hard sell, visual proof first.',
-  colorGrade: 'clean boutique lighting, dark grey textured wall, warm wood floor, soft LED accent highlights, natural skin tone',
+  colorGrade: 'bright clear boutique lighting, clean neutral-grey textured wall, warm wood floor, soft LED accent highlights, natural skin tone, high product readability',
   pacing: 'smooth relaxed fit-check pacing with graceful pose holds, soft turns, and no rushed mirror/selfie energy',
   sceneBeats: [
     {
@@ -1051,7 +1052,7 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       timestamp: 'Step 1',
       beatName: 'RELAXED CAMERA HOOK',
       description: 'Open standing close to the front camera with a smooth hair flip or walk-in gesture to establish relaxed fit-check confidence.',
-      contextHint: 'Dark grey boutique wall, arched display niches, floating shelf, LED strip accents, curved ceiling, warm wood floor.',
+      contextHint: 'Bright neutral-grey boutique wall, arched display niches, floating shelf, LED strip accents, curved ceiling, warm wood floor, clear face and product exposure.',
       cameraHint: 'Stable front-lens observer camera, medium-to-full framing, no phone or mirror framing.',
       narrationHint: 'No spoken line; visual hook and optional short on-screen text only.',
     },
@@ -1078,7 +1079,7 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       timestamp: 'Step 4',
       beatName: 'SMOOTH SIDE SILHOUETTE',
       description: 'Turn into a soft side or three-quarter pose with one relaxed hand-to-hip/hand-to-thigh gesture to prove drape and body line.',
-      contextHint: 'No venue switch; keep dark grey boutique anchors visible.',
+      contextHint: 'No venue switch; keep bright neutral-grey boutique anchors and product details visible.',
       cameraHint: 'Fixed front camera while subject pivots smoothly; no abrupt shake or close-up takeover.',
       narrationHint: 'No spoken line; relaxed pose and silhouette proof carry the beat.',
     },
@@ -8589,7 +8590,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
         : (isNightCityTemplateScenario
           ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep strong outfit readability, preserve key background anchors (window frame/citylight/floor/decor placement), and treat this image as environment anchor only (not identity/product source).'
           : (isRelaxedBoutiqueTemplateScenario
-            ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same boutique-style scene across all keyframes/scenes, avoid venue switching, keep full-body outfit readability, preserve grey wall, arched display niches, shelf line, LED strips, ceiling curve, and wood floor anchors, and treat this image as environment only.'
+            ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same bright boutique-style scene across all keyframes/scenes, avoid venue switching, keep full-body outfit and product-detail readability, preserve grey wall, arched display niches, shelf line, LED strips, ceiling curve, and wood floor anchors, maintain clear face/product exposure, and treat this image as environment only.'
           : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement), and treat this image as environment anchor only (not identity/product source).')))
       : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing for mirror phone fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).')
     : 'BACKGROUND LOCATION LOCK: no background input image provided.'
@@ -8827,7 +8828,12 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
             ? 'Observer-camera framing with controlled movement and stable axis continuity.'
             : 'Phone-held mirror framing with controlled movement and stable axis continuity.'),
       )
-      const lighting = toSafeString(raw.lighting, `Natural soft lighting with ${analysis.colorGrade || 'balanced'} color mood and clear product details.`)
+      const lighting = toSafeString(
+        raw.lighting,
+        isRelaxedBoutiqueTemplateScenario
+          ? 'Bright clear boutique lighting with soft frontal fill, natural skin tone, readable fabric texture, accurate product color, and no dim or low-key shadows.'
+          : `Natural soft lighting with ${analysis.colorGrade || 'balanced'} color mood and clear product details.`,
+      )
       const style = toSafeString(
         raw.style,
         isFrontCameraTemplate
@@ -12800,14 +12806,14 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         : (isCozyTemplateScenario
           ? 'Background anchor lock: model must stand in front of filming camera inside the provided cozy home background, keep full-body head-to-toe framing, preserve key background anchors including rear mirror placement, hold the same venue across beats, and avoid aggressive push-in/zoom behavior.'
           : (isRelaxedBoutiqueTemplateScenario
-            ? 'Background anchor lock: model must stand in front of filming camera inside the provided relaxed boutique background, keep full-body readability, preserve grey wall, arched display niches, shelf line, LED strip, ceiling curve, and wood floor anchors, hold the same venue across beats, and avoid mirror/selfie framing.'
+            ? 'Background anchor lock: model must stand in front of filming camera inside the provided relaxed boutique background, keep bright clear exposure on face/body/product, keep full-body readability, preserve grey wall, arched display niches, shelf line, LED strip, ceiling curve, and wood floor anchors, hold the same venue across beats, and avoid mirror/selfie framing.'
           : 'Background anchor lock: model must stay in front of filming camera inside the provided selected-scenario background, preserve key venue anchors (window frame/citylight/floor line/decor), keep continuity across all beats, and allow only smooth full-body-to-medium push-in progression when needed.')))
       : (usesMirrorPhoneTemplate
         ? 'Background anchor lock: no background image provided, so keep mirror-room continuity in one venue.'
         : (isCozyTemplateScenario
           ? 'Background anchor lock: no background image provided, so keep one cozy home venue continuity with observer-camera framing, rear mirror behind model, and stable full-body composition.'
           : (isRelaxedBoutiqueTemplateScenario
-            ? 'Background anchor lock: no background image provided, so keep one relaxed boutique venue with dark grey wall, arched display niches, shelf accents, LED strips, wood floor, stable observer-camera framing, and no mirror/selfie behavior.'
+            ? 'Background anchor lock: no background image provided, so keep one bright relaxed boutique venue with clean neutral-grey wall, arched display niches, shelf accents, LED strips, wood floor, stable observer-camera framing, clear product exposure, and no mirror/selfie behavior.'
           : 'Background anchor lock: no background image provided, so keep one selected-scenario venue continuity with observer-camera framing and stable anchor composition.')))
     const rearMirrorReflectionRule = shouldEnforceRearMirrorReflection
       ? 'Rear mirror reflection lock: keep mirror behind model visible as reflection proof across all beats; never show camera/tripod/operator in mirror reflection.'
