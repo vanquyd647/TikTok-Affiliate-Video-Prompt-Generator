@@ -351,7 +351,7 @@ type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image' | 'storyboard_video' | 'music_video'
 type AppPageMode = 'core' | 'ootd_template' | 'storyboard_template' | 'music_video_template' | 'prompt_library'
-type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam' | 'relaxed_boutique_camera'
+type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam' | 'relaxed_boutique_camera' | 'free_style_product_review'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
 type LookbookTheme = 'auto' | 'minimal_studio' | 'street_casual' | 'office_chic' | 'party_night' | 'vacation_resort'
@@ -1028,6 +1028,7 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_SOURCE_DURATION_SEC = 39
 const OOTD_TEMPLATE_RELAXED_BOUTIQUE_PRODUCT_BRIEF = `Keep the relaxed non-mirror front-camera boutique fit-check progression from the reference video.
 - Preserve observer-camera framing: model stands in front of the filming camera, no phone-in-hand mirror framing.
 - Keep progression: smooth walk-in / hair-flip hook -> relaxed full-fit proof -> product-detail motion proof -> soft side/three-quarter silhouette turn -> confident front reset / close.
+- 32s option only: include exactly one soft over-shoulder back-detail lean before the close; torso angles slightly to show the garment back/backline, but face stays turned toward the front camera and the pose returns to front/three-quarter immediately.
 - Keep beat order, but do not clone exact second-by-second timeline from the reference.
 - The only variable is the outfit/product from current PRODUCT input image.
 - Maintain full-body readability while keeping product details visible in every beat; make the template usable for dresses, skirts, tops, bottoms, outerwear, sets, shoes, and accessories.
@@ -1036,13 +1037,13 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_PRODUCT_BRIEF = `Keep the relaxed non-mirro
 - Camera lock: fixed or very gently stabilized front-lens observer camera; no mirror, no selfie, no phone in hand, no aggressive zoom.
 - Framing lock: begin medium/full-body, step back to show full head-to-toe, allow natural medium framing for product-detail proof, then return to full/three-quarter readability.
 - Prop rule: do not bring hand-held product props or extra loose garments into frame; use the worn product, body movement, hand styling, fabric touch, hem/collar/waist/strap/closure detail, and natural pose changes as proof.
-- Direction rule: face stays mostly front toward camera; allow gentle side/three-quarter turns for silhouette proof; avoid prolonged back-facing hold.
+- Direction rule: face stays mostly front toward camera; allow gentle side/three-quarter turns for silhouette proof; in 32s only, allow one short over-shoulder back-detail lean with face still visible toward camera; avoid full or prolonged back-facing hold.
 - Voice rule: visual-only relaxed fit-check, no voiceover/spoken dialogue, no lip-sync behavior.`
 const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'ootd',
   detectedDurationSec: OOTD_TEMPLATE_RELAXED_BOUTIQUE_SOURCE_DURATION_SEC,
   hookStyle: 'Relaxed front-camera boutique hook with smooth hair flip / walk-in energy and immediate outfit presence.',
-  narrativeStructure: 'Front-camera hook -> relaxed full-fit proof -> product-detail motion proof -> smooth side/three-quarter silhouette proof -> confident front reset close (order lock, timeline-flex).',
+  narrativeStructure: 'Front-camera hook -> relaxed full-fit proof -> product-detail motion proof -> smooth side/three-quarter silhouette proof with optional 32s over-shoulder back-detail lean -> confident front reset close (order lock, timeline-flex).',
   ctaStyle: 'Soft boutique recommendation close, no hard sell, visual proof first.',
   colorGrade: 'bright clear boutique lighting, clean neutral-grey textured wall, warm wood floor, soft LED accent highlights, natural skin tone, high product readability',
   pacing: 'smooth relaxed fit-check pacing with graceful pose holds, soft turns, and no rushed mirror/selfie energy',
@@ -1078,9 +1079,9 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       index: 3,
       timestamp: 'Step 4',
       beatName: 'SMOOTH SIDE SILHOUETTE',
-      description: 'Turn into a soft side or three-quarter pose with one relaxed hand-to-hip/hand-to-thigh gesture to prove drape and body line.',
+      description: 'Turn into a soft side or three-quarter pose with one relaxed hand-to-hip/hand-to-thigh gesture to prove drape and body line. For 32s output, this beat becomes one soft over-shoulder back-detail lean: torso slightly angles to show backline while face stays turned toward the front camera.',
       contextHint: 'No venue switch; keep bright neutral-grey boutique anchors and product details visible.',
-      cameraHint: 'Fixed front camera while subject pivots smoothly; no abrupt shake or close-up takeover.',
+      cameraHint: 'Fixed front camera while subject pivots smoothly; no abrupt shake or close-up takeover; never hold a full back-facing orientation.',
       narrationHint: 'No spoken line; relaxed pose and silhouette proof carry the beat.',
     },
     {
@@ -1096,8 +1097,81 @@ const OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   generatedScript: `Open with a relaxed front-camera walk-in or hair-flip hook in the boutique set.
 Settle into a full-body fit proof so silhouette, waistline, length, footwear, and category-specific details are readable.
 Use hands and small body movement to show product details on the worn item; do not bring extra loose garments into frame.
-Turn smoothly into a side or three-quarter pose with relaxed hand styling for drape and body-line proof.
+Turn smoothly into a side or three-quarter pose with relaxed hand styling for drape and body-line proof; for 32s, add one soft over-shoulder back-detail lean while the face stays turned toward camera.
 Return to front/three-quarter hero stance and close with calm boutique confidence.`,
+  generatedAt: 0,
+}
+
+const OOTD_TEMPLATE_FREESTYLE_REFERENCE_VIDEO_ID = 'free_style_product_review'
+const OOTD_TEMPLATE_FREESTYLE_REFERENCE_VIDEO_FILE_NAME = 'no-reference-freestyle'
+const OOTD_TEMPLATE_FREESTYLE_SOURCE_DURATION_SEC = 0
+const OOTD_TEMPLATE_FREESTYLE_PRODUCT_BRIEF = `Free Style Product Review template for OOTD Template Page.
+- Creative freedom is open: the model may walk, pivot, pose, detail-check, style-adjust, gesture, sit/stand, or use a natural creator-style movement.
+- Core content is non-negotiable: the video must review the current fashion product/outfit from PRODUCT input with clear fit, material, detail, movement, styling, and verdict proof.
+- Every scene uses KF[i] as START FRAME and KF[i+1] as END FRAME as a standalone product-review clip.
+- Adjacent keyframes must never share the same facingDirection. KF[i] and KF[i+1] must show a visible turn/pivot/body-direction change so Veo has two different directions to interpolate.
+- If a generated idea repeats the same direction twice, remap the second keyframe to the nearest different direction and describe the turn explicitly.
+- Keep product readability higher than freestyle choreography: no action may hide the garment, crop key fit areas, or replace the product review intent.
+- Visual-only rule: no voiceover/spoken dialogue/lip-sync/talking-to-camera behavior.`
+const OOTD_TEMPLATE_FREESTYLE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
+  detectedContentType: 'ootd',
+  detectedDurationSec: OOTD_TEMPLATE_FREESTYLE_SOURCE_DURATION_SEC,
+  hookStyle: 'Freestyle creator-native product review hook with clear outfit readability.',
+  narrativeStructure: 'Freestyle product-review sequence: hook/full-look -> fit/proportion -> material/detail -> movement/styling -> verdict close, with every adjacent keyframe using a different body direction.',
+  ctaStyle: 'Soft styling verdict and product-readable recommendation.',
+  colorGrade: 'clean fashion creator lighting, natural skin tone, accurate product color, high fabric/detail readability',
+  pacing: 'freestyle but controlled; each standalone scene has a distinct review angle and a visible pivot from start keyframe to end keyframe',
+  sceneBeats: [
+    {
+      index: 0,
+      timestamp: 'Scene style 1',
+      beatName: 'FREESTYLE HOOK / FULL-LOOK REVIEW',
+      description: 'Open with any natural creator-style action while showing the complete outfit/product clearly.',
+      contextHint: 'Any product-appropriate fashion setting is allowed if the product remains readable.',
+      cameraHint: 'Full-body or medium-wide framing with stable product visibility.',
+      narrationHint: 'No spoken line; optional short on-screen text only.',
+    },
+    {
+      index: 1,
+      timestamp: 'Scene style 2',
+      beatName: 'FIT AND PROPORTION REVIEW',
+      description: 'Use a different body direction and a visible pivot to review fit, size, proportion, and silhouette.',
+      contextHint: 'Keep identity/product/location anchors stable within the scene.',
+      cameraHint: 'Start/end frames must not share the same facing direction.',
+      narrationHint: 'Visual proof only.',
+    },
+    {
+      index: 2,
+      timestamp: 'Scene style 3',
+      beatName: 'MATERIAL / DETAIL REVIEW',
+      description: 'Use hands, posture, or a controlled turn to review fabric texture, seams, trim, closure, collar, hem, strap, or hardware.',
+      contextHint: 'No extra product props required; review the worn product.',
+      cameraHint: 'Medium or full-body composition with detail readable.',
+      narrationHint: 'No spoken line.',
+    },
+    {
+      index: 3,
+      timestamp: 'Scene style 4',
+      beatName: 'MOVEMENT / COMFORT REVIEW',
+      description: 'Use a walk, pivot, step, stretch, or body movement to review comfort, drape, and wearability.',
+      contextHint: 'Movement stays practical and product-first.',
+      cameraHint: 'Visible turn/pivot from start to end keyframe.',
+      narrationHint: 'No dialogue.',
+    },
+    {
+      index: 4,
+      timestamp: 'Scene style 5',
+      beatName: 'STYLING VERDICT CLOSE',
+      description: 'End with a different angle, confident pose, and product-readable styling verdict.',
+      contextHint: 'Freestyle close may vary, but product remains hero.',
+      cameraHint: 'Clean final pose with outfit visible.',
+      narrationHint: 'Optional concise on-screen CTA text only.',
+    },
+  ],
+  generatedScript: `Freestyle product review: open with any natural creator-style hook while keeping the full outfit readable.
+Use a different body direction on every adjacent keyframe and make each scene start/end with a visible pivot.
+Review fit and proportion, then material/detail, then movement/comfort or styling use-case.
+Close with a confident product-readable verdict pose.`,
   generatedAt: 0,
 }
 
@@ -1107,7 +1181,7 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
   desc: string
   referenceVideoId: string
   referenceVideoFileName: string
-  referenceVideoUrl: string
+  referenceVideoUrl?: string
   sourceDurationSec: number
   lockedContentType: ResolvedContentType
   cameraFormat: 'mirror_phone' | 'front_camera'
@@ -1165,6 +1239,18 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
     cameraFormat: 'front_camera',
     productBrief: OOTD_TEMPLATE_RELAXED_BOUTIQUE_PRODUCT_BRIEF,
     lockedAnalysis: OOTD_TEMPLATE_RELAXED_BOUTIQUE_LOCKED_ANALYSIS,
+  },
+  {
+    id: 'free_style_product_review',
+    label: 'Free Style Review',
+    desc: 'Tu do hanh dong, core la review san pham thoi trang',
+    referenceVideoId: OOTD_TEMPLATE_FREESTYLE_REFERENCE_VIDEO_ID,
+    referenceVideoFileName: OOTD_TEMPLATE_FREESTYLE_REFERENCE_VIDEO_FILE_NAME,
+    sourceDurationSec: OOTD_TEMPLATE_FREESTYLE_SOURCE_DURATION_SEC,
+    lockedContentType: 'ootd',
+    cameraFormat: 'front_camera',
+    productBrief: OOTD_TEMPLATE_FREESTYLE_PRODUCT_BRIEF,
+    lockedAnalysis: OOTD_TEMPLATE_FREESTYLE_LOCKED_ANALYSIS,
   },
 ]
 
@@ -1826,6 +1912,16 @@ const DETAIL_SENSITIVE_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
   'three-quarter-left',
   'front',
   'three-quarter-right',
+] as const
+
+const OOTD_FREESTYLE_REVIEW_FACING_SEQUENCE: readonly ConcreteFacingDirection[] = [
+  'front',
+  'three-quarter-left',
+  'left',
+  'three-quarter-right',
+  'right',
+  'front',
+  'back',
 ] as const
 
 const DETAIL_SENSITIVE_PRODUCT_CATEGORY_PREFIXES = [
@@ -3897,6 +3993,43 @@ function sanitizeVisualOnlyConciseSubject(value: string): string {
 const OOTD_TEMPLATE_SILENT_FIT_CHECK_PERFORMANCE_LOCK = 'PERFORMANCE: Fit-check only; mouth stays relaxed and closed at rest, expression stays calm, and the model does not perform talking-to-camera behavior.'
 const OOTD_TEMPLATE_SILENT_FIT_CHECK_AUDIO_LOCK = 'AUDIO: Silent video or natural room tone and light fabric rustle only; no voice, no dialogue, no narration, no lip-sync, and no spoken CTA.'
 const OOTD_TEMPLATE_SILENT_FIT_CHECK_NEGATIVE_PROMPT = 'NEGATIVE PROMPT: talking, speaking, lip-sync, dialogue, voiceover, narration, presenter monologue, speech-like mouth movement, jaw-talking motion, camera-facing speech performance.'
+const OOTD_TEMPLATE_SCENE_REVIEW_STYLES = [
+  {
+    label: 'Full-look first impression review',
+    directive: 'show the complete outfit/product silhouette, proportion, color, and immediate fit impression.',
+  },
+  {
+    label: 'Fit and proportion review',
+    directive: 'review waist/shoulder/hip/length/overall sizing cues with a calm pose change.',
+  },
+  {
+    label: 'Material and detail review',
+    directive: 'review fabric texture, seams, trims, closure, strap, collar, hem, or hardware details on the worn product.',
+  },
+  {
+    label: 'Movement and comfort review',
+    directive: 'review drape, stretch, walkability, arm/leg movement, and practical wearing comfort.',
+  },
+  {
+    label: 'Side/backline silhouette review',
+    directive: 'review side profile, backline, drape fall, and body-line proof without losing face/product readability.',
+  },
+  {
+    label: 'Styling verdict review',
+    directive: 'close with a practical styling verdict, use-case cue, and confident product-readable final pose.',
+  },
+] as const
+
+function getOotdTemplateSceneReviewStyle(index: number): typeof OOTD_TEMPLATE_SCENE_REVIEW_STYLES[number] {
+  return OOTD_TEMPLATE_SCENE_REVIEW_STYLES[index % OOTD_TEMPLATE_SCENE_REVIEW_STYLES.length]
+}
+
+function buildOotdTemplateSceneReviewStylePlan(sceneCount: number): string {
+  return Array.from({ length: sceneCount }, (_, index) => {
+    const style = getOotdTemplateSceneReviewStyle(index)
+    return `Scene ${index + 1}: ${style.label} - ${style.directive}`
+  }).join('\n')
+}
 
 function appendOotdTemplateSilentFitCheckPerformance(value: string): string {
   return appendSentenceIfMissing(
@@ -6635,7 +6768,7 @@ ${scriptReference.text}`,
       'image-to-video-handoff',
       'veo-fast-iteration',
       'veo-native-audio-localization',
-      'veo-continuity',
+      ...(templateScenarioId ? [] : ['veo-continuity' as const]),
       'safety-policy',
       'schema-qa',
     ],
@@ -8551,20 +8684,30 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const isCozyTemplateScenario = templateScenarioId === 'cozy_home_background'
   const isNightCityTemplateScenario = templateScenarioId === 'night_city_glam'
   const isRelaxedBoutiqueTemplateScenario = templateScenarioId === 'relaxed_boutique_camera'
+  const isFreeStyleProductReviewTemplateScenario = templateScenarioId === 'free_style_product_review'
+  const shouldUseRelaxedBoutique32sBackDetailLean = isRelaxedBoutiqueTemplateScenario && duration === 32
   const frontCameraNaturalActionFallback = isNightCityTemplateScenario
     ? 'Natural front-camera glam fit-check flow with smooth step-in, gentle turn-return, and clear outfit readability.'
     : (isRelaxedBoutiqueTemplateScenario
-      ? 'Relaxed non-mirror front-camera boutique fit-check flow with smooth walk-in, hair-flip energy, full-fit proof, worn-product detail motion, soft side turn, and calm front reset.'
+      ? (shouldUseRelaxedBoutique32sBackDetailLean
+        ? 'Relaxed non-mirror front-camera boutique fit-check flow with smooth walk-in, hair-flip energy, full-fit proof, worn-product detail motion, one soft over-shoulder back-detail lean with face toward camera, and calm front reset.'
+        : 'Relaxed non-mirror front-camera boutique fit-check flow with smooth walk-in, hair-flip energy, full-fit proof, worn-product detail motion, soft side turn, and calm front reset.')
+    : (isFreeStyleProductReviewTemplateScenario
+      ? 'Freestyle front-camera fashion product review with creative actions, clear product proof, and a different body direction on every adjacent keyframe.'
     : (isCozyTemplateScenario
       ? 'Natural front-camera fit-check flow with subtle weight shifts, gentle turn-return, and clear full-body outfit readability.'
-      : 'Natural front-camera fit-check movement with relaxed micro-poses and clear outfit readability.'))
+      : 'Natural front-camera fit-check movement with relaxed micro-poses and clear outfit readability.')))
   const frontCameraAnchoredActionSentence = isNightCityTemplateScenario
     ? 'Model performs a natural front-camera glam fit-check flow in the provided background scene with smooth step-in, shoulder-line turns, and confident close posture.'
     : (isRelaxedBoutiqueTemplateScenario
-      ? 'Model performs a relaxed non-mirror front-camera boutique fit-check in the provided background scene with smooth hair movement, full-fit proof, category-appropriate detail motion on the worn product, soft side/three-quarter turn, and calm front reset.'
+      ? (shouldUseRelaxedBoutique32sBackDetailLean
+        ? 'Model performs a relaxed non-mirror front-camera boutique fit-check in the provided background scene with smooth hair movement, full-fit proof, category-appropriate detail motion on the worn product, one short over-shoulder back-detail lean while face stays turned toward the front camera, and calm front reset.'
+        : 'Model performs a relaxed non-mirror front-camera boutique fit-check in the provided background scene with smooth hair movement, full-fit proof, category-appropriate detail motion on the worn product, soft side/three-quarter turn, and calm front reset.')
+    : (isFreeStyleProductReviewTemplateScenario
+      ? 'Model performs a freestyle fashion product review in the provided background scene; actions may vary creatively, but product proof stays clear and every adjacent keyframe changes body direction with a visible pivot.'
     : (isCozyTemplateScenario
       ? 'Model performs a natural front-camera fit-check flow in the provided background scene with subtle weight shifts, gentle turn-return, and relaxed hand-to-hip pose changes.'
-      : 'Model performs a natural front-camera fit-check flow in the provided background scene with relaxed micro-poses and smooth turn-return continuity.'))
+      : 'Model performs a natural front-camera fit-check flow in the provided background scene with relaxed micro-poses and smooth turn-return continuity.')))
 
   const scriptBeatReferences = buildTikTokScriptBeatReferences(analysis.generatedScript, sceneCount)
   const contextBeatReferences = buildTikTokContextBeatReferences(analysis.sceneBeats, sceneCount)
@@ -8668,8 +8811,20 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
       shouldEnforceRearMirrorReflection ? 'Rear mirror/reflection lock is active.' : '',
       `Background reference ${hasBackgroundLocationReference ? 'provided' : 'not provided'}.`,
       shouldEnforceConciseVisualOnlyAction ? 'Concise visual-only action mode is active.' : 'Standard visual action mode is active.',
+      templateScenarioId ? 'OOTD scene mode: each scene is a standalone START KF -> END KF review clip; scene-to-scene continuity is not required.' : '',
     ],
   })
+  const ootdTemplateSceneModePrompt = templateScenarioId
+    ? `OOTD TEMPLATE SCENE MODE:
+- Treat each scene as a standalone review clip using KF[i] as START FRAME and KF[i+1] as END FRAME.
+- Do not write scenes as one continuous action chain across the whole video. Scene-to-scene cuts are allowed.
+- Preserve the same face identity, exact product, and location/background anchors across scenes.
+- Inside each scene, the START FRAME and END FRAME should form a clear 8s product-review movement.
+- Each scene must use a different review angle; do not repeat the same scene review style.
+
+SCENE REVIEW STYLE PLAN:
+${buildOotdTemplateSceneReviewStylePlan(sceneCount)}`
+    : ''
 
   const prompt = `You are a TikTok prompt-packaging specialist in DETACHED ANALYSIS MODE.
 
@@ -8686,6 +8841,8 @@ VIDEO CONFIG:
 - Background location reference: ${hasBackgroundLocationReference ? 'provided (environment/location guidance only)' : 'not provided'}
 
 ${detachedRemixAgentSkillBlock}
+
+${ootdTemplateSceneModePrompt}
 
 REVIEW PRODUCT SOURCE (MANDATORY):
 - Review product context must come from REVIEW NOTES below.
@@ -8720,8 +8877,13 @@ HARD CONSTRAINTS:
 - ${backgroundLocationLockPrompt}
 - ${rearMirrorReflectionLockPrompt}
 - ${shouldApplyFrontFaceQuarterBodyLock
-  ? 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera/mirror on every keyframe; body direction is only front or gentle three-quarter-left or three-quarter-right; never use back-facing body orientation.'
+  ? (shouldUseRelaxedBoutique32sBackDetailLean
+    ? 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera on every keyframe. Body direction is front or gentle three-quarter-left/right, except exactly one 32s relaxed boutique keyframe may use a soft over-shoulder back-detail lean: torso angles slightly to reveal the garment back/backline while face remains visible toward the front camera. Never use a full back-facing hold.'
+    : 'FRONT-FACE / QUARTER-BODY LOCK: keep face front-oriented toward camera/mirror on every keyframe; body direction is only front or gentle three-quarter-left or three-quarter-right; never use back-facing body orientation.')
   : 'FRONT-FACE / QUARTER-BODY LOCK: inactive.'}
+- ${isFreeStyleProductReviewTemplateScenario
+  ? 'FREESTYLE KF DIRECTION LOCK: core content must remain fashion product review. Every adjacent keyframe pair KF[i] -> KF[i+1] must use different facingDirection values and describe a visible turn/pivot between them. Never output two adjacent KFs with the same body direction.'
+  : 'FREESTYLE KF DIRECTION LOCK: inactive.'}
 - ${noVoiceTrackPrompt}
 - TERMINOLOGY LOCK: avoid script-oriented wording and express pacing cues as visual beat flow only.
 - ${shouldEnforceConciseVisualOnlyAction
@@ -8729,7 +8891,9 @@ HARD CONSTRAINTS:
   : 'ACTION WRITING LOCK: keep ACTION clear, product-first, and visual.'}
 - PERFORMANCE LOCK: block talking-to-camera behavior, lip articulation, jaw-speaking motion, speech-like head nodding, and presenter-style acting.
 - ${cameraMotionLockPrompt}
-- Maintain stable, non-performative movement and camera continuity.
+- ${templateScenarioId
+  ? 'SCENE INDEPENDENCE LOCK: maintain stable movement inside each scene only; do not require continuous action or body motion from one scene into the next.'
+  : 'Maintain stable, non-performative movement and camera continuity.'}
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
 - Do not copy exact identifiable text/signage/persons from source video context.
 
@@ -8881,6 +9045,11 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       : ''
 
     const keyframes: KeyframePrompt[] = keyframesDraft.map((keyframe, index) => {
+      const isRelaxedBoutique32sBackDetailLeanFrame = shouldUseRelaxedBoutique32sBackDetailLean
+        && index === Math.min(3, keyframesDraft.length - 2)
+      const freestyleReviewFacing = isFreeStyleProductReviewTemplateScenario
+        ? OOTD_FREESTYLE_REVIEW_FACING_SEQUENCE[index % OOTD_FREESTYLE_REVIEW_FACING_SEQUENCE.length]
+        : null
       const lockedFrontQuarterFacing: ConcreteFacingDirection | null = shouldApplyFrontFaceQuarterBodyLock
         ? (
           index % 4 === 0
@@ -8892,7 +9061,8 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
                 : 'three-quarter-right'
         )
         : null
-      const finalFacingDirection: ConcreteFacingDirection = lockedFrontQuarterFacing
+      const finalFacingDirection: ConcreteFacingDirection = freestyleReviewFacing
+        || lockedFrontQuarterFacing
         || (isConcreteFacingDirection(keyframe.facingDirection) ? keyframe.facingDirection : 'front')
 
       let finalAction = keyframe.action
@@ -8952,6 +9122,37 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         }
       }
 
+      if (freestyleReviewFacing) {
+        finalAction = enforceActionFacingDirection(finalAction, freestyleReviewFacing)
+        if (index > 0) {
+          const previousFacing = OOTD_FREESTYLE_REVIEW_FACING_SEQUENCE[(index - 1) % OOTD_FREESTYLE_REVIEW_FACING_SEQUENCE.length]
+          finalAction = appendSentenceIfMissing(
+            finalAction,
+            `Freestyle review turn: pivot visibly from ${toFacingDirectionLabel(previousFacing)} to ${toFacingDirectionLabel(freestyleReviewFacing)} so this KF direction differs from the previous KF.`,
+          )
+          finalCamera = appendSentenceIfMissing(
+            finalCamera,
+            'Capture the turn/pivot clearly; adjacent keyframes must not share the same body direction.',
+          )
+        } else {
+          finalAction = appendSentenceIfMissing(
+            finalAction,
+            'Freestyle product review start: keep product readable and prepare a visible turn into the next KF.',
+          )
+        }
+      }
+
+      if (isRelaxedBoutique32sBackDetailLeanFrame) {
+        finalAction = appendSentenceIfMissing(
+          finalAction,
+          '32s relaxed boutique pose: use one soft over-shoulder back-detail lean, torso angled slightly to reveal the garment back/backline while face stays turned toward the front camera, then return to front/three-quarter.',
+        )
+        finalCamera = appendSentenceIfMissing(
+          finalCamera,
+          'Keep the face visible and the backline readable in bright front-camera boutique lighting; no full back-facing hold.',
+        )
+      }
+
       if (isFrontCameraTemplate) {
         finalAction = removeOotdMirrorHandheldDevicePhrases(finalAction)
         finalCamera = appendSentenceIfMissing(
@@ -9003,6 +9204,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
     const scenes: ScenePrompt[] = Array.from({ length: sceneCount }, (_, index) => {
       const raw = asRecord(rawScenes[index]) ? rawScenes[index] as Record<string, unknown> : {}
+      const ootdSceneReviewStyle = templateScenarioId ? getOotdTemplateSceneReviewStyle(index) : null
       const startSec = Math.round((index * duration) / sceneCount)
       const endSec = Math.round(((index + 1) * duration) / sceneCount)
       const scriptBeat = scriptBeatReferences[index] || analysis.sceneBeats[index]?.narrationHint || analysis.sceneBeats[index]?.description || ''
@@ -9013,7 +9215,9 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           ? (isNightCityTemplateScenario
             ? 'Natural glam fit-check flow: full-look hero, smooth turn-return, upper-body detail pass, and confident close.'
             : (isRelaxedBoutiqueTemplateScenario
-              ? 'Relaxed boutique fit-check flow: smooth walk-in or hair-flip hook, full-fit proof, worn-product detail motion, soft side/three-quarter turn, and calm front reset.'
+              ? (shouldUseRelaxedBoutique32sBackDetailLean
+                ? 'Relaxed boutique fit-check flow: smooth walk-in or hair-flip hook, full-fit proof, worn-product detail motion, one soft over-shoulder back-detail lean with face toward camera, and calm front reset.'
+                : 'Relaxed boutique fit-check flow: smooth walk-in or hair-flip hook, full-fit proof, worn-product detail motion, soft side/three-quarter turn, and calm front reset.')
             : 'Natural fit-check flow: full-look pose, gentle turn-return, detail-check, and relaxed close with clear outfit visibility.'))
           : 'Hold full-fit front pose, then detail-check and gentle side-angle confirmation with clear outfit visibility.'))
         : scriptBeat.length > 0
@@ -9058,6 +9262,17 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         narrative = appendOotdTemplateSilentFitCheckPerformance(narrative)
       }
 
+      if (ootdSceneReviewStyle) {
+        narrative = appendSentenceIfMissing(
+          narrative,
+          `Standalone scene review angle: ${ootdSceneReviewStyle.label}; ${ootdSceneReviewStyle.directive}`,
+        )
+        narrative = appendSentenceIfMissing(
+          narrative,
+          'Scene does not need to continue action from the previous scene or set up continuous action for the next scene.',
+        )
+      }
+
       if (isFrontCameraTemplate) {
         narrative = removeOotdMirrorHandheldDevicePhrases(narrative)
       }
@@ -9072,12 +9287,18 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
       const startPose = keyframes[index]?.action || ''
       const endPose = keyframes[index + 1]?.action || keyframes[index]?.action || ''
+      const startFacing = keyframes[index]?.facingDirection || ''
+      const endFacing = keyframes[index + 1]?.facingDirection || keyframes[index]?.facingDirection || ''
       const startLocation = keyframes[index]?.location || ''
       const endLocation = keyframes[index + 1]?.location || startLocation
       const locationFlow = anchoredTemplateLocation
-        ? `Hold location: ${anchoredTemplateLocation}`
+        ? (templateScenarioId
+          ? `Standalone scene location: ${anchoredTemplateLocation}; preserve anchors but no scene-to-scene action continuity required.`
+          : `Hold location: ${anchoredTemplateLocation}`)
         : normalizeLocationKey(startLocation) === normalizeLocationKey(endLocation)
-          ? `Hold location: ${startLocation}`
+          ? (templateScenarioId
+            ? `Standalone scene location: ${startLocation}; preserve anchors but no scene-to-scene action continuity required.`
+            : `Hold location: ${startLocation}`)
           : `${startLocation} -> ${endLocation}`
       const composition = anchoredTemplateLocation
         ? appendSentenceIfMissing(
@@ -9111,10 +9332,26 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         locationFlow,
         fullPrompt: [
           `SUBJECT: ${sceneSubject}`,
+          ...(ootdSceneReviewStyle
+            ? [
+              'SCENE MODE: standalone OOTD review clip from START FRAME to END FRAME; no need to connect action continuously with previous or next scene.',
+              `REVIEW ANGLE: ${ootdSceneReviewStyle.label} - ${ootdSceneReviewStyle.directive}`,
+              `START FRAME: ${startPose}`,
+              `END FRAME: ${endPose}`,
+              ...(isFreeStyleProductReviewTemplateScenario
+                ? [
+                  `START FACING: ${startFacing}`,
+                  `END FACING: ${endFacing}`,
+                  'FREESTYLE DIRECTION LOCK: START FACING and END FACING must be different, with a visible product-review turn/pivot between them.',
+                ]
+                : []),
+            ]
+            : []),
           `ACTION: ${narrative}`,
           finalComposition ? `COMPOSITION: ${finalComposition}` : '',
           `CAMERA: ${cameraMovement}`,
           lighting ? `LIGHTING: ${lighting}` : '',
+          locationFlow ? `LOCATION FLOW: ${locationFlow}` : '',
           ...(shouldEnforceConciseVisualOnlyAction && templateScenarioId
             ? buildOotdTemplateSilentFitCheckVeoLocks(!isFrontCameraTemplate)
             : []),
@@ -11758,11 +11995,14 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const videoPoseDirectionLockLabel = LOOKBOOK_POSE_DIRECTION_LOCK_OPTIONS.find((item) => item.value === videoPoseDirectionLock)?.label || 'Auto'
   const isMirrorPhoneTemplateScenario = activeOotdTemplateScenario.cameraFormat === 'mirror_phone'
   const isCozyTemplateScenario = activeOotdTemplateScenario.id === 'cozy_home_background'
+  const isFreeStyleProductReviewTemplateScenario = activeOotdTemplateScenario.id === 'free_style_product_review'
   const ootdTemplateDirectionLockLabel = isMirrorPhoneTemplateScenario
     ? 'Face FRONT + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK)'
     : isCozyTemplateScenario
       ? 'Face FRONT toward camera + Body FRONT/3/4 LEFT/3/4 RIGHT only (no BACK); keep framing stable.'
-      : 'Allow FRONT/3/4 with one short BACK-reveal beat; return to FRONT/3/4 for closing while keeping framing stable.'
+      : isFreeStyleProductReviewTemplateScenario
+        ? 'Free style: every adjacent KF pair must use different directions and a visible turn/pivot; core remains fashion product review.'
+        : 'Allow FRONT/3/4 with one short BACK-reveal beat; return to FRONT/3/4 for closing while keeping framing stable.'
   const ootdTemplateVoiceTrackLabel = isMirrorPhoneTemplateScenario
     ? 'OFF (visual-only mirror phone fit-check)'
     : 'OFF (visual-only front-camera outfit presentation)'
@@ -12788,13 +13028,18 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     const usesMirrorPhoneTemplate = activeTemplateScenario.cameraFormat === 'mirror_phone'
     const isCozyTemplateScenario = activeTemplateScenario.id === 'cozy_home_background'
     const isRelaxedBoutiqueTemplateScenario = activeTemplateScenario.id === 'relaxed_boutique_camera'
+    const isFreeStyleProductReviewTemplateScenario = activeTemplateScenario.id === 'free_style_product_review'
+    const lockedDuration = DURATIONS.find((entry) => entry.value === duration)?.value || OOTD_TEMPLATE_LOCKED_DURATION
+    const shouldUseRelaxedBoutique32sBackDetailLean = isRelaxedBoutiqueTemplateScenario && lockedDuration === 32
     const shouldEnforceFrontFaceNoBackLock = usesMirrorPhoneTemplate || isCozyTemplateScenario || isRelaxedBoutiqueTemplateScenario
     const shouldEnforceRearMirrorReflection = usesMirrorPhoneTemplate || isCozyTemplateScenario
     const directionRule = shouldEnforceFrontFaceNoBackLock
       ? (usesMirrorPhoneTemplate
         ? 'Direction rule: face must stay FRONT in mirror; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation.'
         : (isRelaxedBoutiqueTemplateScenario
-          ? 'Direction rule: non-mirror front-camera fitcheck; face stays mostly FRONT toward camera, body only FRONT, soft SIDE, 3/4 LEFT, or 3/4 RIGHT; no prolonged BACK body orientation; keep movement relaxed and smooth.'
+          ? (shouldUseRelaxedBoutique32sBackDetailLean
+            ? 'Direction rule: non-mirror front-camera fitcheck; face stays mostly FRONT toward camera. In the 32s option, include exactly one soft over-shoulder back-detail lean: torso angles slightly to show the garment back/backline while face stays visible toward the front camera; no full or prolonged BACK body orientation.'
+            : 'Direction rule: non-mirror front-camera fitcheck; face stays mostly FRONT toward camera, body only FRONT, soft SIDE, 3/4 LEFT, or 3/4 RIGHT; no prolonged BACK body orientation; keep movement relaxed and smooth.')
           : 'Direction rule: face must stay FRONT toward camera; body only FRONT, 3/4 LEFT, or 3/4 RIGHT; no BACK body orientation; keep the camera frame stable.'))
       : 'Direction rule: allow FRONT, 3/4 LEFT, 3/4 RIGHT, and one short BACK reveal beat when the selected scenario requires it; avoid prolonged back-facing hold and return to FRONT/3/4 for closing.'
     const voiceRule = usesMirrorPhoneTemplate
@@ -12818,16 +13063,33 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     const rearMirrorReflectionRule = shouldEnforceRearMirrorReflection
       ? 'Rear mirror reflection lock: keep mirror behind model visible as reflection proof across all beats; never show camera/tripod/operator in mirror reflection.'
       : 'Rear mirror reflection lock: inactive.'
-    const lockedDuration = DURATIONS.find((entry) => entry.value === duration)?.value || OOTD_TEMPLATE_LOCKED_DURATION
+    const relaxedBoutique32sBackDetailRule = shouldUseRelaxedBoutique32sBackDetailLean
+      ? '32s relaxed boutique pose rule: include exactly one short soft over-shoulder back-detail lean before the close. The torso may angle slightly to reveal the garment back/backline, but the face must stay turned toward the front camera, the frame must stay bright and readable, and the next beat returns to front/three-quarter.'
+      : ''
+    const freeStyleDirectionRule = isFreeStyleProductReviewTemplateScenario
+      ? 'Free Style direction rule: creative actions are allowed, but this is still a fashion product review. Every adjacent keyframe pair must have different facingDirection values and a visible turn/pivot; never let KF start and KF end in a scene share the same body direction.'
+      : ''
+    const sourceTimingRule = activeTemplateScenario.sourceDurationSec > 0
+      ? `Target output duration: ${lockedDuration}s (reference source ${activeTemplateScenario.sourceDurationSec}s). Expand/compress beat timing proportionally without changing beat order.`
+      : `Target output duration: ${lockedDuration}s. No source timeline is locked; create freestyle product-review pacing with standalone scene review angles.`
+    const ootdSceneIndependenceRule = `Scene structure rule: generate ${DURATIONS.find((entry) => entry.value === lockedDuration)?.scenes || 0} standalone review scenes. Each scene uses its own KF start and KF end pair; do not require action continuity between scenes. Each scene must use a different review angle:
+${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value === lockedDuration)?.scenes || 1)}`
 
     const reviewProductNotes = [
       activeTemplateScenario.productBrief,
       `Product category hint: ${activeProductCategoryOption.label}.`,
       `Detail hint: ${activeProductCategoryOption.detailHint}`,
-      'Ignore all non-product visual identity from the reference video. Keep only pacing and scene progression.',
-      'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
-      `Target output duration: ${lockedDuration}s (reference source ${activeTemplateScenario.sourceDurationSec}s). Expand/compress beat timing proportionally without changing beat order.`,
+      isFreeStyleProductReviewTemplateScenario
+        ? 'No reference video is used. Create original freestyle actions while keeping product-review intent primary.'
+        : 'Ignore all non-product visual identity from the reference video. Keep only pacing and scene progression.',
+      isFreeStyleProductReviewTemplateScenario
+        ? 'Timeline rule: freestyle pacing is allowed, but every scene must remain a standalone product-review clip with distinct review angle.'
+        : 'Timeline rule: keep the same beat order as reference, but adapt timing flexibly for target output duration.',
+      sourceTimingRule,
       directionRule,
+      relaxedBoutique32sBackDetailRule,
+      freeStyleDirectionRule,
+      ootdSceneIndependenceRule,
       'Action + scene writing rule: concise visual description only, no beat labels, no speaking/lip cues.',
       'Performance rule: fit-check only. Keep mouth relaxed and closed at rest, jaw stable, no speech-like head nods, no talking-presenter behavior, and no camera-facing monologue.',
       voiceRule,
@@ -13203,7 +13465,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                 {isPromptLibraryPage
                   ? 'AI Video Editor Intern Prompt Library'
                   : isOotdTemplatePage
-                  ? `OOTD Template Page (Beat-flow lock theo video ${activeOotdTemplateScenario.referenceVideoFileName})`
+                  ? `OOTD Template Page (${activeOotdTemplateScenario.referenceVideoUrl ? `Beat-flow lock theo video ${activeOotdTemplateScenario.referenceVideoFileName}` : activeOotdTemplateScenario.label})`
                   : isMusicVideoTemplatePage
                   ? 'Music Video Template (audio + script + artist/location references)'
                   : isStoryboardTemplatePage
@@ -13337,7 +13599,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                 }}
               >
                 <div className="card-title" style={{ color: '#38bdf8' }}>
-                  <Film /> OOTD Template Lock ({activeOotdTemplateScenario.label} • {activeOotdTemplateScenario.referenceVideoFileName})
+                  <Film /> OOTD Template Lock ({activeOotdTemplateScenario.label}{activeOotdTemplateScenario.referenceVideoUrl ? ` • ${activeOotdTemplateScenario.referenceVideoFileName}` : ''})
                 </div>
 
                 <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 10 }}>
@@ -13389,25 +13651,31 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
                   </div>
                 </div>
 
-                <video
-                  src={activeOotdTemplateScenario.referenceVideoUrl}
-                  controls
-                  preload="metadata"
-                  playsInline
-                  muted
-                  style={{
-                    width: '100%',
-                    borderRadius: 10,
-                    border: '1px solid rgba(56, 189, 248, 0.35)',
-                    marginBottom: 12,
-                    background: '#020617',
-                  }}
-                />
+                {activeOotdTemplateScenario.referenceVideoUrl ? (
+                  <video
+                    src={activeOotdTemplateScenario.referenceVideoUrl}
+                    controls
+                    preload="metadata"
+                    playsInline
+                    muted
+                    style={{
+                      width: '100%',
+                      borderRadius: 10,
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      marginBottom: 12,
+                      background: '#020617',
+                    }}
+                  />
+                ) : (
+                  <div className="prompt-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 12 }}>
+                    Free Style Review khong dung video tham chieu. Gemini duoc tu do tao hanh dong, nhung core van la review san pham thoi trang va moi cap KF start/end phai khac huong.
+                  </div>
+                )}
 
                 <div className="prompt-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 10 }}>
                   <strong>Lock config:</strong>{'\n'}
-                  Scenario: {activeOotdTemplateScenario.label} (video {activeOotdTemplateScenario.referenceVideoId}){'\n'}
-                  Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s; nguon tham chieu {activeOotdTemplateScenario.sourceDurationSec}s, chi de tham khao nhip){'\n'}
+                  Scenario: {activeOotdTemplateScenario.label} ({activeOotdTemplateScenario.referenceVideoUrl ? `video ${activeOotdTemplateScenario.referenceVideoId}` : 'no reference video'}){'\n'}
+                  Duration output: {duration}s (default {OOTD_TEMPLATE_LOCKED_DURATION}s{activeOotdTemplateScenario.sourceDurationSec > 0 ? `; nguon tham chieu ${activeOotdTemplateScenario.sourceDurationSec}s, chi de tham khao nhip` : '; freestyle no reference duration'}){'\n'}
                   Ratio: {OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: {activeOotdTemplateScenario.lockedContentType.toUpperCase()}{'\n'}
                   Direction lock: {ootdTemplateDirectionLockLabel}{'\n'}
