@@ -2452,6 +2452,56 @@ function stripPromptFieldPrefix(value: string, labels: readonly string[]): strin
   return next
 }
 
+const STRUCTURED_PROMPT_FIELD_LABELS = [
+  'SUBJECT',
+  'ACTION',
+  'NARRATIVE',
+  'SCENE',
+  'LOCATION',
+  'FACING',
+  'FACING DIRECTION',
+  'CAMERA',
+  'CINEMATOGRAPHY',
+  'LIGHTING',
+  'STYLE',
+  'AMBIANCE',
+  'AUDIO',
+  'NEGATIVE PROMPT',
+  'ASPECT RATIO',
+  'ASPECT-RATIO',
+] as const
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function extractStructuredPromptField(value: string, labels: readonly string[]): string {
+  const source = normalizePromptWhitespace(value)
+  if (!source) return source
+
+  const targetLabels = labels
+    .map((label) => label.trim())
+    .filter((label) => label.length > 0)
+    .map(escapeRegExp)
+  if (targetLabels.length === 0) return stripPromptFieldPrefix(source, labels)
+
+  const targetPattern = new RegExp(`\\b(?:${targetLabels.join('|')})\\s*:\\s*`, 'i')
+  const targetMatch = targetPattern.exec(source)
+  if (!targetMatch) return stripPromptFieldPrefix(source, labels)
+
+  const start = targetMatch.index + targetMatch[0].length
+  const rest = source.slice(start)
+  const allFieldLabels = STRUCTURED_PROMPT_FIELD_LABELS.map(escapeRegExp).join('|')
+  const nextFieldPattern = new RegExp(`\\b(?:${allFieldLabels})\\s*:\\s*`, 'i')
+  const nextMatch = nextFieldPattern.exec(rest)
+  const extracted = (nextMatch ? rest.slice(0, nextMatch.index) : rest)
+    .replace(/^[,.;:\-\s]+/, '')
+    .replace(/[,.;:\-\s]+$/, '')
+    .trim()
+
+  return extracted || stripPromptFieldPrefix(source, labels)
+}
+
 function buildNanoBananaProFramePrompt(input: {
   subject: string
   action: string
@@ -2462,14 +2512,14 @@ function buildNanoBananaProFramePrompt(input: {
   style: string
   aspectRatio: string
 }): string {
-  const subject = stripPromptFieldPrefix(input.subject, ['SUBJECT'])
-  const action = stripPromptFieldPrefix(input.action, ['ACTION'])
-  const facing = stripPromptFieldPrefix(input.facingDirection, ['FACING', 'FACING DIRECTION'])
-  const location = stripPromptFieldPrefix(input.location, ['LOCATION'])
-  const camera = stripPromptFieldPrefix(input.camera, ['CAMERA'])
-  const lighting = stripPromptFieldPrefix(input.lighting, ['LIGHTING'])
-  const style = stripPromptFieldPrefix(input.style, ['STYLE'])
-  const aspectRatio = stripPromptFieldPrefix(input.aspectRatio, ['ASPECT RATIO', 'ASPECT-RATIO'])
+  const subject = extractStructuredPromptField(input.subject, ['SUBJECT'])
+  const action = extractStructuredPromptField(input.action, ['ACTION'])
+  const facing = extractStructuredPromptField(input.facingDirection, ['FACING', 'FACING DIRECTION'])
+  const location = extractStructuredPromptField(input.location, ['LOCATION', 'SCENE'])
+  const camera = extractStructuredPromptField(input.camera, ['CAMERA', 'CINEMATOGRAPHY'])
+  const lighting = extractStructuredPromptField(input.lighting, ['LIGHTING'])
+  const style = extractStructuredPromptField(input.style, ['STYLE'])
+  const aspectRatio = extractStructuredPromptField(input.aspectRatio, ['ASPECT RATIO', 'ASPECT-RATIO'])
 
   return `SUBJECT: ${subject}
 ACTION: ${action}
@@ -8970,7 +9020,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           ? `Product review movement follows visual beat flow: ${fallbackScriptBeat}`
           : (analysis.sceneBeats[scriptBeatIndex]?.description || 'Natural product review motion with clear detail demonstration.')
 
-      const rawAction = toSafeString(raw.action, fallbackAction)
+      const rawAction = extractStructuredPromptField(toSafeString(raw.action, fallbackAction), ['ACTION'])
       const normalizedAction = shouldEnforceConciseVisualOnlyAction
         ? sanitizeVisualOnlyConciseAction(rawAction)
         : rawAction
@@ -8984,22 +9034,22 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const fallbackFacing = RULE32_FACING_SEQUENCE[index % RULE32_FACING_SEQUENCE.length]
       const facingDirection = resolveFacing(raw.facingDirection ?? raw.action, fallbackFacing)
       const fallbackLocation = buildTikTokContextRemixLocationFallback(fallbackContextBeat)
-      const location = toSafeString(raw.location, fallbackLocation)
+      const location = extractStructuredPromptField(toSafeString(raw.location, fallbackLocation), ['LOCATION', 'SCENE'])
       const camera = toSafeString(
-        raw.camera,
+        extractStructuredPromptField(toSafeString(raw.camera, ''), ['CAMERA', 'CINEMATOGRAPHY']),
         analysis.sceneBeats[scriptBeatIndex]?.cameraHint
           || (isFrontCameraTemplate
             ? 'Observer-camera framing with controlled movement and stable axis continuity.'
             : 'Phone-held mirror framing with controlled movement and stable axis continuity.'),
       )
       const lighting = toSafeString(
-        raw.lighting,
+        extractStructuredPromptField(toSafeString(raw.lighting, ''), ['LIGHTING']),
         isRelaxedBoutiqueTemplateScenario
           ? 'Bright clear boutique lighting with soft frontal fill, natural skin tone, readable fabric texture, accurate product color, and no dim or low-key shadows.'
           : `Natural soft lighting with ${analysis.colorGrade || 'balanced'} color mood and clear product details.`,
       )
       const style = toSafeString(
-        raw.style,
+        extractStructuredPromptField(toSafeString(raw.style, ''), ['STYLE']),
         isFrontCameraTemplate
           ? `Front-camera outfit presentation style; pacing ${analysis.pacing || 'mid-pace'}. Context remix from analyzed video environment.`
           : `Mirror phone fit-check style; pacing ${analysis.pacing || 'mid-pace'}. Context remix from analyzed video environment.`,
@@ -9226,7 +9276,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
 
       const baseNarrative = shouldEnforceConciseVisualOnlyAction
         ? fallbackNarrative
-        : toSafeString(raw.narrative, fallbackNarrative)
+        : extractStructuredPromptField(toSafeString(raw.narrative, fallbackNarrative), ['ACTION', 'NARRATIVE'])
       let narrative = shouldEnforceConciseVisualOnlyAction
         ? sanitizeVisualOnlyConciseSceneNarrative(baseNarrative)
         : appendSentenceIfMissing(
