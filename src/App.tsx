@@ -1257,6 +1257,80 @@ const OOTD_TEMPLATE_SCENARIOS: Array<{
 
 const OOTD_TEMPLATE_DEFAULT_SCENARIO_ID: OotdTemplateScenarioId = 'classic_mirror_phone'
 
+const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION = 32
+const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
+const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL = 'TikTok Affiliate Fashion Prompt Agent'
+const TIKTOK_SHOP_AFFILIATE_TEMPLATE_PRODUCT_BRIEF = `TikTok Shop Affiliate Fashion Prompt Agent core.
+- Build a high-converting fashion product demo / fitcheck video for TikTok Shop affiliate.
+- Use N+1 keyframe algorithm: 4 video scenes = 5 keyframes. Never write scenes without keyframes.
+- Required output order inside the prompt package intent: product analysis -> master consistency lock -> negative prompt -> keyframe prompts -> scene prompts -> text overlay suggestions -> voice-over direction -> caption/hashtag direction -> N+1 summary.
+- Default structure: Scene 1 opening/hook full-body front view; Scene 2 product detail/fabric/waistline/texture; Scene 3 fit/shape/full-body 3/4 angle; Scene 4 side/back/final CTA product display.
+- Product lock: the hero product is the current PRODUCT input image. Preserve exact color, fabric, length, waistline, silhouette, texture, shine level, seam/hem/trim details, and styling position.
+- Model lock: if FACE input exists, preserve the same adult female model, facial likeness, hairstyle, makeup, accessories, shoes, and natural body proportions across all keyframes/scenes.
+- Boutique background default: use a real women's clothing boutique interior commonly seen in TikTok affiliate fitcheck videos. It must look authentic and photographed in real life, not CGI, not fantasy retail, not empty white studio.
+- Boutique details: polished tile or wood floor, cream-beige walls, ceiling track/recessed retail lights, full-length mirror with believable reflection, clothing racks with real garments, fitting-room curtain/corner, small display table or shelves, natural depth, slightly lived-in but clean layout.
+- Camera style: vertical 9:16, natural smartphone creator fashion content, stable realistic lens perspective, clear product visibility, authentic in-store atmosphere, not overly cinematic or glossy.
+- Motion: smooth, minimal, realistic, product-focused; slow push-in/pull-back, gentle turn, soft pose change, light fabric touch, small weight shift, final pose hold.
+- Text overlay: short Vietnamese product-focused overlays, one per scene, realistic wording only; no exaggerated universal claims.
+- Voice/caption: natural Vietnamese TikTok affiliate voice script and short sales-oriented caption direction are allowed; avoid fake personal experience unless supplied.
+- Safety: SFW, adult model, no nudity, no explicit sexual framing, no underage-looking subject, no fake celebrity/influencer endorsement.
+- Negative prompt must block CGI showroom, fantasy retail interior, fake mirror reflection, white studio unless requested, outfit/product change, wrong fabric/color/length, extra people/accessories, distorted anatomy, warped face/hands, unrealistic camera jump, nudity, explicit sexual content.`
+
+const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
+  detectedContentType: 'tiktokshop',
+  detectedDurationSec: TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION,
+  hookStyle: 'Immediate full-body fashion product hook with clear product visibility and short Vietnamese overlay.',
+  narrativeStructure: 'N+1 affiliate product demo: full-body hook -> product detail proof -> 3/4 fit/shape proof -> side/back final display with TikTok Shop CTA.',
+  ctaStyle: 'Soft TikTok Shop affiliate CTA using text overlay/voice direction, no hard-sell spam or fake scarcity.',
+  colorGrade: 'real boutique retail lighting, cream-beige walls, natural skin tone, realistic fabric texture, high product readability',
+  pacing: '4 controlled scenes / 5 keyframes, smooth smartphone creator pacing, minimal product-focused motion',
+  sceneBeats: [
+    {
+      index: 1,
+      timestamp: '0-8s',
+      beatName: 'OPENING HOOK / FULL BODY',
+      description: 'Show a full-body front view of the adult model wearing the hero product inside a real boutique, with immediate product readability.',
+      contextHint: 'Authentic women fashion boutique, polished floor, cream-beige wall, clothing racks, retail lights, real store depth.',
+      cameraHint: 'Vertical smartphone full-body front view, stable, slow push-in or small elegant pose.',
+      narrationHint: 'Short Vietnamese hook about the product being easy to style / worth checking in the TikTok Shop cart.',
+    },
+    {
+      index: 2,
+      timestamp: '8-16s',
+      beatName: 'PRODUCT DETAIL / FABRIC PROOF',
+      description: 'Move into product detail: fabric, waistline, texture, tailoring, shine, stretch, drape, seam or construction.',
+      contextHint: 'Same boutique background softly visible, mirror/rack/store fixture anchors stay believable.',
+      cameraHint: 'Close-up from chest/waist to thigh or product detail area, slow push, hand lightly touches fabric.',
+      narrationHint: 'Vietnamese proof line about material/fit/detail without exaggerated claim.',
+    },
+    {
+      index: 3,
+      timestamp: '16-24s',
+      beatName: 'FIT / SHAPE / 3-4 ANGLE',
+      description: 'Show how the product looks on body from a flattering 3/4 angle, with fit and silhouette clarity.',
+      contextHint: 'Same real boutique, stable depth, no artificial showroom or fantasy lighting.',
+      cameraHint: 'Full-body 3/4 view, gentle body turn or small weight shift, product remains readable.',
+      narrationHint: 'Vietnamese use-case line: easy to pair, suitable for work/cafe/date/daily styling as appropriate.',
+    },
+    {
+      index: 4,
+      timestamp: '24-32s',
+      beatName: 'SIDE/BACK / FINAL CTA',
+      description: 'End with side/back/final product display pose suitable for affiliate CTA, keeping the product as hero.',
+      contextHint: 'Same boutique lighting and store anchors, clean but real and slightly lived-in.',
+      cameraHint: 'Slow turn into final full-body or side/back display frame, stable final pose hold.',
+      narrationHint: 'Soft CTA: the exact model/product is in the TikTok Shop cart; invite viewer to check color/size/deal.',
+    },
+  ],
+  generatedScript: `Use this TikTok Shop affiliate N+1 video structure:
+KF1 full-body front product hook -> Scene 1 -> KF2 product detail close-up.
+KF2 product detail close-up -> Scene 2 -> KF3 full-body 3/4 fit proof.
+KF3 full-body 3/4 fit proof -> Scene 3 -> KF4 clean side/back product silhouette.
+KF4 clean side/back product silhouette -> Scene 4 -> KF5 final full-body product display / soft CTA frame.
+Keep the real boutique background consistent, preserve the current product exactly, and write prompts mostly in English with concise Vietnamese overlay/voice/caption intent.`,
+  generatedAt: 0,
+}
+
 const RESOLVED_CONTENT_TYPES: ResolvedContentType[] = [
   'ootd',
   'ootdmirror',
@@ -4458,7 +4532,6 @@ ${buildFitModelRuleLockMatrix()}`
       'reference-lock',
       'user-intent-priority',
       'fashion-affiliate-strategy',
-      'tiktok-shop-affiliate-template',
       'creative-director-controls',
       'location-context',
       'veo-prompting-guide',
@@ -5571,7 +5644,6 @@ Output STRICT JSON only:
         'reference-lock',
         'user-intent-priority',
         'fashion-affiliate-strategy',
-        'tiktok-shop-affiliate-template',
         'nano-banana-image-framework',
         'creative-director-controls',
         'veo-prompting-guide',
@@ -7050,7 +7122,6 @@ async function generateStoryboardVideoWithGemini(
       'creative-director-controls',
       'storyboard-engine',
       'fashion-affiliate-strategy',
-      'tiktok-shop-affiliate-template',
       'realtime-web-visualization',
       'veo-prompting-guide',
       'image-to-video-handoff',
@@ -8296,7 +8367,7 @@ async function generateSeoWithGemini(
   const salesTemplateHint = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
   const seoAgentSkillBlock = buildGeminiAgentSkillBlock({
     stage: 'seo_copy',
-    skillIds: ['commerce-copy', 'tiktok-shop-affiliate-template', 'safety-policy', 'schema-qa'],
+    skillIds: ['commerce-copy', 'safety-policy', 'schema-qa'],
     outputContract: '3 TikTok Shop SEO variants JSON',
     runtimeNotes: [
       `Product name: ${trimmedProductName}.`,
@@ -8460,7 +8531,7 @@ async function generateVoiceoverWithGemini(
   const salesTemplateHint = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
   const voiceoverAgentSkillBlock = buildGeminiAgentSkillBlock({
     stage: 'voiceover',
-    skillIds: ['commerce-copy', 'tiktok-shop-affiliate-template', 'safety-policy', 'schema-qa'],
+    skillIds: ['commerce-copy', 'safety-policy', 'schema-qa'],
     outputContract: 'one 25-35 second voiceover script JSON',
     runtimeNotes: [
       `Product name: ${trimmedProductName}.`,
@@ -8715,6 +8786,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     templateCameraFormat?: 'mirror_phone' | 'front_camera'
     enforceRearMirrorReflection?: boolean
     templateScenarioId?: OotdTemplateScenarioId
+    useTikTokShopAffiliateTemplateSkill?: boolean
   },
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
@@ -8735,6 +8807,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const isFrontCameraTemplate = templateCameraFormat === 'front_camera'
   const shouldEnforceRearMirrorReflection = options?.enforceRearMirrorReflection === true
   const templateScenarioId = options?.templateScenarioId
+  const useTikTokShopAffiliateTemplateSkill = options?.useTikTokShopAffiliateTemplateSkill === true
   const isCozyTemplateScenario = templateScenarioId === 'cozy_home_background'
   const isNightCityTemplateScenario = templateScenarioId === 'night_city_glam'
   const isRelaxedBoutiqueTemplateScenario = templateScenarioId === 'relaxed_boutique_camera'
@@ -8845,7 +8918,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
       'reference-lock',
       ...(templateScenarioId ? ['ootd-fit-check-template' as const] : []),
       'tiktok-analysis-transfer',
-      'tiktok-shop-affiliate-template',
+      ...(useTikTokShopAffiliateTemplateSkill ? ['tiktok-shop-affiliate-template' as const] : []),
       'user-intent-priority',
       'realtime-web-visualization',
       'nano-banana-image-framework',
@@ -8862,6 +8935,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     runtimeNotes: [
       `Detected content type ${analysis.detectedContentType}; target duration ${duration}s; aspect ratio ${aspectRatio}.`,
       templateScenarioId ? `OOTD template scenario is active: ${templateScenarioId}.` : '',
+      useTikTokShopAffiliateTemplateSkill ? 'TikTok Shop Affiliate Fashion Prompt Agent core skill is active.' : '',
       `Template camera format: ${templateCameraFormat}.`,
       shouldEnforceRearMirrorReflection ? 'Rear mirror/reflection lock is active.' : '',
       `Background reference ${hasBackgroundLocationReference ? 'provided' : 'not provided'}.`,
@@ -10072,18 +10146,6 @@ type ProductImagePromptPreset = {
   prompt: string
 }
 
-type AffiliateSkillTemplate = {
-  id: string
-  title: string
-  stage: string
-  platform: string
-  output: string
-  fields: string[]
-  defaults: string[]
-  sections: string[]
-  prompt: string
-}
-
 type OmniFlashGuideItem = {
   id: string
   title: string
@@ -10534,140 +10596,6 @@ No redesign, no extra handbags, no distorted face, no impossible proportions, no
   },
 ]
 
-const TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES: AffiliateSkillTemplate[] = [
-  {
-    id: 'tiktok-shop-fashion-beauty-ugc-review',
-    title: 'TikTok Shop Affiliate - Fashion/Beauty UGC Review',
-    stage: 'Affiliate Skill Template',
-    platform: 'TikTok Shop / Reels / Shorts',
-    output: 'UGC script + visual prompt + copy pack',
-    fields: [
-      'PRODUCT_NAME',
-      'CATEGORY: fashion / beauty / accessory',
-      'TARGET_CUSTOMER',
-      'CUSTOMER_PAIN_POINT',
-      'KEY_BENEFIT',
-      'COMMON_OBJECTION',
-      'PROOF_OR_DEMO',
-      'PRICE_OR_DEAL',
-      'CREATOR_PERSONA',
-      'DURATION_SECONDS',
-      'LANGUAGE',
-      'CTA',
-      'VISUAL_ONLY_MODE: yes / no',
-    ],
-    defaults: [
-      'LANGUAGE = Vietnamese',
-      'STYLE = natural UGC review, trust-first, soft sell',
-      'DURATION_SECONDS = 24-32',
-      'FORMAT = vertical 9:16',
-      'CATEGORY_DEFAULT = fashion/beauty',
-      'CTA = Bam gio hang TikTok Shop de xem gia va mau/size phu hop',
-    ],
-    sections: [
-      'TikTok hook',
-      'Shot-by-shot UGC script',
-      'Visual prompt/keyframes',
-      'Caption',
-      'Hashtags',
-      'Negative prompt',
-      'Compliance notes',
-      'Compact final export',
-    ],
-    prompt: `ROLE:
-You are a TikTok Shop affiliate strategist, UGC scriptwriter, and AI video prompt director for fashion/beauty products.
-
-INPUT FIELDS:
-- PRODUCT_NAME: [ten san pham]
-- CATEGORY: [fashion / beauty / accessory / custom]
-- TARGET_CUSTOMER: [ai se mua]
-- CUSTOMER_PAIN_POINT: [van de nguoi xem dang gap]
-- KEY_BENEFIT: [loi ich chinh co the chung minh bang hinh]
-- COMMON_OBJECTION: [ly do nguoi xem con lan tan]
-- PROOF_OR_DEMO: [try-on / before-after / texture swatch / fit proof / material close-up / outfit pairing / skin-hair-detail close-up]
-- PRICE_OR_DEAL: [gia / voucher / deal neu co; neu khong co thi ghi "not provided"]
-- CREATOR_PERSONA: [ban nu review tu nhien / beauty creator / boutique staff / office girl / student]
-- DURATION_SECONDS: [24 / 32 / 40]
-- LANGUAGE: [Vietnamese by default]
-- CTA: [TikTok Shop call-to-action]
-- VISUAL_ONLY_MODE: [yes/no]
-
-DEFAULT STYLE:
-- Natural UGC review, fast hook in the first 1-2 seconds, creator-native but product-readable.
-- Fashion/beauty proof first: try-on, before-after, texture swatch, outfit pairing, material/fit close-up, skin/hair/detail close-up.
-- Soft sell: useful proof -> objection handling -> clear TikTok Shop purchase cue.
-- Keep the product as hero in every beat; avoid generic lifestyle filler.
-
-OUTPUT REQUIREMENTS:
-1. TIKTOK HOOK:
-   - 3 hook options in Vietnamese.
-   - Each hook must mention PRODUCT_NAME or the exact customer pain point.
-   - Keep each hook short enough for on-screen text.
-
-2. SHOT-BY-SHOT UGC SCRIPT:
-   - Build a timeline for DURATION_SECONDS.
-   - Required beat order: Hook -> product proof -> objection handling -> use-case/result -> CTA.
-   - For each beat return timestamp, shot, action, spoken line, on-screen text, and editing note.
-   - If VISUAL_ONLY_MODE = yes, replace spoken line with "NO DIALOGUE" and move the message into short on-screen text.
-
-3. VISUAL PROMPT / KEYFRAMES:
-   - Create 4-6 visual prompts for a 9:16 AI video workflow.
-   - Separate spoken script from visual prompt.
-   - Each visual prompt must include SUBJECT, PRODUCT, ACTION, SCENE, CAMERA, LIGHTING, STYLE, AUDIO, NEGATIVE PROMPT.
-   - If VISUAL_ONLY_MODE = yes, AUDIO must say: silence/room tone only; no voiceover, no dialogue, no lip-sync.
-
-4. CAPTION:
-   - 2 TikTok captions: one natural review caption and one deal/CTA caption.
-   - Keep claims safe and verifiable.
-
-5. HASHTAGS:
-   - 8-12 hashtags, mixing TikTok Shop, category, use-case, and Vietnamese search terms.
-
-6. NEGATIVE PROMPT:
-   - Block product redesign, wrong color/material, hidden fit proof, random text, fake logos, warped hands, distorted face, oversexualized framing, hard-sell spam.
-
-7. COMPLIANCE NOTES:
-   - Do not invent "best seller", medical cure, guaranteed transformation, fake scarcity, fake reviews, or celebrity/influencer endorsement.
-   - If price/deal/proof is not provided, mark it as a placeholder instead of fabricating it.
-   - Beauty claims must be framed as look/feel/use experience unless clinical proof is supplied.
-
-8. COMPACT FINAL EXPORT:
-   Return a copy-ready block with:
-   PRODUCT_BRIEF:
-   HOOK:
-   UGC_SCRIPT:
-   VISUAL_PROMPTS:
-   CAPTION:
-   HASHTAGS:
-   CTA:
-   NEGATIVE_PROMPT:
-   COMPLIANCE_LOCKS:`,
-  },
-]
-
-function buildTikTokShopAffiliateTemplateText(): string {
-  return [
-    'TIKTOK SHOP AFFILIATE SKILL TEMPLATES - FASHION/BEAUTY UGC REVIEW',
-    ...TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES.map((item, index) => [
-      `${index + 1}. ${item.title}`,
-      `STAGE: ${item.stage}`,
-      `PLATFORM: ${item.platform}`,
-      `OUTPUT: ${item.output}`,
-      '',
-      'INPUT FIELDS:',
-      ...item.fields.map((field) => `- ${field}`),
-      '',
-      'DEFAULTS:',
-      ...item.defaults.map((line) => `- ${line}`),
-      '',
-      'OUTPUT SECTIONS:',
-      ...item.sections.map((section) => `- ${section}`),
-      '',
-      item.prompt,
-    ].join('\n')),
-  ].join('\n\n---\n\n')
-}
-
 const INTERN_PROMPT_LIBRARY: PromptLibraryItem[] = [
   {
     id: 'workflow-strategy',
@@ -11099,128 +11027,6 @@ Professional, clear, easy for a team to execute.`,
   },
 ]
 
-function TikTokShopAffiliateTemplatePage() {
-  const affiliateSkillTemplateText = buildTikTokShopAffiliateTemplateText()
-  const primaryTemplate = TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES[0]
-
-  return (
-    <main className="prompt-library-page fade-in">
-      <section className="prompt-library-hero">
-        <div className="prompt-library-kicker">
-          <TrendingUp size={14} />
-          TikTok Shop Affiliate Template
-        </div>
-        <div className="prompt-library-hero-grid">
-          <div>
-            <h2>{primaryTemplate.title}</h2>
-            <p>
-              Page template rieng cho fashion/beauty affiliate UGC review: nhap brief san pham,
-              tao hook, kich ban UGC, visual prompt/keyframes, caption, hashtags, negative prompt
-              va compliance locks de copy vao quy trinh AFF Video Prompt.
-            </p>
-          </div>
-          <div className="prompt-library-actions">
-            <CopyButton text={affiliateSkillTemplateText} />
-            <span>Copy full affiliate template</span>
-          </div>
-        </div>
-      </section>
-
-      <section className="prompt-library-workflow" aria-label="TikTok Shop affiliate workflow">
-        {['Brief', 'Hook', 'UGC Script', 'Visual Prompts', 'Caption', 'Compliance'].map((step) => (
-          <div key={step} className="prompt-library-step">{step}</div>
-        ))}
-      </section>
-
-      <section className="prompt-library-framework">
-        <div className="prompt-library-framework-main">
-          <div className="card-title">
-            <FileText /> Editable Input Fields
-          </div>
-          <div className="prompt-library-framework-grid">
-            {primaryTemplate.fields.map((field) => (
-              <div key={field} className="prompt-library-framework-item">
-                <h3>{field}</h3>
-                <p>Placeholder co the thay doi theo tung san pham/campaign.</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="prompt-library-formula">
-          <div className="card-title">
-            <Sparkles /> Defaults
-            <CopyButton text={primaryTemplate.defaults.join('\n')} />
-          </div>
-          <code>{primaryTemplate.output}</code>
-          <p>{primaryTemplate.defaults.join(' / ')}</p>
-        </div>
-      </section>
-
-      <section className="prompt-library-shot-section">
-        <div className="prompt-library-section-head">
-          <div>
-            <div className="card-title">
-              <Layers /> Output Sections
-            </div>
-            <h3>Bo dau ra day du cho UGC review conversion</h3>
-            <p>
-              Template tach script noi rieng voi visual prompt/keyframes, co visual-only mode,
-              negative prompt va compliance locks de tranh claim sai trong TikTok Shop affiliate.
-            </p>
-          </div>
-          <div className="prompt-library-actions">
-            <CopyButton text={primaryTemplate.prompt} />
-            <span>Copy template prompt</span>
-          </div>
-        </div>
-
-        <div className="prompt-library-shot-grid">
-          {primaryTemplate.sections.map((section, index) => (
-            <article key={section} className="prompt-library-shot-card">
-              <div className="prompt-library-shot-index">{String(index + 1).padStart(2, '0')}</div>
-              <div className="prompt-library-shot-body">
-                <h4>{section}</h4>
-                <p>Required section trong final affiliate package.</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="prompt-library-grid">
-        {TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES.map((item) => (
-          <article key={item.id} className="prompt-library-card" style={{ ['--library-accent' as string]: '#f97316' }}>
-            <div className="prompt-library-card-head">
-              <div className="prompt-library-icon">
-                <TrendingUp size={18} />
-              </div>
-              <div>
-                <p className="prompt-library-stage">{item.stage}</p>
-                <h3>{item.title}</h3>
-              </div>
-              <CopyButton text={item.prompt} />
-            </div>
-
-            <div className="prompt-library-meta">
-              <span>{item.platform}</span>
-              <span>{item.output}</span>
-            </div>
-
-            <div className="product-image-preset-meta">
-              {item.defaults.map((line) => (
-                <span key={line}>{line}</span>
-              ))}
-            </div>
-
-            <pre className="prompt-library-prompt">{item.prompt}</pre>
-          </article>
-        ))}
-      </section>
-    </main>
-  )
-}
-
 function PromptLibraryPage() {
   const frameworkText = [
     'AI VIDEO EDITOR INTERN WORKFLOW',
@@ -11279,8 +11085,6 @@ function PromptLibraryPage() {
     ].join('\n')),
   ].join('\n\n---\n\n')
 
-  const affiliateSkillTemplateText = buildTikTokShopAffiliateTemplateText()
-
   const fullLibraryText = INTERN_PROMPT_LIBRARY
     .map((item, index) => `${index + 1}. ${item.title}\nSTAGE: ${item.stage}\nOUTPUT: ${item.output}\n\n${item.prompt}`)
     .join('\n\n---\n\n')
@@ -11302,7 +11106,7 @@ function PromptLibraryPage() {
             </p>
           </div>
           <div className="prompt-library-actions">
-            <CopyButton text={`${frameworkText}\n\n---\n\n${omniFlashText}\n\n---\n\n${affiliateSkillTemplateText}\n\n---\n\n${productImageText}\n\n---\n\n${shotCommandText}\n\n---\n\n${fullLibraryText}`} />
+            <CopyButton text={`${frameworkText}\n\n---\n\n${omniFlashText}\n\n---\n\n${productImageText}\n\n---\n\n${shotCommandText}\n\n---\n\n${fullLibraryText}`} />
             <span>Copy full toolkit</span>
           </div>
         </div>
@@ -11395,56 +11199,6 @@ function PromptLibraryPage() {
             </article>
           ))}
         </div>
-      </section>
-
-      <section className="prompt-library-shot-section">
-        <div className="prompt-library-section-head">
-          <div>
-            <div className="card-title">
-              <TrendingUp /> TikTok Shop Affiliate Skill Templates
-            </div>
-            <h3>Fashion/beauty UGC review template de tao video chuyen doi</h3>
-            <p>
-              Template nay gom input fields, hook, kich ban UGC, visual prompt/keyframes, caption, hashtags,
-              negative prompt va compliance locks. Dung cho san pham thoi trang/beauty can review tu nhien,
-              proof ro va CTA TikTok Shop mem nhung co dinh huong mua.
-            </p>
-          </div>
-          <div className="prompt-library-actions">
-            <CopyButton text={affiliateSkillTemplateText} />
-            <span>Copy affiliate skill templates</span>
-          </div>
-        </div>
-
-        <section className="prompt-library-grid" aria-label="TikTok Shop Affiliate skill templates">
-          {TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES.map((item) => (
-            <article key={item.id} className="prompt-library-card" style={{ ['--library-accent' as string]: '#f97316' }}>
-              <div className="prompt-library-card-head">
-                <div className="prompt-library-icon">
-                  <TrendingUp size={18} />
-                </div>
-                <div>
-                  <p className="prompt-library-stage">{item.stage}</p>
-                  <h3>{item.title}</h3>
-                </div>
-                <CopyButton text={item.prompt} />
-              </div>
-
-              <div className="prompt-library-meta">
-                <span>{item.platform}</span>
-                <span>{item.output}</span>
-              </div>
-
-              <div className="product-image-preset-meta">
-                {item.defaults.map((line) => (
-                  <span key={line}>{line}</span>
-                ))}
-              </div>
-
-              <pre className="prompt-library-prompt">{item.prompt}</pre>
-            </article>
-          ))}
-        </section>
       </section>
 
       <section className="product-image-library-section">
@@ -11726,6 +11480,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
   const isPromptLibraryPage = pageMode === 'prompt_library'
   const isTikTokShopAffiliateTemplatePage = pageMode === 'tiktok_shop_affiliate_template'
+  const isTemplateGenerationPage = isOotdTemplatePage || isTikTokShopAffiliateTemplatePage
   const isStoryboardTemplatePage = pageMode === 'storyboard_template'
   const isMusicVideoTemplatePage = pageMode === 'music_video_template'
 
@@ -11782,6 +11537,37 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     isContentTypeManuallyLocked,
     isOotdTemplatePage,
     activeOotdTemplateScenario.lockedContentType,
+    videoPoseDirectionLock,
+  ])
+
+  useEffect(() => {
+    if (!isTikTokShopAffiliateTemplatePage) return
+
+    if (generationMode !== 'video_prompt') {
+      setGenerationMode('video_prompt')
+    }
+    if (duration !== TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION) {
+      setDuration(TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION)
+    }
+    if (aspectRatio !== TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO) {
+      setAspectRatio(TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO)
+    }
+    if (contentType !== 'tiktokshop') {
+      setContentType('tiktokshop')
+    }
+    if (!isContentTypeManuallyLocked) {
+      setIsContentTypeManuallyLocked(true)
+    }
+    if (videoPoseDirectionLock !== 'auto') {
+      setVideoPoseDirectionLock('auto')
+    }
+  }, [
+    aspectRatio,
+    contentType,
+    duration,
+    generationMode,
+    isContentTypeManuallyLocked,
+    isTikTokShopAffiliateTemplatePage,
     videoPoseDirectionLock,
   ])
 
@@ -12395,6 +12181,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       : 'OFF (them background image de khoa)')
   const promptPrimaryLabel = isOotdTemplatePage
     ? 'Prompt OOTD Template'
+    : isTikTokShopAffiliateTemplatePage
+      ? 'Prompt TikTok Shop Template'
     : generationMode === 'music_video'
       ? 'Music Video'
     : generationMode === 'storyboard_video'
@@ -12402,7 +12190,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     : generationMode === 'lookbook_image'
       ? 'Anh Lookbook'
       : 'Prompt Package'
-  const loadingStages = !isOotdTemplatePage && generationMode === 'lookbook_image'
+  const loadingStages = !isTemplateGenerationPage && generationMode === 'lookbook_image'
     ? LOOKBOOK_LOADING_STAGES
     : PROMPT_LOADING_STAGES
   const promptStatusKind = loading ? 'loading' : error ? 'error' : hasPromptResult ? 'success' : 'idle'
@@ -12418,6 +12206,16 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
           : canGenerate
             ? `Page nay khoa beat script OOTD theo scenario ${activeOotdTemplateScenario.label}. Ban co the doi duration output, doi anh san pham roi bam Tao Prompt OOTD Template (khong can giong timeline tung giay).`
             : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
+    : isTikTokShopAffiliateTemplatePage
+      ? loading
+        ? promptLoadingStep
+        : error
+          ? 'Co loi khi tao prompt TikTok Shop template. Kiem tra thong bao de thu lai.'
+          : hasPromptResult
+            ? `Prompt TikTok Shop template da san sang (${selectedContentType.toUpperCase()} • ${duration}s • 4 scenes / 5 keyframes).`
+            : canGenerate
+              ? 'Page nay khoa core skill TikTok Affiliate Fashion: N+1 5 keyframes / 4 scenes, boutique that, smartphone vertical, product demo + CTA.'
+              : 'Nhap Gemini API Key de bat tinh nang tao noi dung.'
     : loading
       ? promptLoadingStep
       : error
@@ -12446,6 +12244,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       ? 'Phan tich Video TikTok'
     : isOotdTemplatePage
       ? `OOTD Template Output — ${duration}s / ${OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}`
+    : isTikTokShopAffiliateTemplatePage
+      ? `TikTok Shop Template Output — ${duration}s / ${TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO}`
     : result
       ? hasVideoPromptResult
         ? generationMode === 'music_video'
@@ -13642,6 +13442,197 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
     }
   }
 
+  const handleGenerateTikTokShopAffiliateTemplate = async () => {
+    if (!apiKey.trim()) {
+      setError('Vui long nhap Gemini API Key de tao prompt TikTok Shop template')
+      setPromptToast({
+        kind: 'error',
+        message: 'Thieu Gemini API Key.',
+      })
+      return
+    }
+
+    const lockedDuration = TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION
+    const lockedAspectRatio = TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO
+    const lockedContentType: ResolvedContentType = 'tiktokshop'
+    const currentProductImageId = productImage ? createProductImageId(productImage) : null
+    const backgroundRule = backgroundImage
+      ? 'Background input is active: use the provided background image as environment/location cue only, but keep the setting grounded as a real women fashion boutique; do not copy people, garments, logos, or signage from it.'
+      : 'No background input: create one authentic real women fashion boutique interior with polished floor, cream/beige walls, retail ceiling lights, clothing racks, fitting-room corner, display shelves, natural depth, and believable mirror reflection.'
+
+    const reviewProductNotes = [
+      TIKTOK_SHOP_AFFILIATE_TEMPLATE_PRODUCT_BRIEF,
+      `Product category hint: ${activeProductCategoryOption.label}.`,
+      `Detail hint: ${activeProductCategoryOption.detailHint}`,
+      backgroundRule,
+      'Core skill mode: TikTok Shop Affiliate Fashion Prompt Agent. Use this core skill instead of OOTD fit-check scenario rules.',
+      'N+1 lock: target exactly 4 scenes and 5 keyframes for the default affiliate fashion template.',
+      'Scene chain: KF1 full-body front hook -> KF2 product detail close-up -> KF3 full-body 3/4 fit proof -> KF4 clean side/back silhouette -> KF5 final product display / soft CTA.',
+      'Output writing rule: prompts mostly in English for image/video tools; Vietnamese only for text overlay, voice script direction, caption, and CTA wording.',
+    ].join('\n')
+
+    setGenerationMode('video_prompt')
+    setDuration(lockedDuration)
+    setAspectRatio(lockedAspectRatio)
+    setContentType(lockedContentType)
+    setIsContentTypeManuallyLocked(true)
+    setVideoPoseDirectionLock('auto')
+
+    setLoading(true)
+    setSelectedHistoryId(null)
+    setLoadingStageIndex(0)
+    setPromptToast({
+      kind: 'loading',
+      message: `Dang tao Prompt TikTok Shop Template theo ${TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL}...`,
+    })
+    setError('')
+    setResult(null)
+    setErrorLogLines([])
+
+    const logLines: string[] = []
+    const pushLog = (line: string) => { logLines.push(line) }
+
+    pushLog(`[START] ${new Date().toISOString()} — source=tiktok-shop-affiliate-template model=${model} duration=${lockedDuration}s ratio=${lockedAspectRatio} type=${lockedContentType}`)
+
+    try {
+      const res = await generatePromptPackageFromTikTokAnalysisWithGemini(
+        apiKey,
+        model,
+        faceImage,
+        productImage,
+        backgroundImage,
+        lockedDuration,
+        lockedAspectRatio,
+        TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS,
+        reviewProductNotes,
+        {
+          enforceFrontFaceQuarterBodyLock: false,
+          enforceConciseVisualOnlyAction: false,
+          templateCameraFormat: 'front_camera',
+          enforceRearMirrorReflection: false,
+          useTikTokShopAffiliateTemplateSkill: true,
+        },
+      )
+
+      pushLog(`[OK] TikTok Shop template generation succeeded — keyframes=${res.keyframes.length} scenes=${res.scenes.length}`)
+      setErrorLogLines([...logLines])
+
+      const resolvedType: ResolvedContentType = res.resolvedContentType || lockedContentType
+      res.createImagePrompt = buildCreateImagePrompt(resolvedType, reviewProductNotes)
+
+      setResult(res)
+      setSelectedContentType(resolvedType)
+      setActiveTab('keyframes')
+      setPromptToast({
+        kind: 'success',
+        message: `Da tao xong Prompt TikTok Shop Template (${TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL}).`,
+      })
+
+      const generatedLocations = Array.from(
+        new Set(
+          res.keyframes
+            .map((keyframe) => keyframe.location.trim())
+            .filter((location) => location.length > 0)
+        )
+      )
+
+      if (generatedLocations.length > 0) {
+        if (currentProductImageId) {
+          setProductLocationHistory((prev) => {
+            const existing = prev[currentProductImageId] || []
+            const merged = Array.from(new Set([...generatedLocations, ...existing]))
+            return {
+              ...prev,
+              [currentProductImageId]: merged.slice(0, MAX_LOCATION_HISTORY_PER_PRODUCT),
+            }
+          })
+        }
+
+        setOutfitTypeLocationHistory((prev) => {
+          const existing = prev[resolvedType] || []
+          const merged = Array.from(new Set([...generatedLocations, ...existing]))
+          return {
+            ...prev,
+            [resolvedType]: merged.slice(0, MAX_LOCATION_HISTORY_PER_OUTFIT_TYPE),
+          }
+        })
+      }
+
+      const promptPackageForHistory = {
+        masterDNA: res.masterDNA,
+        createImagePrompt: res.createImagePrompt || '',
+        keyframes: res.keyframes.map((keyframe) => ({
+          index: keyframe.index,
+          timestamp: keyframe.timestamp,
+          subject: keyframe.subject,
+          action: keyframe.action,
+          facingDirection: keyframe.facingDirection || '',
+          location: keyframe.location,
+          camera: keyframe.camera,
+          lighting: keyframe.lighting,
+          style: keyframe.style,
+          fullPrompt: keyframe.fullPrompt,
+        })),
+        scenes: res.scenes.map((scene) => ({
+          index: scene.index,
+          timeRange: scene.timeRange,
+          narrative: scene.narrative,
+          startPose: scene.startPose,
+          endPose: scene.endPose,
+          cameraMovement: scene.cameraMovement,
+          locationFlow: scene.locationFlow || '',
+          fullPrompt: scene.fullPrompt,
+        })),
+      }
+
+      void persistWorkHistory({
+        action: 'prompt',
+        model,
+        contentType: resolvedType,
+        notes: reviewProductNotes,
+        generatedAt: Date.now(),
+        metadata: {
+          generationMode: 'video_prompt',
+          generationSource: 'tiktok_shop_affiliate_template',
+          inputContentType: lockedContentType,
+          resolvedContentType: resolvedType,
+          duration: lockedDuration,
+          sourceDurationSec: TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS.detectedDurationSec,
+          aspectRatio: lockedAspectRatio,
+          keyframeCount: res.keyframes.length,
+          sceneCount: res.scenes.length,
+          generatedLocations: generatedLocations.slice(0, 10),
+          hasFaceImage: Boolean(faceImage),
+          hasProductImage: Boolean(productImage),
+          hasBackgroundImage: Boolean(backgroundImage),
+          templateScenarioId: 'tiktok_shop_affiliate_template',
+          templateScenarioLabel: TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL,
+          templateNarrativeStructure: TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS.narrativeStructure,
+          promptPackage: promptPackageForHistory,
+        },
+      })
+        .then(() => loadWorkHistory({ silent: true }))
+        .catch((saveError) => {
+          console.warn(
+            'Could not save prompt work history:',
+            saveError instanceof Error ? saveError.message : saveError
+          )
+        })
+    } catch (err: any) {
+      const message = err?.message || 'Failed to generate TikTok Shop affiliate template prompt package'
+      pushLog(`[ERROR] Fatal: ${message}`)
+      setErrorLogLines([...logLines])
+      setError(message)
+      setPromptToast({
+        kind: 'error',
+        message,
+      })
+    } finally {
+      setLoading(false)
+      setPromptToast((prev) => (prev?.kind === 'loading' ? null : prev))
+    }
+  }
+
   // Export All
   const handleExportAll = () => {
     if (!hasAnyResult) return
@@ -13946,9 +13937,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
           </div>
         </header>
 
-        {isTikTokShopAffiliateTemplatePage ? (
-          <TikTokShopAffiliateTemplatePage />
-        ) : isPromptLibraryPage ? (
+        {isPromptLibraryPage ? (
           <PromptLibraryPage />
         ) : (
           <>
@@ -14082,6 +14071,44 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                 <div className="prompt-text" style={{ whiteSpace: 'pre-wrap' }}>
                   <strong>Beat flow (giu thu tu, timeline linh hoat):</strong>{'\n'}
                   {activeOotdTemplateScenario.lockedAnalysis.sceneBeats
+                    .map((beat) => `${beat.timestamp}: ${beat.beatName}`)
+                    .join('\n')}
+                </div>
+              </div>
+            )}
+
+            {isTikTokShopAffiliateTemplatePage && (
+              <div
+                className="card"
+                style={{
+                  marginBottom: 16,
+                  borderColor: 'rgba(249, 115, 22, 0.35)',
+                  background: 'linear-gradient(180deg, rgba(249, 115, 22, 0.09), rgba(251, 146, 60, 0.04))',
+                }}
+              >
+                <div className="card-title" style={{ color: '#f97316' }}>
+                  <TrendingUp /> TikTok Shop Template Lock ({TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL})
+                </div>
+
+                <p className="ai-task-hint" style={{ marginTop: 0, marginBottom: 10 }}>
+                  Page nay lay form OOTD Template lam mau: van upload face/product/background, van tao keyframe + scene,
+                  nhung core skill duoc khoa sang TikTok Shop Affiliate Fashion. Default la 32s, 9:16, 5 keyframe / 4 scene.
+                </p>
+
+                <div className="prompt-text" style={{ whiteSpace: 'pre-wrap', marginBottom: 10 }}>
+                  <strong>Lock config:</strong>{'\n'}
+                  Core skill: {TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL}{'\n'}
+                  Duration output: {TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION}s (4 scenes / 5 keyframes){'\n'}
+                  Ratio: {TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
+                  Content type: TIKTOKSHOP{'\n'}
+                  Background: real women boutique, not CGI/fantasy/studio; background image is optional environment cue only{'\n'}
+                  Camera: vertical smartphone creator style, stable, product-readable{'\n'}
+                  Voice/copy: Vietnamese overlay, voice direction, caption and hashtags are allowed; no fake claims
+                </div>
+
+                <div className="prompt-text" style={{ whiteSpace: 'pre-wrap' }}>
+                  <strong>Beat flow (N+1):</strong>{'\n'}
+                  {TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS.sceneBeats
                     .map((beat) => `${beat.timestamp}: ${beat.beatName}`)
                     .join('\n')}
                 </div>
@@ -14235,7 +14262,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
               )}
             </div>
 
-            {!isOotdTemplatePage && (
+            {!isTemplateGenerationPage && (
               <>
             {/* Generation Mode */}
             <div className="card" style={{ marginBottom: 16 }}>
@@ -14710,7 +14737,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
               </>
             )}
 
-            {!isOotdTemplatePage && (
+            {!isTemplateGenerationPage && (
               <>
             {/* Notes */}
             <div className="card" style={{ marginBottom: 16 }}>
@@ -15753,6 +15780,8 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
           role="region"
           aria-label={isOotdTemplatePage
             ? 'Tao Prompt OOTD Template'
+            : isTikTokShopAffiliateTemplatePage
+              ? 'Tao Prompt TikTok Shop Template'
             : generationMode === 'lookbook_image'
               ? 'Tao Anh Lookbook'
               : generationMode === 'music_video'
@@ -15766,6 +15795,8 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
               <p className="prompt-floating-title">
                 {isOotdTemplatePage
                   ? 'Tao Prompt OOTD Template'
+                  : isTikTokShopAffiliateTemplatePage
+                    ? 'Tao Prompt TikTok Shop Template'
                   : generationMode === 'lookbook_image'
                     ? 'Tao Anh Lookbook'
                     : generationMode === 'music_video'
@@ -15782,7 +15813,11 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
             <button
               id="generate-btn"
               className={`btn-generate prompt-floating-btn ${loading ? 'loading' : ''}`}
-              onClick={isOotdTemplatePage ? handleGenerateOotdTemplate : handleGenerate}
+              onClick={isOotdTemplatePage
+                ? handleGenerateOotdTemplate
+                : isTikTokShopAffiliateTemplatePage
+                  ? handleGenerateTikTokShopAffiliateTemplate
+                  : handleGenerate}
               disabled={loading || !canGenerate}
             >
               {loading ? (
@@ -15790,6 +15825,8 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                   <div className="spinner" />
                   {isOotdTemplatePage
                     ? 'Dang tao prompt OOTD template...'
+                    : isTikTokShopAffiliateTemplatePage
+                      ? 'Dang tao prompt TikTok Shop template...'
                     : generationMode === 'lookbook_image'
                       ? 'Dang tao anh lookbook...'
                       : generationMode === 'music_video'
@@ -15803,6 +15840,8 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                   <Wand2 size={18} />
                   {isOotdTemplatePage
                     ? 'Tao Prompt OOTD Template'
+                    : isTikTokShopAffiliateTemplatePage
+                      ? 'Tao Prompt TikTok Shop Template'
                     : generationMode === 'lookbook_image'
                       ? 'Tao Anh Lookbook'
                       : generationMode === 'music_video'

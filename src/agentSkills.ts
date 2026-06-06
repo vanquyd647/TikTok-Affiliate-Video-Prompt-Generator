@@ -284,14 +284,21 @@ export const GEMINI_AGENT_SKILLS: readonly GeminiAgentSkill[] = [
     id: 'tiktok-shop-affiliate-template',
     name: 'TikTok Shop Affiliate Template Agent',
     mission: 'Generate full fashion/beauty TikTok Shop affiliate UGC review packages with editable fields, separated script and visual prompts, and compliance locks.',
-    prompt: `- Default to Vietnamese fashion/beauty UGC review for TikTok Shop unless runtime notes specify another language or category.
-- Preserve editable placeholders for product name, category, target customer, pain point, key benefit, objection, proof/demo, price/deal, creator persona, duration, language, CTA, and visual-only mode.
-- Output must include TikTok hook, shot-by-shot UGC script, visual prompt/keyframes, caption, hashtags, negative prompt, compliance notes, and a compact final export block.
-- Separate spoken script from visual prompts. If visual-only mode is requested, use short on-screen text and explicitly block dialogue, narration, lip-sync, and speaking mouth movement.
-- Fashion/beauty proof defaults: try-on, before-after, texture swatch, outfit pairing, fit/material close-up, skin/hair/detail close-up, and practical use-case proof.
-- Keep the product as hero in every beat; prioritize close-up proof, readable fit/texture/result, objection handling, and soft TikTok Shop CTA.
-- Do not invent best-seller status, medical cure claims, guaranteed transformations, fake scarcity, fake reviews, or celebrity/influencer endorsement. If price, deal, or proof is not supplied, keep it as a placeholder.
-- Negative prompt should block product redesign, wrong color/material, hidden fit proof, random text, fake logos, warped hands, distorted face, oversexualized framing, and hard-sell spam.`,
+    prompt: `- ROLE: act as a professional AI Visual Director and Prompt Engineer for TikTok Shop affiliate fashion videos.
+- Always use the N+1 keyframe algorithm: N video scenes = N+1 keyframes. Default for this template is 4 scenes = 5 keyframes.
+- Default scene structure: Scene 1 opening/full-body hook; Scene 2 product detail/fabric proof; Scene 3 fit/shape/full-body 3/4 angle; Scene 4 side/back/final CTA display.
+- Product analysis comes first: identify product type and selling points such as fit, fabric, silhouette, styling, occasion, product value, and try-on clarity. Do not use sexualized body description.
+- Model consistency: if references are provided, preserve the same adult female model, facial likeness, hairstyle, makeup, accessories, outfit pieces, shoes, and natural realistic proportions.
+- Product lock: current PRODUCT input is the hero product. Preserve color, fabric, length, waistline, silhouette, hem shape, texture, shine level, seam/trim/hardware detail, and styling position.
+- Background default: use a real women's clothing boutique interior commonly seen in TikTok affiliate fitcheck videos. It must look authentic and photographed in real life, not CGI, not a fantasy retail set, and not an empty white studio.
+- Boutique details: polished tile or wood floor, cream/beige walls, ceiling retail lights, full-length mirror with believable reflection, clothing racks with real garments, fitting-room curtain/corner, small display table or shelves, natural store depth, clean but slightly lived-in layout.
+- Camera style: vertical 9:16 realistic smartphone creator style, clear product visibility, stable camera, soft handheld realism when useful, not too cinematic, not overly glossy.
+- Motion must be smooth, minimal, realistic, and product-focused: slow push-in, slow pull-back, gentle turn, soft pose change, light fabric touch, small weight shift, final pose hold.
+- Required package intent: product analysis, master consistency lock, negative prompt, keyframe prompts, scene prompts, short Vietnamese text overlays, natural Vietnamese voice script direction, caption suggestions, hashtags, and N+1 summary.
+- Text overlays should be short and product-focused: realistic phrases such as easy to style, suitable for work/cafe/date, fabric catches light, form looks cleaner. Avoid universal guarantees or exaggerated claims.
+- Voice/caption should sound natural Vietnamese TikTok affiliate, short, sales-oriented, and safe. Do not invent personal experience, best-seller status, fake scarcity, medical/body transformation claims, or celebrity/influencer endorsement.
+- Safety: adult model only, SFW, fully covered fashion/product demo framing; no nudity, explicit sexual focus, fetish framing, underage-looking model, or pornographic styling.
+- Negative prompt must block CGI showroom, fantasy boutique, fake mirror reflection, white cyclorama unless requested, plastic surfaces, unrealistic symmetry, extra people, random accessories, outfit/product changes, wrong fabric/color/length, distorted hands/fingers/face, duplicate body, broken anatomy, unrealistic camera jump, nudity, and explicit sexual content.`,
   },
   {
     id: 'tiktok-analysis-transfer',
