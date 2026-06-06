@@ -4457,6 +4457,7 @@ ${buildFitModelRuleLockMatrix()}`
       'reference-lock',
       'user-intent-priority',
       'fashion-affiliate-strategy',
+      'tiktok-shop-affiliate-template',
       'creative-director-controls',
       'location-context',
       'veo-prompting-guide',
@@ -5569,6 +5570,7 @@ Output STRICT JSON only:
         'reference-lock',
         'user-intent-priority',
         'fashion-affiliate-strategy',
+        'tiktok-shop-affiliate-template',
         'nano-banana-image-framework',
         'creative-director-controls',
         'veo-prompting-guide',
@@ -7047,6 +7049,7 @@ async function generateStoryboardVideoWithGemini(
       'creative-director-controls',
       'storyboard-engine',
       'fashion-affiliate-strategy',
+      'tiktok-shop-affiliate-template',
       'realtime-web-visualization',
       'veo-prompting-guide',
       'image-to-video-handoff',
@@ -8292,7 +8295,7 @@ async function generateSeoWithGemini(
   const salesTemplateHint = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
   const seoAgentSkillBlock = buildGeminiAgentSkillBlock({
     stage: 'seo_copy',
-    skillIds: ['commerce-copy', 'safety-policy', 'schema-qa'],
+    skillIds: ['commerce-copy', 'tiktok-shop-affiliate-template', 'safety-policy', 'schema-qa'],
     outputContract: '3 TikTok Shop SEO variants JSON',
     runtimeNotes: [
       `Product name: ${trimmedProductName}.`,
@@ -8456,7 +8459,7 @@ async function generateVoiceoverWithGemini(
   const salesTemplateHint = salesTemplate === 'hard' ? 'HARD_SELL (A)' : 'SOFT_SELL (B)'
   const voiceoverAgentSkillBlock = buildGeminiAgentSkillBlock({
     stage: 'voiceover',
-    skillIds: ['commerce-copy', 'safety-policy', 'schema-qa'],
+    skillIds: ['commerce-copy', 'tiktok-shop-affiliate-template', 'safety-policy', 'schema-qa'],
     outputContract: 'one 25-35 second voiceover script JSON',
     runtimeNotes: [
       `Product name: ${trimmedProductName}.`,
@@ -8841,6 +8844,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
       'reference-lock',
       ...(templateScenarioId ? ['ootd-fit-check-template' as const] : []),
       'tiktok-analysis-transfer',
+      'tiktok-shop-affiliate-template',
       'user-intent-priority',
       'realtime-web-visualization',
       'nano-banana-image-framework',
@@ -10067,6 +10071,18 @@ type ProductImagePromptPreset = {
   prompt: string
 }
 
+type AffiliateSkillTemplate = {
+  id: string
+  title: string
+  stage: string
+  platform: string
+  output: string
+  fields: string[]
+  defaults: string[]
+  sections: string[]
+  prompt: string
+}
+
 type OmniFlashGuideItem = {
   id: string
   title: string
@@ -10514,6 +10530,117 @@ Clean studio light, texture rim light, high contrast background, premium product
 
 NEGATIVE:
 No redesign, no extra handbags, no distorted face, no impossible proportions, no warped text, no fused garment cuts, no missing shoes.`,
+  },
+]
+
+const TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES: AffiliateSkillTemplate[] = [
+  {
+    id: 'tiktok-shop-fashion-beauty-ugc-review',
+    title: 'TikTok Shop Affiliate - Fashion/Beauty UGC Review',
+    stage: 'Affiliate Skill Template',
+    platform: 'TikTok Shop / Reels / Shorts',
+    output: 'UGC script + visual prompt + copy pack',
+    fields: [
+      'PRODUCT_NAME',
+      'CATEGORY: fashion / beauty / accessory',
+      'TARGET_CUSTOMER',
+      'CUSTOMER_PAIN_POINT',
+      'KEY_BENEFIT',
+      'COMMON_OBJECTION',
+      'PROOF_OR_DEMO',
+      'PRICE_OR_DEAL',
+      'CREATOR_PERSONA',
+      'DURATION_SECONDS',
+      'LANGUAGE',
+      'CTA',
+      'VISUAL_ONLY_MODE: yes / no',
+    ],
+    defaults: [
+      'LANGUAGE = Vietnamese',
+      'STYLE = natural UGC review, trust-first, soft sell',
+      'DURATION_SECONDS = 24-32',
+      'FORMAT = vertical 9:16',
+      'CATEGORY_DEFAULT = fashion/beauty',
+      'CTA = Bam gio hang TikTok Shop de xem gia va mau/size phu hop',
+    ],
+    sections: [
+      'TikTok hook',
+      'Shot-by-shot UGC script',
+      'Visual prompt/keyframes',
+      'Caption',
+      'Hashtags',
+      'Negative prompt',
+      'Compliance notes',
+      'Compact final export',
+    ],
+    prompt: `ROLE:
+You are a TikTok Shop affiliate strategist, UGC scriptwriter, and AI video prompt director for fashion/beauty products.
+
+INPUT FIELDS:
+- PRODUCT_NAME: [ten san pham]
+- CATEGORY: [fashion / beauty / accessory / custom]
+- TARGET_CUSTOMER: [ai se mua]
+- CUSTOMER_PAIN_POINT: [van de nguoi xem dang gap]
+- KEY_BENEFIT: [loi ich chinh co the chung minh bang hinh]
+- COMMON_OBJECTION: [ly do nguoi xem con lan tan]
+- PROOF_OR_DEMO: [try-on / before-after / texture swatch / fit proof / material close-up / outfit pairing / skin-hair-detail close-up]
+- PRICE_OR_DEAL: [gia / voucher / deal neu co; neu khong co thi ghi "not provided"]
+- CREATOR_PERSONA: [ban nu review tu nhien / beauty creator / boutique staff / office girl / student]
+- DURATION_SECONDS: [24 / 32 / 40]
+- LANGUAGE: [Vietnamese by default]
+- CTA: [TikTok Shop call-to-action]
+- VISUAL_ONLY_MODE: [yes/no]
+
+DEFAULT STYLE:
+- Natural UGC review, fast hook in the first 1-2 seconds, creator-native but product-readable.
+- Fashion/beauty proof first: try-on, before-after, texture swatch, outfit pairing, material/fit close-up, skin/hair/detail close-up.
+- Soft sell: useful proof -> objection handling -> clear TikTok Shop purchase cue.
+- Keep the product as hero in every beat; avoid generic lifestyle filler.
+
+OUTPUT REQUIREMENTS:
+1. TIKTOK HOOK:
+   - 3 hook options in Vietnamese.
+   - Each hook must mention PRODUCT_NAME or the exact customer pain point.
+   - Keep each hook short enough for on-screen text.
+
+2. SHOT-BY-SHOT UGC SCRIPT:
+   - Build a timeline for DURATION_SECONDS.
+   - Required beat order: Hook -> product proof -> objection handling -> use-case/result -> CTA.
+   - For each beat return timestamp, shot, action, spoken line, on-screen text, and editing note.
+   - If VISUAL_ONLY_MODE = yes, replace spoken line with "NO DIALOGUE" and move the message into short on-screen text.
+
+3. VISUAL PROMPT / KEYFRAMES:
+   - Create 4-6 visual prompts for a 9:16 AI video workflow.
+   - Separate spoken script from visual prompt.
+   - Each visual prompt must include SUBJECT, PRODUCT, ACTION, SCENE, CAMERA, LIGHTING, STYLE, AUDIO, NEGATIVE PROMPT.
+   - If VISUAL_ONLY_MODE = yes, AUDIO must say: silence/room tone only; no voiceover, no dialogue, no lip-sync.
+
+4. CAPTION:
+   - 2 TikTok captions: one natural review caption and one deal/CTA caption.
+   - Keep claims safe and verifiable.
+
+5. HASHTAGS:
+   - 8-12 hashtags, mixing TikTok Shop, category, use-case, and Vietnamese search terms.
+
+6. NEGATIVE PROMPT:
+   - Block product redesign, wrong color/material, hidden fit proof, random text, fake logos, warped hands, distorted face, oversexualized framing, hard-sell spam.
+
+7. COMPLIANCE NOTES:
+   - Do not invent "best seller", medical cure, guaranteed transformation, fake scarcity, fake reviews, or celebrity/influencer endorsement.
+   - If price/deal/proof is not provided, mark it as a placeholder instead of fabricating it.
+   - Beauty claims must be framed as look/feel/use experience unless clinical proof is supplied.
+
+8. COMPACT FINAL EXPORT:
+   Return a copy-ready block with:
+   PRODUCT_BRIEF:
+   HOOK:
+   UGC_SCRIPT:
+   VISUAL_PROMPTS:
+   CAPTION:
+   HASHTAGS:
+   CTA:
+   NEGATIVE_PROMPT:
+   COMPLIANCE_LOCKS:`,
   },
 ]
 
@@ -11006,6 +11133,27 @@ function PromptLibraryPage() {
     ].join('\n')),
   ].join('\n\n---\n\n')
 
+  const affiliateSkillTemplateText = [
+    'TIKTOK SHOP AFFILIATE SKILL TEMPLATES - FASHION/BEAUTY UGC REVIEW',
+    ...TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES.map((item, index) => [
+      `${index + 1}. ${item.title}`,
+      `STAGE: ${item.stage}`,
+      `PLATFORM: ${item.platform}`,
+      `OUTPUT: ${item.output}`,
+      '',
+      'INPUT FIELDS:',
+      ...item.fields.map((field) => `- ${field}`),
+      '',
+      'DEFAULTS:',
+      ...item.defaults.map((line) => `- ${line}`),
+      '',
+      'OUTPUT SECTIONS:',
+      ...item.sections.map((section) => `- ${section}`),
+      '',
+      item.prompt,
+    ].join('\n')),
+  ].join('\n\n---\n\n')
+
   const fullLibraryText = INTERN_PROMPT_LIBRARY
     .map((item, index) => `${index + 1}. ${item.title}\nSTAGE: ${item.stage}\nOUTPUT: ${item.output}\n\n${item.prompt}`)
     .join('\n\n---\n\n')
@@ -11027,7 +11175,7 @@ function PromptLibraryPage() {
             </p>
           </div>
           <div className="prompt-library-actions">
-            <CopyButton text={`${frameworkText}\n\n---\n\n${omniFlashText}\n\n---\n\n${productImageText}\n\n---\n\n${shotCommandText}\n\n---\n\n${fullLibraryText}`} />
+            <CopyButton text={`${frameworkText}\n\n---\n\n${omniFlashText}\n\n---\n\n${affiliateSkillTemplateText}\n\n---\n\n${productImageText}\n\n---\n\n${shotCommandText}\n\n---\n\n${fullLibraryText}`} />
             <span>Copy full toolkit</span>
           </div>
         </div>
@@ -11120,6 +11268,56 @@ function PromptLibraryPage() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="prompt-library-shot-section">
+        <div className="prompt-library-section-head">
+          <div>
+            <div className="card-title">
+              <TrendingUp /> TikTok Shop Affiliate Skill Templates
+            </div>
+            <h3>Fashion/beauty UGC review template de tao video chuyen doi</h3>
+            <p>
+              Template nay gom input fields, hook, kich ban UGC, visual prompt/keyframes, caption, hashtags,
+              negative prompt va compliance locks. Dung cho san pham thoi trang/beauty can review tu nhien,
+              proof ro va CTA TikTok Shop mem nhung co dinh huong mua.
+            </p>
+          </div>
+          <div className="prompt-library-actions">
+            <CopyButton text={affiliateSkillTemplateText} />
+            <span>Copy affiliate skill templates</span>
+          </div>
+        </div>
+
+        <section className="prompt-library-grid" aria-label="TikTok Shop Affiliate skill templates">
+          {TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES.map((item) => (
+            <article key={item.id} className="prompt-library-card" style={{ ['--library-accent' as string]: '#f97316' }}>
+              <div className="prompt-library-card-head">
+                <div className="prompt-library-icon">
+                  <TrendingUp size={18} />
+                </div>
+                <div>
+                  <p className="prompt-library-stage">{item.stage}</p>
+                  <h3>{item.title}</h3>
+                </div>
+                <CopyButton text={item.prompt} />
+              </div>
+
+              <div className="prompt-library-meta">
+                <span>{item.platform}</span>
+                <span>{item.output}</span>
+              </div>
+
+              <div className="product-image-preset-meta">
+                {item.defaults.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </div>
+
+              <pre className="prompt-library-prompt">{item.prompt}</pre>
+            </article>
+          ))}
+        </section>
       </section>
 
       <section className="product-image-library-section">

@@ -34,6 +34,7 @@ export type GeminiAgentSkillId =
   | 'music-video-storyboard'
   | 'lookbook-image'
   | 'commerce-copy'
+  | 'tiktok-shop-affiliate-template'
   | 'tiktok-analysis-transfer'
 
 interface GeminiAgentSkill {
@@ -278,6 +279,19 @@ export const GEMINI_AGENT_SKILLS: readonly GeminiAgentSkill[] = [
 - Avoid spammy overclaims, fake scarcity unless user supplies it, medical/body transformation promises, celebrity endorsements, and impersonation.
 - Hashtags should be distinct, relevant, and readable.
 - Voiceover should follow a short hook -> proof -> use-case -> CTA rhythm.`,
+  },
+  {
+    id: 'tiktok-shop-affiliate-template',
+    name: 'TikTok Shop Affiliate Template Agent',
+    mission: 'Generate full fashion/beauty TikTok Shop affiliate UGC review packages with editable fields, separated script and visual prompts, and compliance locks.',
+    prompt: `- Default to Vietnamese fashion/beauty UGC review for TikTok Shop unless runtime notes specify another language or category.
+- Preserve editable placeholders for product name, category, target customer, pain point, key benefit, objection, proof/demo, price/deal, creator persona, duration, language, CTA, and visual-only mode.
+- Output must include TikTok hook, shot-by-shot UGC script, visual prompt/keyframes, caption, hashtags, negative prompt, compliance notes, and a compact final export block.
+- Separate spoken script from visual prompts. If visual-only mode is requested, use short on-screen text and explicitly block dialogue, narration, lip-sync, and speaking mouth movement.
+- Fashion/beauty proof defaults: try-on, before-after, texture swatch, outfit pairing, fit/material close-up, skin/hair/detail close-up, and practical use-case proof.
+- Keep the product as hero in every beat; prioritize close-up proof, readable fit/texture/result, objection handling, and soft TikTok Shop CTA.
+- Do not invent best-seller status, medical cure claims, guaranteed transformations, fake scarcity, fake reviews, or celebrity/influencer endorsement. If price, deal, or proof is not supplied, keep it as a placeholder.
+- Negative prompt should block product redesign, wrong color/material, hidden fit proof, random text, fake logos, warped hands, distorted face, oversexualized framing, and hard-sell spam.`,
   },
   {
     id: 'tiktok-analysis-transfer',
