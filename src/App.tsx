@@ -350,7 +350,7 @@ type ResolvedContentType = Exclude<ContentType, 'auto'>
 type AffiliateMode = 'balanced' | 'strict'
 type SalesTemplate = 'hard' | 'soft'
 type GenerationMode = 'video_prompt' | 'lookbook_image' | 'storyboard_video' | 'music_video'
-type AppPageMode = 'core' | 'ootd_template' | 'storyboard_template' | 'music_video_template' | 'prompt_library'
+type AppPageMode = 'core' | 'ootd_template' | 'storyboard_template' | 'music_video_template' | 'tiktok_shop_affiliate_template' | 'prompt_library'
 type OotdTemplateScenarioId = 'classic_mirror_phone' | 'cozy_home_background' | 'night_city_glam' | 'relaxed_boutique_camera' | 'free_style_product_review'
 type LookbookImageCount = 5 | 10 | 20
 type LookbookStyleTone = 'standard' | 'sexy'
@@ -789,6 +789,7 @@ const FIXED_STRATEGY_DESC = 'Khoa AUTO ve nhom convert cao va giu tone trust-fir
 const OOTD_TEMPLATE_ROUTE_PATH = '/ootd-template'
 const STORYBOARD_TEMPLATE_ROUTE_PATH = '/storyboard-template'
 const MUSIC_VIDEO_TEMPLATE_ROUTE_PATH = '/music-video-template'
+const TIKTOK_SHOP_AFFILIATE_TEMPLATE_ROUTE_PATH = '/tiktok-shop-affiliate-template'
 const PROMPT_LIBRARY_ROUTE_PATH = '/prompt-library'
 const OOTD_TEMPLATE_LOCKED_DURATION = 24
 const OOTD_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
@@ -10644,6 +10645,29 @@ OUTPUT REQUIREMENTS:
   },
 ]
 
+function buildTikTokShopAffiliateTemplateText(): string {
+  return [
+    'TIKTOK SHOP AFFILIATE SKILL TEMPLATES - FASHION/BEAUTY UGC REVIEW',
+    ...TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES.map((item, index) => [
+      `${index + 1}. ${item.title}`,
+      `STAGE: ${item.stage}`,
+      `PLATFORM: ${item.platform}`,
+      `OUTPUT: ${item.output}`,
+      '',
+      'INPUT FIELDS:',
+      ...item.fields.map((field) => `- ${field}`),
+      '',
+      'DEFAULTS:',
+      ...item.defaults.map((line) => `- ${line}`),
+      '',
+      'OUTPUT SECTIONS:',
+      ...item.sections.map((section) => `- ${section}`),
+      '',
+      item.prompt,
+    ].join('\n')),
+  ].join('\n\n---\n\n')
+}
+
 const INTERN_PROMPT_LIBRARY: PromptLibraryItem[] = [
   {
     id: 'workflow-strategy',
@@ -11075,6 +11099,128 @@ Professional, clear, easy for a team to execute.`,
   },
 ]
 
+function TikTokShopAffiliateTemplatePage() {
+  const affiliateSkillTemplateText = buildTikTokShopAffiliateTemplateText()
+  const primaryTemplate = TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES[0]
+
+  return (
+    <main className="prompt-library-page fade-in">
+      <section className="prompt-library-hero">
+        <div className="prompt-library-kicker">
+          <TrendingUp size={14} />
+          TikTok Shop Affiliate Template
+        </div>
+        <div className="prompt-library-hero-grid">
+          <div>
+            <h2>{primaryTemplate.title}</h2>
+            <p>
+              Page template rieng cho fashion/beauty affiliate UGC review: nhap brief san pham,
+              tao hook, kich ban UGC, visual prompt/keyframes, caption, hashtags, negative prompt
+              va compliance locks de copy vao quy trinh AFF Video Prompt.
+            </p>
+          </div>
+          <div className="prompt-library-actions">
+            <CopyButton text={affiliateSkillTemplateText} />
+            <span>Copy full affiliate template</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="prompt-library-workflow" aria-label="TikTok Shop affiliate workflow">
+        {['Brief', 'Hook', 'UGC Script', 'Visual Prompts', 'Caption', 'Compliance'].map((step) => (
+          <div key={step} className="prompt-library-step">{step}</div>
+        ))}
+      </section>
+
+      <section className="prompt-library-framework">
+        <div className="prompt-library-framework-main">
+          <div className="card-title">
+            <FileText /> Editable Input Fields
+          </div>
+          <div className="prompt-library-framework-grid">
+            {primaryTemplate.fields.map((field) => (
+              <div key={field} className="prompt-library-framework-item">
+                <h3>{field}</h3>
+                <p>Placeholder co the thay doi theo tung san pham/campaign.</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="prompt-library-formula">
+          <div className="card-title">
+            <Sparkles /> Defaults
+            <CopyButton text={primaryTemplate.defaults.join('\n')} />
+          </div>
+          <code>{primaryTemplate.output}</code>
+          <p>{primaryTemplate.defaults.join(' / ')}</p>
+        </div>
+      </section>
+
+      <section className="prompt-library-shot-section">
+        <div className="prompt-library-section-head">
+          <div>
+            <div className="card-title">
+              <Layers /> Output Sections
+            </div>
+            <h3>Bo dau ra day du cho UGC review conversion</h3>
+            <p>
+              Template tach script noi rieng voi visual prompt/keyframes, co visual-only mode,
+              negative prompt va compliance locks de tranh claim sai trong TikTok Shop affiliate.
+            </p>
+          </div>
+          <div className="prompt-library-actions">
+            <CopyButton text={primaryTemplate.prompt} />
+            <span>Copy template prompt</span>
+          </div>
+        </div>
+
+        <div className="prompt-library-shot-grid">
+          {primaryTemplate.sections.map((section, index) => (
+            <article key={section} className="prompt-library-shot-card">
+              <div className="prompt-library-shot-index">{String(index + 1).padStart(2, '0')}</div>
+              <div className="prompt-library-shot-body">
+                <h4>{section}</h4>
+                <p>Required section trong final affiliate package.</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="prompt-library-grid">
+        {TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES.map((item) => (
+          <article key={item.id} className="prompt-library-card" style={{ ['--library-accent' as string]: '#f97316' }}>
+            <div className="prompt-library-card-head">
+              <div className="prompt-library-icon">
+                <TrendingUp size={18} />
+              </div>
+              <div>
+                <p className="prompt-library-stage">{item.stage}</p>
+                <h3>{item.title}</h3>
+              </div>
+              <CopyButton text={item.prompt} />
+            </div>
+
+            <div className="prompt-library-meta">
+              <span>{item.platform}</span>
+              <span>{item.output}</span>
+            </div>
+
+            <div className="product-image-preset-meta">
+              {item.defaults.map((line) => (
+                <span key={line}>{line}</span>
+              ))}
+            </div>
+
+            <pre className="prompt-library-prompt">{item.prompt}</pre>
+          </article>
+        ))}
+      </section>
+    </main>
+  )
+}
+
 function PromptLibraryPage() {
   const frameworkText = [
     'AI VIDEO EDITOR INTERN WORKFLOW',
@@ -11133,26 +11279,7 @@ function PromptLibraryPage() {
     ].join('\n')),
   ].join('\n\n---\n\n')
 
-  const affiliateSkillTemplateText = [
-    'TIKTOK SHOP AFFILIATE SKILL TEMPLATES - FASHION/BEAUTY UGC REVIEW',
-    ...TIKTOK_SHOP_AFFILIATE_SKILL_TEMPLATES.map((item, index) => [
-      `${index + 1}. ${item.title}`,
-      `STAGE: ${item.stage}`,
-      `PLATFORM: ${item.platform}`,
-      `OUTPUT: ${item.output}`,
-      '',
-      'INPUT FIELDS:',
-      ...item.fields.map((field) => `- ${field}`),
-      '',
-      'DEFAULTS:',
-      ...item.defaults.map((line) => `- ${line}`),
-      '',
-      'OUTPUT SECTIONS:',
-      ...item.sections.map((section) => `- ${section}`),
-      '',
-      item.prompt,
-    ].join('\n')),
-  ].join('\n\n---\n\n')
+  const affiliateSkillTemplateText = buildTikTokShopAffiliateTemplateText()
 
   const fullLibraryText = INTERN_PROMPT_LIBRARY
     .map((item, index) => `${index + 1}. ${item.title}\nSTAGE: ${item.stage}\nOUTPUT: ${item.output}\n\n${item.prompt}`)
@@ -11598,6 +11725,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   useEffect(() => { saveProductLocationHistory(productLocationHistory) }, [productLocationHistory])
   useEffect(() => { saveOutfitTypeLocationHistory(outfitTypeLocationHistory) }, [outfitTypeLocationHistory])
   const isPromptLibraryPage = pageMode === 'prompt_library'
+  const isTikTokShopAffiliateTemplatePage = pageMode === 'tiktok_shop_affiliate_template'
   const isStoryboardTemplatePage = pageMode === 'storyboard_template'
   const isMusicVideoTemplatePage = pageMode === 'music_video_template'
 
@@ -11611,6 +11739,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
         ? STORYBOARD_TEMPLATE_ROUTE_PATH
       : pageMode === 'music_video_template'
         ? MUSIC_VIDEO_TEMPLATE_ROUTE_PATH
+      : pageMode === 'tiktok_shop_affiliate_template'
+        ? TIKTOK_SHOP_AFFILIATE_TEMPLATE_ROUTE_PATH
       : pageMode === 'prompt_library'
         ? PROMPT_LIBRARY_ROUTE_PATH
         : '/'
@@ -13712,6 +13842,8 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
               <p className="header-subtitle">
                 {isPromptLibraryPage
                   ? 'AI Video Editor Intern Prompt Library'
+                  : isTikTokShopAffiliateTemplatePage
+                  ? 'TikTok Shop Affiliate Template Page'
                   : isOotdTemplatePage
                   ? `OOTD Template Page (${activeOotdTemplateScenario.referenceVideoUrl ? `Beat-flow lock theo video ${activeOotdTemplateScenario.referenceVideoFileName}` : activeOotdTemplateScenario.label})`
                   : isMusicVideoTemplatePage
@@ -13773,6 +13905,19 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
               </button>
               <button
                 type="button"
+                className={`chip ${pageMode === 'tiktok_shop_affiliate_template' ? 'active' : ''}`}
+                onClick={() => setPageMode('tiktok_shop_affiliate_template')}
+                id="switch-page-tiktok-shop-affiliate-template"
+                style={pageMode === 'tiktok_shop_affiliate_template' ? {
+                  borderColor: '#f97316',
+                  color: '#f97316',
+                  background: 'color-mix(in srgb, #f97316 14%, transparent)',
+                } : {}}
+              >
+                TikTok Shop Template
+              </button>
+              <button
+                type="button"
                 className={`chip ${pageMode === 'prompt_library' ? 'active' : ''}`}
                 onClick={() => setPageMode('prompt_library')}
                 id="switch-page-prompt-library"
@@ -13801,7 +13946,9 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
           </div>
         </header>
 
-        {isPromptLibraryPage ? (
+        {isTikTokShopAffiliateTemplatePage ? (
+          <TikTokShopAffiliateTemplatePage />
+        ) : isPromptLibraryPage ? (
           <PromptLibraryPage />
         ) : (
           <>
