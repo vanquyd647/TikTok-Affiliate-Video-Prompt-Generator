@@ -289,6 +289,7 @@ export const GEMINI_AGENT_SKILLS: readonly GeminiAgentSkill[] = [
 - N+1 LOCK: N scenes require N+1 keyframes. For this template always output 4 scenes and 5 keyframes unless runtime configuration explicitly changes it.
 - KEYFRAME ORDER: KF1 full-body hero opening; KF2 close-up product detail; KF3 dynamic front three-quarter fit-check; KF4 side or back three-quarter proof; KF5 final product display, mirror, or CTA frame.
 - MASTER PROMPT: include vertical 9:16 TikTok Shop affiliate format, Model Lock, Product Lock, Background Lock, camera style, continuity rules, and no text/logo/watermark.
+- CAMERA DISTANCE LOCK: keep the model standing close to the camera and visually dominant, targeting roughly 80-90% frame-height occupancy. Full-body keyframes must still preserve head-to-toe visibility with minimal headroom and footroom; detail keyframes may move closer. Do not use distant wide shots or excessive empty background.
 - PRODUCT ANALYSIS: identify product type, color, material, fit, length, pattern, key details, closure, slit/waist/collar construction, selling points, styling value, and appropriate use occasions. Never use sexualized body descriptions.
 - MODEL LOCK: preserve the same adult model, face, hairstyle, makeup, natural proportions, outfit pieces, shoes, and accessories across all keyframes and scenes.
 - PRODUCT LOCK: the current PRODUCT input is the hero product. Preserve exact color, fabric, fit, length, silhouette, pattern, waistline, hem, texture, shine, seams, trim, hardware, closure, and styling position.
