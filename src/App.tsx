@@ -40,10 +40,42 @@ interface ScenePrompt {
   fullPrompt: string
 }
 
+interface AffiliateProductAnalysis {
+  productName: string
+  productType: string
+  color: string
+  material: string
+  fit: string
+  length: string
+  pattern: string
+  keyDetails: string
+  closure: string
+  sellingPoints: string[]
+  backgroundChoice: string
+}
+
+interface AffiliateNPlusOneRow {
+  sceneIndex: number
+  startKeyframe: number
+  endKeyframe: number
+  purpose: string
+}
+
+interface AffiliatePackage {
+  productAnalysis: AffiliateProductAnalysis
+  negativePrompt: string
+  textOverlays: string[]
+  voiceScript: string[]
+  caption: string
+  hashtags: string[]
+  nPlusOneSummary: AffiliateNPlusOneRow[]
+}
+
 interface GenerateResult {
   masterDNA: string
   keyframes: KeyframePrompt[]
   scenes: ScenePrompt[]
+  affiliatePackage?: AffiliatePackage
   createImagePrompt?: string
   musicVideoPromptMarkdown?: string
   lookbookImagePrompts?: LookbookImagePrompt[]
@@ -1711,6 +1743,67 @@ const PRODUCT_CATEGORY_OPTIONS: Array<{
     benchmarkHint: 'Nen lam clip combo phu kien theo mood/case de tang save va add-to-cart.',
   },
 ]
+
+const FASHION_AFFILIATE_DEFAULT_BACKGROUND = [
+  'real modern women fashion boutique',
+  'cream-beige walls and warm natural retail lighting',
+  'polished wood or tile floor',
+  'believable clothing racks, fitting-room corner, display shelf, and natural store depth',
+  'clean but slightly lived-in atmosphere',
+].join(', ')
+
+const FASHION_AFFILIATE_BACKGROUND_BY_CATEGORY: Record<ProductCategory, string> = {
+  auto: `${FASHION_AFFILIATE_DEFAULT_BACKGROUND}; infer a more specific real setting from the visible product subtype`,
+  tops_tshirt: 'real coffee shop exterior, casual street corner, bedroom mirror corner, or minimal lived-in apartment',
+  tops_shirts: 'real office lobby, smart-casual boutique, city cafe, or apartment mirror corner',
+  tops_blouses: 'real feminine boutique, French-inspired boutique, vanity corner, or office-casual setting',
+  tops_croptops: 'real summer street, casual boutique, city cafe exterior, or minimal apartment wardrobe corner',
+  tops_corset: 'real eveningwear boutique, dressing room, or soft-glam makeup room with believable fixtures',
+  tops_cami_tank_halter: 'real summer cafe, resort room, feminine fitting room, or wardrobe corner',
+  tops_sweaters_cardigan: 'real cozy apartment, book cafe, autumn street, or coffee shop window',
+  tops_hoodies_sweatshirts: 'real urban street, casual coffee shop exterior, campus walkway, or lived-in apartment',
+  bottoms_jeans: 'real urban street, cafe exterior, denim boutique, or daylight rooftop',
+  bottoms_trousers_fabric: 'real office-casual setting, co-working space, modern boutique, or city sidewalk',
+  bottoms_shorts: 'real summer street, campus walkway, casual boutique, or tennis-club walkway',
+  bottoms_jogger_cargo_legging: 'real urban street, clean gym entrance, studio hallway, or home workout corner',
+  dresses_by_silhouette: 'infer subtype: real eveningwear boutique or hotel lounge for body/party dress; beach resort or tropical garden for maxi; flower shop or garden cafe for babydoll; dressing room or hotel-suite mirror for slip dress',
+  dresses_by_occasion: 'infer occasion: real office lobby/co-working space for work dress; elegant eveningwear boutique/hotel lounge for party dress; beach villa/poolside/resort balcony for maxi or vacation dress',
+  dresses_by_material: 'infer material: real modern women boutique or mirror fit-check corner for satin/silk; elegant dressing room for lace/velvet; bright boutique for jersey/tweed, with material-appropriate lighting',
+  skirts_by_length: 'real modern women boutique, fitting room, mirror fit-check corner, city cafe, or office-casual setting chosen to match skirt length and styling',
+  skirts_by_shape: 'real women boutique, office-casual corner, city cafe, or eveningwear showroom chosen to match the skirt silhouette',
+  skirts_by_material: 'real denim boutique or urban street for denim; modern women boutique for leather/tweed; elegant eveningwear showroom with warm champagne light for satin/silk',
+  outerwear_light_fall: 'real autumn street, boutique entrance, hotel lobby, or cafe exterior',
+  outerwear_winter: 'real autumn/winter street, business hotel lobby, boutique entrance, or coffee shop window',
+  outerwear_utility: 'real city sidewalk, commute setting, casual boutique entrance, or practical outdoor walkway',
+  loungewear_home_sets: 'real cozy bedroom, soft living room, morning apartment, or home mirror corner',
+  loungewear_sleepwear: 'real cozy bedroom, soft living room, morning apartment, or hotel-room wardrobe corner',
+  lingerie_core: 'real private fitting room or clean wardrobe corner with tasteful soft lighting, full coverage, and non-sexual product demonstration',
+  swimwear_core: 'real beach resort, poolside, cabana, tropical walkway, or resort balcony',
+  activewear_apparel: 'real yoga studio, pilates room, clean gym studio, or home workout corner',
+  activewear_accessories: 'real yoga/pilates prop shelf, clean gym bench, or home workout corner',
+  traditional_festive_wear: 'real elegant Asian-inspired silk boutique or modern tea-room fashion space with warm wood panels, cream-beige walls, ceramic vase decor, folding screen, silk garment racks, and soft golden lighting',
+  accessories_shoes: 'real shoe display corner, polished boutique floor, office hallway, or resort walkway',
+  accessories_bags: 'real boutique display table, cafe table, outfit mirror corner, or dressing room',
+  accessories_addons: 'real vanity table, accessory counter, dressing mirror, or close-up beauty corner',
+}
+
+function getFashionAffiliateBackgroundProfile(
+  productCategory: ProductCategory,
+  productDescription: string,
+): string {
+  const categoryProfile = FASHION_AFFILIATE_BACKGROUND_BY_CATEGORY[productCategory]
+    || FASHION_AFFILIATE_DEFAULT_BACKGROUND
+  const normalizedDescription = productDescription.toLowerCase()
+
+  if (/\b(suon xam|qipao|cheongsam|ao dai)\b/.test(normalizedDescription)) {
+    return FASHION_AFFILIATE_BACKGROUND_BY_CATEGORY.traditional_festive_wear
+  }
+  if (/\b(satin|lua|silk)\b/.test(normalizedDescription) && /\b(chan vay|skirt|vay|dam|dress)\b/.test(normalizedDescription)) {
+    return 'real modern women fashion boutique, elegant eveningwear showroom, or mirror fit-check corner with cream-beige walls, warm champagne lighting, real garment racks, fitting-room curtain, and full-length mirror'
+  }
+
+  return categoryProfile
+}
 
 const PRODUCT_CATEGORY_GROUP_VALUES = PRODUCT_CATEGORY_GROUP_OPTIONS.map((item) => item.value) as ProductCategoryGroup[]
 const PRODUCT_CATEGORY_VALUES = PRODUCT_CATEGORY_OPTIONS.map((item) => item.value) as ProductCategory[]
@@ -7739,6 +7832,169 @@ function toHistoryStringList(value: unknown, maxItems = 20): string[] {
   )).slice(0, maxItems)
 }
 
+const FASHION_AFFILIATE_NEGATIVE_PROMPT = [
+  'no CGI showroom',
+  'no fantasy set',
+  'no fake mirror reflection',
+  'no empty white cyclorama',
+  'no outfit change',
+  'no product redesign',
+  'no wrong product color, fabric, fit, length, pattern, closure, or key detail',
+  'no extra people or random accessories',
+  'no distorted hands, fingers, face, anatomy, or duplicate body',
+  'no random text, logo, subtitle, or watermark',
+  'no unrealistic camera jump',
+  'no talking, dialogue, lip-sync, or speech-like mouth movement',
+  'no nudity, explicit sexual framing, fetish framing, or underage-looking subject',
+].join(', ')
+
+function normalizeAffiliateVoiceScript(value: unknown): string[] {
+  const fromArray = toHistoryStringList(value, 5)
+  if (fromArray.length >= 3) return fromArray.slice(0, 5)
+
+  if (typeof value === 'string') {
+    const fromText = value
+      .split(/\r?\n|(?<=[.!?])\s+/)
+      .map((line) => line.replace(/^[-*\d.)\s]+/, '').trim())
+      .filter((line) => line.length > 0)
+      .slice(0, 5)
+    if (fromText.length >= 3) return fromText
+  }
+
+  return [
+    'Mẫu này lên form gọn và giữ được đúng tinh thần của sản phẩm.',
+    'Phần chất liệu và chi tiết được quay gần để mình nhìn rõ trước khi chọn.',
+    'Phối đi làm, đi cafe hoặc đi chơi đều dễ tùy đúng kiểu sản phẩm.',
+    'Mình để đúng mẫu ở giỏ hàng nha, bạn kiểm tra thêm màu và size phù hợp.',
+  ]
+}
+
+function normalizeAffiliateHashtags(value: unknown): string[] {
+  const normalized = toHistoryStringList(value, 12)
+    .map((tag) => tag.replace(/\s+/g, ''))
+    .map((tag) => (tag.startsWith('#') ? tag : `#${tag.replace(/^#+/, '')}`))
+    .filter((tag) => tag.length > 1)
+
+  const hashtags = Array.from(new Set(normalized))
+  const fallbacks = ['#tiktokshop', '#thoitrangnu', '#fitcheck', '#reviewsanpham', '#phoidonu']
+  for (const fallback of fallbacks) {
+    if (hashtags.length >= 8) break
+    if (!hashtags.includes(fallback)) hashtags.push(fallback)
+  }
+  return hashtags.slice(0, 12)
+}
+
+function normalizeAffiliatePackage(
+  value: unknown,
+  options?: {
+    required?: boolean
+    backgroundChoice?: string
+    productType?: string
+    scenePurposes?: string[]
+  },
+): AffiliatePackage | undefined {
+  const record = toHistoryRecord(value)
+  if (!record && !options?.required) return undefined
+
+  const productRecord = toHistoryRecord(record?.productAnalysis) || {}
+  const backgroundChoice = toHistoryString(
+    productRecord.backgroundChoice,
+    options?.backgroundChoice || FASHION_AFFILIATE_DEFAULT_BACKGROUND,
+  )
+  const defaultProductType = options?.productType || 'fashion product detected from PRODUCT reference'
+  const rawOverlays = toHistoryStringList(record?.textOverlays, 4)
+  const overlayFallbacks = [
+    'Lên form gọn, nhìn rõ dáng',
+    'Cận chất liệu và chi tiết thật',
+    'Dễ phối cho nhiều hoàn cảnh',
+    'Mình để đúng mẫu ở giỏ hàng nha',
+  ]
+  const textOverlays = Array.from({ length: 4 }, (_, index) => rawOverlays[index] || overlayFallbacks[index])
+  const rawSummary = Array.isArray(record?.nPlusOneSummary) ? record.nPlusOneSummary : []
+  const nPlusOneSummary = Array.from({ length: 4 }, (_, index): AffiliateNPlusOneRow => {
+    const row = toHistoryRecord(rawSummary[index]) || {}
+    return {
+      sceneIndex: index + 1,
+      startKeyframe: index + 1,
+      endKeyframe: index + 2,
+      purpose: toHistoryString(
+        row.purpose,
+        options?.scenePurposes?.[index] || `TikTok affiliate product proof scene ${index + 1}`,
+      ),
+    }
+  })
+  const rawNegativePrompt = toHistoryString(record?.negativePrompt, '')
+  const rawCaption = toHistoryString(
+    record?.caption,
+    'Mẫu dễ phối và nhìn rõ form trong nhiều góc quay.',
+  )
+  const captionCta = 'mình để đúng mẫu ở giỏ hàng nha'
+
+  return {
+    productAnalysis: {
+      productName: toHistoryString(productRecord.productName, 'Hero product from PRODUCT reference'),
+      productType: toHistoryString(productRecord.productType, defaultProductType),
+      color: toHistoryString(productRecord.color, 'Preserve exact visible product color'),
+      material: toHistoryString(productRecord.material, 'Preserve exact visible fabric/material'),
+      fit: toHistoryString(productRecord.fit, 'Preserve exact visible fit and silhouette'),
+      length: toHistoryString(productRecord.length, 'Preserve exact visible length'),
+      pattern: toHistoryString(productRecord.pattern, 'Preserve exact visible pattern or solid finish'),
+      keyDetails: toHistoryString(productRecord.keyDetails, 'Preserve seams, trim, hardware, waist, hem, collar, slit, and construction details'),
+      closure: toHistoryString(productRecord.closure, 'Preserve the visible closure and fastening construction'),
+      sellingPoints: toHistoryStringList(productRecord.sellingPoints, 6).length > 0
+        ? toHistoryStringList(productRecord.sellingPoints, 6)
+        : ['clear fit proof', 'material/detail visibility', 'practical styling value'],
+      backgroundChoice,
+    },
+    negativePrompt: rawNegativePrompt
+      ? `${rawNegativePrompt}, ${FASHION_AFFILIATE_NEGATIVE_PROMPT}`
+      : FASHION_AFFILIATE_NEGATIVE_PROMPT,
+    textOverlays,
+    voiceScript: normalizeAffiliateVoiceScript(record?.voiceScript),
+    caption: rawCaption.toLowerCase().includes(captionCta)
+      ? rawCaption
+      : `${rawCaption.replace(/[.!?\s]+$/, '')}, ${captionCta}.`,
+    hashtags: normalizeAffiliateHashtags(record?.hashtags),
+    nPlusOneSummary,
+  }
+}
+
+function buildAffiliatePackageCopyText(affiliatePackage: AffiliatePackage): string {
+  const analysis = affiliatePackage.productAnalysis
+  return [
+    'PRODUCT ANALYSIS',
+    `Product: ${analysis.productName}`,
+    `Type: ${analysis.productType}`,
+    `Color: ${analysis.color}`,
+    `Material: ${analysis.material}`,
+    `Fit: ${analysis.fit}`,
+    `Length: ${analysis.length}`,
+    `Pattern: ${analysis.pattern}`,
+    `Key details: ${analysis.keyDetails}`,
+    `Closure: ${analysis.closure}`,
+    `Selling points: ${analysis.sellingPoints.join(' | ')}`,
+    `Background: ${analysis.backgroundChoice}`,
+    '',
+    'NEGATIVE PROMPT',
+    affiliatePackage.negativePrompt,
+    '',
+    'TEXT OVERLAYS',
+    ...affiliatePackage.textOverlays.map((overlay, index) => `Scene ${index + 1}: ${overlay}`),
+    '',
+    'VOICE SCRIPT',
+    ...affiliatePackage.voiceScript.map((line, index) => `${index + 1}. ${line}`),
+    '',
+    'TIKTOK CAPTION',
+    affiliatePackage.caption,
+    affiliatePackage.hashtags.join(' '),
+    '',
+    'N+1 SUMMARY',
+    ...affiliatePackage.nPlusOneSummary.map(
+      (row) => `Scene ${row.sceneIndex}: KF${row.startKeyframe} -> KF${row.endKeyframe} | ${row.purpose}`,
+    ),
+  ].join('\n')
+}
+
 function normalizeHistoryContentType(value: unknown, fallback: ContentType = 'ootd'): ContentType {
   const candidate = toHistoryString(value, fallback).toLowerCase()
   return CONTENT_TYPE_VALUES.includes(candidate as ContentType)
@@ -8225,11 +8481,13 @@ function buildPromptResultFromHistoryItem(
     promptRecord.createImagePrompt,
     buildCreateImagePrompt(resolvedType, item.notes || ''),
   )
+  const affiliatePackage = normalizeAffiliatePackage(promptRecord.affiliatePackage)
 
   return {
     masterDNA,
     keyframes,
     scenes,
+    affiliatePackage,
     createImagePrompt,
     resolvedContentType: resolvedType,
     affiliateModeUsed: FIXED_AFFILIATE_MODE,
@@ -8787,6 +9045,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     enforceRearMirrorReflection?: boolean
     templateScenarioId?: OotdTemplateScenarioId
     useTikTokShopAffiliateTemplateSkill?: boolean
+    affiliateBackgroundProfile?: string
   },
 ): Promise<GenerateResult> {
   const durationInfo = DURATIONS.find((entry) => entry.value === duration) || DURATIONS[1]
@@ -8808,6 +9067,8 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
   const shouldEnforceRearMirrorReflection = options?.enforceRearMirrorReflection === true
   const templateScenarioId = options?.templateScenarioId
   const useTikTokShopAffiliateTemplateSkill = options?.useTikTokShopAffiliateTemplateSkill === true
+  const affiliateBackgroundProfile = options?.affiliateBackgroundProfile?.trim()
+    || FASHION_AFFILIATE_DEFAULT_BACKGROUND
   const isCozyTemplateScenario = templateScenarioId === 'cozy_home_background'
   const isNightCityTemplateScenario = templateScenarioId === 'night_city_glam'
   const isRelaxedBoutiqueTemplateScenario = templateScenarioId === 'relaxed_boutique_camera'
@@ -8863,15 +9124,19 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
             ? 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same bright boutique-style scene across all keyframes/scenes, avoid venue switching, keep full-body outfit and product-detail readability, preserve grey wall, arched display niches, shelf line, LED strips, ceiling curve, and wood floor anchors, maintain clear face/product exposure, and treat this image as environment only.'
           : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing in front of filming camera in this same background across all keyframes/scenes, avoid venue switching, keep full-body head-to-toe readability, preserve key background anchors (wall/floor/decor placement), and treat this image as environment anchor only (not identity/product source).')))
       : 'BACKGROUND LOCATION LOCK: current BACKGROUND input image is the anchor set. Keep model standing for mirror phone fit-check in this same background across all keyframes/scenes, avoid venue switching, enforce closer mirror framing so outfit appears larger (target subject occupancy ~70-85% frame), keep full-body head-to-toe readability, preserve key background anchors (mirror edges, floor line, major decor placement), and treat this image as environment anchor only (not identity/product source).')
-    : 'BACKGROUND LOCATION LOCK: no background input image provided.'
+    : useTikTokShopAffiliateTemplateSkill
+      ? `BACKGROUND LOCATION LOCK: no background input image provided. Select and keep one physically real product-appropriate environment from this profile: ${affiliateBackgroundProfile}. Preserve the same environment and stable spatial anchors across all keyframes/scenes.`
+      : 'BACKGROUND LOCATION LOCK: no background input image provided.'
 
   const rearMirrorReflectionLockPrompt = shouldEnforceRearMirrorReflection
     ? 'REAR MIRROR REFLECTION LOCK: keep a rear mirror behind model visible in the frame and preserve reflection continuity across all keyframes/scenes. Do not place camera in mirror; camera/tripod/operator must not appear in reflection.'
     : 'REAR MIRROR REFLECTION LOCK: inactive.'
 
-  const noVoiceTrackPrompt = isFrontCameraTemplate
-    ? 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual front-camera outfit presentation actions and optional on-screen text only. Keep the mouth relaxed/closed at rest and block talking-to-camera behavior.'
-    : 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual mirror phone fit-check actions and optional on-screen text only. Keep the mouth relaxed/closed at rest and block talking-to-camera behavior.'
+  const noVoiceTrackPrompt = useTikTokShopAffiliateTemplateSkill
+    ? 'VISUAL PERFORMANCE / AUDIO LOCK: scene and keyframe prompts must contain no dialogue, no model speech, no lip-sync, no spoken CTA, and no speech-like mouth movement. Keep the mouth relaxed/closed at rest. A separate Vietnamese post-production voiceScript is required inside affiliatePackage and must never be performed by the on-screen model.'
+    : isFrontCameraTemplate
+      ? 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual front-camera outfit presentation actions and optional on-screen text only. Keep the mouth relaxed/closed at rest and block talking-to-camera behavior.'
+      : 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual mirror phone fit-check actions and optional on-screen text only. Keep the mouth relaxed/closed at rest and block talking-to-camera behavior.'
 
   const cameraMotionLockPrompt = shouldEnforceConciseVisualOnlyAction
     ? (isFrontCameraTemplate
@@ -8931,11 +9196,14 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
       'safety-policy',
       'schema-qa',
     ],
-    outputContract: `${keyframeCount} detached remix keyframes + ${sceneCount} scenes JSON`,
+    outputContract: useTikTokShopAffiliateTemplateSkill
+      ? `${keyframeCount} keyframes + ${sceneCount} N+1 scenes + complete affiliatePackage JSON`
+      : `${keyframeCount} detached remix keyframes + ${sceneCount} scenes JSON`,
     runtimeNotes: [
       `Detected content type ${analysis.detectedContentType}; target duration ${duration}s; aspect ratio ${aspectRatio}.`,
       templateScenarioId ? `OOTD template scenario is active: ${templateScenarioId}.` : '',
       useTikTokShopAffiliateTemplateSkill ? 'TikTok Shop Affiliate Fashion Prompt Agent core skill is active.' : '',
+      useTikTokShopAffiliateTemplateSkill ? `Product-category background profile: ${affiliateBackgroundProfile}.` : '',
       `Template camera format: ${templateCameraFormat}.`,
       shouldEnforceRearMirrorReflection ? 'Rear mirror/reflection lock is active.' : '',
       `Background reference ${hasBackgroundLocationReference ? 'provided' : 'not provided'}.`,
@@ -8953,6 +9221,35 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
 
 SCENE REVIEW STYLE PLAN:
 ${buildOotdTemplateSceneReviewStylePlan(sceneCount)}`
+    : ''
+  const affiliatePackageSchema = useTikTokShopAffiliateTemplateSkill
+    ? `,
+  "affiliatePackage": {
+    "productAnalysis": {
+      "productName": "...",
+      "productType": "...",
+      "color": "...",
+      "material": "...",
+      "fit": "...",
+      "length": "...",
+      "pattern": "...",
+      "keyDetails": "...",
+      "closure": "...",
+      "sellingPoints": ["..."],
+      "backgroundChoice": "..."
+    },
+    "negativePrompt": "...",
+    "textOverlays": ["Vietnamese scene 1", "Vietnamese scene 2", "Vietnamese scene 3", "Vietnamese scene 4"],
+    "voiceScript": ["Vietnamese sentence 1", "Vietnamese sentence 2", "Vietnamese sentence 3", "Vietnamese CTA sentence"],
+    "caption": "Vietnamese caption ending with: mình để đúng mẫu ở giỏ hàng nha",
+    "hashtags": ["#tiktokshop", "..."],
+    "nPlusOneSummary": [
+      { "sceneIndex": 1, "startKeyframe": 1, "endKeyframe": 2, "purpose": "..." },
+      { "sceneIndex": 2, "startKeyframe": 2, "endKeyframe": 3, "purpose": "..." },
+      { "sceneIndex": 3, "startKeyframe": 3, "endKeyframe": 4, "purpose": "..." },
+      { "sceneIndex": 4, "startKeyframe": 4, "endKeyframe": 5, "purpose": "..." }
+    ]
+  }`
     : ''
 
   const prompt = `You are a TikTok prompt-packaging specialist in DETACHED ANALYSIS MODE.
@@ -8999,7 +9296,9 @@ VISUAL BEAT FLOW TEMPLATE TO FOLLOW:
 ${analysis.generatedScript || 'No visual beat flow template provided'}
 
 HARD CONSTRAINTS:
-- Do not apply any external/core template enforcement.
+- ${useTikTokShopAffiliateTemplateSkill
+  ? 'Apply the activated Fashion Affiliate Prompt Generator skill and ignore unrelated OOTD scenario rules.'
+  : 'Do not apply any external/core template enforcement.'}
 - Use analyzed TikTok video only as structure and rhythm reference.
 - Never copy product identity/outfit details from analyzed TikTok video.
 - Keep product review focus anchored to REVIEW NOTES and current PRODUCT input image.
@@ -9025,6 +9324,15 @@ HARD CONSTRAINTS:
   : 'Maintain stable, non-performative movement and camera continuity.'}
 - CONTEXT REMIX LOCK: Keep background/setting logic similar to analyzed video (venue type, indoor/outdoor feel, prop density, movement space, transition rhythm).
 - Do not copy exact identifiable text/signage/persons from source video context.
+${useTikTokShopAffiliateTemplateSkill
+  ? `- FASHION AFFILIATE OUTPUT LOCK: analyze the exact visible product and return affiliatePackage with all required fields.
+- MASTER PROMPT LOCK: masterDNA must explicitly contain FORMAT 9:16, MODEL LOCK, PRODUCT LOCK, BACKGROUND LOCK, CAMERA STYLE, CONTINUITY RULE, and NO TEXT/LOGO/WATERMARK.
+- BACKGROUND SELECTOR LOCK: ${hasBackgroundLocationReference ? 'the uploaded BACKGROUND image overrides automatic selection' : `choose one real setting from ${affiliateBackgroundProfile}`}. Keep the choice in productAnalysis.backgroundChoice.
+- KEYFRAME LOCK: output exactly KF1 hero full body, KF2 product detail close-up, KF3 front three-quarter dynamic fit-check, KF4 side/back three-quarter proof, and KF5 final product display/CTA frame.
+- N+1 SCENE LOCK: Scene 1 KF1->KF2; Scene 2 KF2->KF3; Scene 3 KF3->KF4; Scene 4 KF4->KF5.
+- POST-PRODUCTION COPY LOCK: return exactly four short Vietnamese textOverlays, one 3-5 sentence Vietnamese voiceScript, caption ending with "mình để đúng mẫu ở giỏ hàng nha", and relevant hashtags.
+- VISUAL CLEAN-FRAME LOCK: text overlays and voice script are post-production metadata only. Never render text/logo/watermark inside keyframe or scene prompts; model never talks or lip-syncs.`
+  : ''}
 
 SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
 ${SCENE_CAMERA_MOVEMENT_PROMPT_RULES}
@@ -9049,7 +9357,7 @@ Return STRICT JSON only in this schema:
       "narrative": "...",
       "cameraMovement": "Position: ${DEFAULT_SCENE_CAMERA_POSITION} | Motion: ${DEFAULT_SCENE_CAMERA_MOTION}"
     }
-  ]
+  ]${affiliatePackageSchema}
 }
 
 Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
@@ -9060,7 +9368,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       model,
       [...parts, { text: prompt }],
       0.66,
-      6144,
+      useTikTokShopAffiliateTemplateSkill ? 8192 : 6144,
     )
 
     const asRecord = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value)
@@ -9300,6 +9608,24 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         )
       }
 
+      const builtFullPrompt = buildNanoBananaProFramePrompt({
+        subject: keyframe.subject,
+        action: finalAction,
+        facingDirection: finalFacingDirection,
+        location: finalLocation,
+        camera: finalCamera,
+        lighting: keyframe.lighting,
+        style: finalStyle,
+        aspectRatio,
+      })
+      const fullPrompt = useTikTokShopAffiliateTemplateSkill
+        ? [
+          builtFullPrompt,
+          'CLEAN FRAME LOCK: no visible text, caption, subtitle, logo, watermark, or random typography.',
+          'PERFORMANCE LOCK: mouth relaxed and closed at rest; no talking, dialogue, lip-sync, spoken CTA, or speech-like mouth movement.',
+        ].join('\n')
+        : builtFullPrompt
+
       return {
         ...keyframe,
         action: finalAction,
@@ -9307,21 +9633,12 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         location: finalLocation,
         camera: finalCamera,
         style: finalStyle,
-        fullPrompt: buildNanoBananaProFramePrompt({
-          subject: keyframe.subject,
-          action: finalAction,
-          facingDirection: finalFacingDirection,
-          location: finalLocation,
-          camera: finalCamera,
-          lighting: keyframe.lighting,
-          style: finalStyle,
-          aspectRatio,
-        }),
+        fullPrompt,
       }
     })
 
     const rawMasterDNA = toSafeString(parsedRecord.masterDNA, '')
-    const masterDNA = rawMasterDNA.length > 0
+    const baseMasterDNA = rawMasterDNA.length > 0
       ? rawMasterDNA
       : [
         '[FACE LOCK]: Keep face identity from current input image only (if provided).',
@@ -9330,6 +9647,18 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         '[ANALYSIS TRANSFER]: Use TikTok analysis as structure-only reference (hook/value/proof/close).',
         '[CONTEXT REMIX LOCK]: Recreate similar background setting logic from analyzed video without copying identity/product specifics.',
       ].join('\n')
+    const masterDNA = useTikTokShopAffiliateTemplateSkill
+      ? [
+        baseMasterDNA,
+        '[FORMAT LOCK]: Vertical 9:16 realistic TikTok Shop affiliate fashion product video.',
+        '[MODEL LOCK]: Preserve the same adult model, face, hairstyle, makeup, natural proportions, shoes, and accessories across every keyframe and scene.',
+        '[PRODUCT LOCK]: Preserve the exact hero product color, fabric, fit, length, silhouette, pattern, waist/hem/collar/slit, seams, trim, hardware, closure, texture, and styling position from PRODUCT reference.',
+        `[BACKGROUND LOCK]: ${hasBackgroundLocationReference ? 'Use the uploaded BACKGROUND reference as the environment anchor.' : `Use one real product-appropriate setting from: ${affiliateBackgroundProfile}.`} Keep physically believable depth, surfaces, props, lighting, and mirror behavior; no venue drift.`,
+        '[CAMERA STYLE]: Stable realistic vertical smartphone creator framing with clear product readability and minimal physically plausible movement.',
+        '[CONTINUITY RULE]: Same model, product, outfit, background anchors, lighting logic, and camera axis across the N+1 chain.',
+        '[CLEAN FRAME LOCK]: No visible text, logo, watermark, random typography, dialogue, talking, or lip-sync in generated visuals.',
+      ].join('\n')
+      : baseMasterDNA
 
     const scenes: ScenePrompt[] = Array.from({ length: sceneCount }, (_, index) => {
       const raw = asRecord(rawScenes[index]) ? rawScenes[index] as Record<string, unknown> : {}
@@ -9448,6 +9777,50 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       const lighting = keyframes[index]?.lighting || ''
       const timeRange = `${startSec}s-${endSec}s`
 
+      const affiliateSceneOpening = `Create a vertical 9:16 realistic TikTok Shop affiliate fashion video using Keyframe ${index + 1} as the start frame and Keyframe ${index + 2} as the end frame.`
+      const sceneFullPrompt = [
+        ...(useTikTokShopAffiliateTemplateSkill
+          ? [
+            affiliateSceneOpening,
+            `START FRAME: Keyframe ${index + 1} - ${startPose}`,
+            `END FRAME: Keyframe ${index + 2} - ${endPose}`,
+          ]
+          : []),
+        `SUBJECT: ${sceneSubject}`,
+        ...(ootdSceneReviewStyle
+          ? [
+            'SCENE MODE: standalone OOTD review clip from START FRAME to END FRAME; no need to connect action continuously with previous or next scene.',
+            `REVIEW ANGLE: ${ootdSceneReviewStyle.label} - ${ootdSceneReviewStyle.directive}`,
+            `START FRAME: ${startPose}`,
+            `END FRAME: ${endPose}`,
+            ...(isFreeStyleProductReviewTemplateScenario
+              ? [
+                `START FACING: ${startFacing}`,
+                `END FACING: ${endFacing}`,
+                'FREESTYLE DIRECTION LOCK: START FACING and END FACING must be different, with a visible product-review turn/pivot between them.',
+              ]
+              : []),
+          ]
+          : []),
+        `ACTION: ${narrative}`,
+        finalComposition ? `COMPOSITION: ${finalComposition}` : '',
+        `CAMERA: ${cameraMovement}`,
+        lighting ? `LIGHTING: ${lighting}` : '',
+        locationFlow ? `LOCATION FLOW: ${locationFlow}` : '',
+        ...(useTikTokShopAffiliateTemplateSkill
+          ? [
+            'PRODUCT FOCUS: preserve the exact hero product and emphasize the scene-specific fit, material, construction, or styling proof.',
+            'BACKGROUND REALISM: keep the selected real environment stable and believable; no CGI, fantasy, fake showroom, artificial mirror reflection, or venue change.',
+            'MOTION: smooth, minimal, clean, realistic TikTok affiliate product-demo movement.',
+            'AUDIO/PERFORMANCE: post-production voice-over is separate; on-screen model does not talk, lip-sync, articulate dialogue, or perform a spoken CTA.',
+            'CLEAN FRAME: no visible text, caption, logo, watermark, or random typography.',
+          ]
+          : []),
+        ...(shouldEnforceConciseVisualOnlyAction && templateScenarioId
+          ? buildOotdTemplateSilentFitCheckVeoLocks(!isFrontCameraTemplate)
+          : []),
+      ].filter(Boolean).join('\n')
+
       return {
         index,
         timeRange,
@@ -9459,39 +9832,24 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         cameraMovement,
         lighting,
         locationFlow,
-        fullPrompt: [
-          `SUBJECT: ${sceneSubject}`,
-          ...(ootdSceneReviewStyle
-            ? [
-              'SCENE MODE: standalone OOTD review clip from START FRAME to END FRAME; no need to connect action continuously with previous or next scene.',
-              `REVIEW ANGLE: ${ootdSceneReviewStyle.label} - ${ootdSceneReviewStyle.directive}`,
-              `START FRAME: ${startPose}`,
-              `END FRAME: ${endPose}`,
-              ...(isFreeStyleProductReviewTemplateScenario
-                ? [
-                  `START FACING: ${startFacing}`,
-                  `END FACING: ${endFacing}`,
-                  'FREESTYLE DIRECTION LOCK: START FACING and END FACING must be different, with a visible product-review turn/pivot between them.',
-                ]
-                : []),
-            ]
-            : []),
-          `ACTION: ${narrative}`,
-          finalComposition ? `COMPOSITION: ${finalComposition}` : '',
-          `CAMERA: ${cameraMovement}`,
-          lighting ? `LIGHTING: ${lighting}` : '',
-          locationFlow ? `LOCATION FLOW: ${locationFlow}` : '',
-          ...(shouldEnforceConciseVisualOnlyAction && templateScenarioId
-            ? buildOotdTemplateSilentFitCheckVeoLocks(!isFrontCameraTemplate)
-            : []),
-        ].filter(Boolean).join('\n'),
+        fullPrompt: sceneFullPrompt,
       }
+    })
+
+    const affiliatePackage = normalizeAffiliatePackage(parsedRecord.affiliatePackage, {
+      required: useTikTokShopAffiliateTemplateSkill,
+      backgroundChoice: hasBackgroundLocationReference
+        ? 'Uploaded BACKGROUND reference image (environment anchor only)'
+        : affiliateBackgroundProfile,
+      productType: 'Fashion product detected from the PRODUCT reference and selected category',
+      scenePurposes: scenes.map((scene) => scene.narrative),
     })
 
     return {
       masterDNA,
       keyframes,
       scenes,
+      affiliatePackage,
       createImagePrompt: buildCreateImagePrompt(resolvedContentType, reviewProductBrief),
       resolvedContentType,
       affiliateModeUsed: FIXED_AFFILIATE_MODE,
@@ -11426,7 +11784,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const [result, setResult] = useState<GenerateResult | null>(null)
   const [seoResult, setSeoResult] = useState<SeoTaskResult | null>(null)
   const [voiceoverResult, setVoiceoverResult] = useState<VoiceoverTaskResult | null>(null)
-  const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'all' | 'image' | 'seo' | 'voiceover' | 'history' | 'tiktokanalysis'>('keyframes')
+  const [activeTab, setActiveTab] = useState<'keyframes' | 'scenes' | 'affiliate' | 'all' | 'image' | 'seo' | 'voiceover' | 'history' | 'tiktokanalysis'>('keyframes')
   const [selectedContentType, setSelectedContentType] = useState<ResolvedContentType>('ootd')
   const [seoProductName, setSeoProductName] = useState('')
   const [seoNotes, setSeoNotes] = useState('')
@@ -11860,7 +12218,13 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
       setSeoResult(null)
       setVoiceoverResult(null)
       setSelectedSeoVariantIndex(0)
-      setActiveTab(restoredPrompt.keyframes.length > 0 && restoredPrompt.scenes.length > 0 ? 'keyframes' : 'image')
+      setActiveTab(
+        restoredPrompt.affiliatePackage
+          ? 'affiliate'
+          : restoredPrompt.keyframes.length > 0 && restoredPrompt.scenes.length > 0
+            ? 'keyframes'
+            : 'image',
+      )
       setPromptToast({
         kind: 'success',
         message: 'Da mo lai Prompt Package tu lich su.',
@@ -12005,6 +12369,7 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
   const canGenerateVoiceover = canGenerate && voiceoverProductName.trim().length > 0
   const hasPromptResult = result !== null
   const hasVideoPromptResult = result !== null && result.keyframes.length > 0 && result.scenes.length > 0
+  const affiliatePackage = result?.affiliatePackage
   const resultVideoEngineLabel = result?.storyboardEngineUsed
     ? STORYBOARD_VIDEO_ENGINE_OPTIONS.find((item) => item.value === result.storyboardEngineUsed)?.label || 'Veo 3.1'
     : 'Veo 3.1'
@@ -12148,6 +12513,10 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     || PRODUCT_CATEGORY_OPTIONS.find((item) => item.value === productCategory)
     || visibleProductCategoryOptions[0]
     || PRODUCT_CATEGORY_OPTIONS[0]
+  const activeFashionAffiliateBackgroundProfile = getFashionAffiliateBackgroundProfile(
+    activeProductCategoryOption.value,
+    `${activeProductCategoryOption.label} ${activeProductCategoryOption.desc} ${activeProductCategoryOption.detailHint}`,
+  )
   const activeProductCategorySuggestedLabels = activeProductCategoryOption.suggestedTypes
     .map((typeValue) => CONTENT_TYPES.find((item) => item.value === typeValue)?.label || typeValue.toUpperCase())
     .join(' / ')
@@ -12242,6 +12611,8 @@ export default function App({ initialPageMode = 'core' }: AppProps) {
     ? 'Lich su da luu (MongoDB)'
     : activeTab === 'tiktokanalysis'
       ? 'Phan tich Video TikTok'
+    : activeTab === 'affiliate'
+      ? 'Fashion Affiliate Pack'
     : isOotdTemplatePage
       ? `OOTD Template Output — ${duration}s / ${OOTD_TEMPLATE_LOCKED_ASPECT_RATIO}`
     : isTikTokShopAffiliateTemplatePage
@@ -13456,15 +13827,17 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
     const lockedAspectRatio = TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO
     const lockedContentType: ResolvedContentType = 'tiktokshop'
     const currentProductImageId = productImage ? createProductImageId(productImage) : null
+    const affiliateBackgroundProfile = activeFashionAffiliateBackgroundProfile
     const backgroundRule = backgroundImage
-      ? 'Background input is active: use the provided background image as environment/location cue only, but keep the setting grounded as a real women fashion boutique; do not copy people, garments, logos, or signage from it.'
-      : 'No background input: create one authentic real women fashion boutique interior with polished floor, cream/beige walls, retail ceiling lights, clothing racks, fitting-room corner, display shelves, natural depth, and believable mirror reflection.'
+      ? 'Background input is active and overrides automatic selection: use the provided background image as environment/location cue only; preserve its real spatial anchors and do not copy people, garments, logos, or signage from it.'
+      : `No background input: choose and lock one physically real setting from this product-category profile: ${affiliateBackgroundProfile}.`
 
     const reviewProductNotes = [
       TIKTOK_SHOP_AFFILIATE_TEMPLATE_PRODUCT_BRIEF,
       `Product category hint: ${activeProductCategoryOption.label}.`,
       `Detail hint: ${activeProductCategoryOption.detailHint}`,
       backgroundRule,
+      `Background selector result: ${affiliateBackgroundProfile}.`,
       'Core skill mode: TikTok Shop Affiliate Fashion Prompt Agent. Use this core skill instead of OOTD fit-check scenario rules.',
       'N+1 lock: target exactly 4 scenes and 5 keyframes for the default affiliate fashion template.',
       'Scene chain: KF1 full-body front hook -> KF2 product detail close-up -> KF3 full-body 3/4 fit proof -> KF4 clean side/back silhouette -> KF5 final product display / soft CTA.',
@@ -13511,6 +13884,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
           templateCameraFormat: 'front_camera',
           enforceRearMirrorReflection: false,
           useTikTokShopAffiliateTemplateSkill: true,
+          affiliateBackgroundProfile,
         },
       )
 
@@ -13522,7 +13896,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
 
       setResult(res)
       setSelectedContentType(resolvedType)
-      setActiveTab('keyframes')
+      setActiveTab(res.affiliatePackage ? 'affiliate' : 'keyframes')
       setPromptToast({
         kind: 'success',
         message: `Da tao xong Prompt TikTok Shop Template (${TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL}).`,
@@ -13561,6 +13935,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
       const promptPackageForHistory = {
         masterDNA: res.masterDNA,
         createImagePrompt: res.createImagePrompt || '',
+        affiliatePackage: res.affiliatePackage,
         keyframes: res.keyframes.map((keyframe) => ({
           index: keyframe.index,
           timestamp: keyframe.timestamp,
@@ -13697,6 +14072,14 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
           )
         }
       }
+
+      if (result.affiliatePackage) {
+        lines.push(
+          '',
+          '── FASHION AFFILIATE PACK ──',
+          buildAffiliatePackageCopyText(result.affiliatePackage),
+        )
+      }
     }
 
     if (seoResult) {
@@ -13787,6 +14170,14 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
             prompt.prompt,
           )
         }
+      }
+
+      if (result.affiliatePackage) {
+        lines.push(
+          '',
+          'FASHION AFFILIATE PACK:',
+          buildAffiliatePackageCopyText(result.affiliatePackage),
+        )
       }
     }
 
@@ -14101,9 +14492,10 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                   Duration output: {TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION}s (4 scenes / 5 keyframes){'\n'}
                   Ratio: {TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO}{'\n'}
                   Content type: TIKTOKSHOP{'\n'}
-                  Background: real women boutique, not CGI/fantasy/studio; background image is optional environment cue only{'\n'}
+                  Background priority: uploaded background {'>'} category selector {'>'} real boutique fallback{'\n'}
+                  Selected background profile: {activeFashionAffiliateBackgroundProfile}{'\n'}
                   Camera: vertical smartphone creator style, stable, product-readable{'\n'}
-                  Voice/copy: Vietnamese overlay, voice direction, caption and hashtags are allowed; no fake claims
+                  Voice/copy: 4 Vietnamese overlays + post-production voice script + caption/hashtags; model does not talk or lip-sync
                 </div>
 
                 <div className="prompt-text" style={{ whiteSpace: 'pre-wrap' }}>
@@ -15174,7 +15566,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                   {result && (
                     <div className="dna-section">
                       <div className="dna-title">
-                        <Wand2 size={13} /> Character DNA
+                        <Wand2 size={13} /> {affiliatePackage ? 'Master Prompt Tổng' : 'Character DNA'}
                         <CopyButton text={result.masterDNA} />
                       </div>
                       <p className="dna-text">{result.masterDNA}</p>
@@ -15197,6 +15589,14 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                         onClick={() => setActiveTab('scenes')}
                       >
                         <Film /> Scenes ({result.scenes.length})
+                      </button>
+                    )}
+                    {result?.affiliatePackage && (
+                      <button
+                        className={`tab ${activeTab === 'affiliate' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('affiliate')}
+                      >
+                        <TrendingUp /> Affiliate Pack
                       </button>
                     )}
                     {seoResult && (
@@ -15310,6 +15710,115 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                           </div>
                         </div>
                       ))}
+                    </>
+                  )}
+
+                  {affiliatePackage && (activeTab === 'affiliate' || activeTab === 'all') && (
+                    <>
+                      {activeTab === 'all' && (
+                        <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f97316', marginBottom: 12, marginTop: 20, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                          Fashion Affiliate Pack
+                        </h3>
+                      )}
+
+                      <div className="prompt-card" style={{ borderColor: 'rgba(249, 115, 22, 0.35)' }}>
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: '#f97316' }}>
+                            <TrendingUp size={14} /> Product Analysis
+                          </div>
+                          <CopyButton text={buildAffiliatePackageCopyText(affiliatePackage)} />
+                        </div>
+                        <div className="prompt-card-body">
+                          <div className="prompt-text">
+                            <strong>PRODUCT:</strong> {affiliatePackage.productAnalysis.productName}
+                            {'\n'}<strong>TYPE:</strong> {affiliatePackage.productAnalysis.productType}
+                            {'\n'}<strong>COLOR:</strong> {affiliatePackage.productAnalysis.color}
+                            {'\n'}<strong>MATERIAL:</strong> {affiliatePackage.productAnalysis.material}
+                            {'\n'}<strong>FIT:</strong> {affiliatePackage.productAnalysis.fit}
+                            {'\n'}<strong>LENGTH:</strong> {affiliatePackage.productAnalysis.length}
+                            {'\n'}<strong>PATTERN:</strong> {affiliatePackage.productAnalysis.pattern}
+                            {'\n'}<strong>KEY DETAILS:</strong> {affiliatePackage.productAnalysis.keyDetails}
+                            {'\n'}<strong>CLOSURE:</strong> {affiliatePackage.productAnalysis.closure}
+                            {'\n'}<strong>SELLING POINTS:</strong> {affiliatePackage.productAnalysis.sellingPoints.join(' | ')}
+                            {'\n'}<strong>BACKGROUND:</strong> {affiliatePackage.productAnalysis.backgroundChoice}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="prompt-card">
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: 'var(--accent-pink)' }}>
+                            <AlertCircle size={14} /> Negative Prompt
+                          </div>
+                          <CopyButton text={affiliatePackage.negativePrompt} />
+                        </div>
+                        <div className="prompt-card-body">
+                          <div className="prompt-text">{affiliatePackage.negativePrompt}</div>
+                        </div>
+                      </div>
+
+                      <div className="prompt-card">
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: 'var(--accent-cyan)' }}>
+                            <MessageSquare size={14} /> Text Overlay Gợi Ý
+                          </div>
+                          <CopyButton text={affiliatePackage.textOverlays.map((line, index) => `Scene ${index + 1}: ${line}`).join('\n')} />
+                        </div>
+                        <div className="prompt-card-body">
+                          <div className="prompt-text">
+                            {affiliatePackage.textOverlays.map((line, index) => `Scene ${index + 1}: ${line}`).join('\n')}
+                            {'\n\n'}POST-PRODUCTION ONLY: không nhúng text vào prompt ảnh/video.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="prompt-card">
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: 'var(--accent-amber)' }}>
+                            <FileText size={14} /> Voice Script Hậu Kỳ
+                          </div>
+                          <CopyButton text={affiliatePackage.voiceScript.join('\n')} />
+                        </div>
+                        <div className="prompt-card-body">
+                          <div className="prompt-text">
+                            {affiliatePackage.voiceScript.map((line, index) => `${index + 1}. ${line}`).join('\n')}
+                            {'\n\n'}Model không nói hoặc lip-sync; script dùng để lồng tiếng hậu kỳ.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="prompt-card">
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: 'var(--accent-emerald)' }}>
+                            <Sparkles size={14} /> Caption & Hashtag
+                          </div>
+                          <CopyButton text={`${affiliatePackage.caption}\n${affiliatePackage.hashtags.join(' ')}`} />
+                        </div>
+                        <div className="prompt-card-body">
+                          <div className="prompt-text">
+                            <strong>CAPTION:</strong> {affiliatePackage.caption}
+                            {'\n'}<strong>HASHTAGS:</strong> {affiliatePackage.hashtags.join(' ')}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="prompt-card">
+                        <div className="prompt-card-header">
+                          <div className="prompt-card-badge" style={{ color: 'var(--accent-purple)' }}>
+                            <Layers size={14} /> N+1 Summary
+                          </div>
+                          <CopyButton text={affiliatePackage.nPlusOneSummary.map(
+                            (row) => `Scene ${row.sceneIndex}: KF${row.startKeyframe} -> KF${row.endKeyframe} | ${row.purpose}`,
+                          ).join('\n')} />
+                        </div>
+                        <div className="prompt-card-body">
+                          <div className="prompt-text">
+                            {affiliatePackage.nPlusOneSummary.map(
+                              (row) => `Scene ${row.sceneIndex}: KF${row.startKeyframe} -> KF${row.endKeyframe} | ${row.purpose}`,
+                            ).join('\n')}
+                          </div>
+                        </div>
+                      </div>
                     </>
                   )}
 
