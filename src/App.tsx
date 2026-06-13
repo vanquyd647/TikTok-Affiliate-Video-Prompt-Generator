@@ -9729,70 +9729,72 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
             `Progressive-distance lock: Scene ${index + 1} starts at KF${index + 1} and smoothly pulls back to the visibly wider KF${index + 2}. Preserve the camera angle while widening; never push in or end tighter than the start frame.`,
           )
           : composition
-      const sceneSubject = shouldEnforceConciseVisualOnlyAction
-        ? sanitizeVisualOnlyConciseSubject(masterDNA)
-        : masterDNA
+      const sceneSubject = useTikTokShopAffiliateTemplateSkill
+        ? 'Same locked adult model wearing the exact locked hero product in the same locked real background.'
+        : shouldEnforceConciseVisualOnlyAction
+          ? sanitizeVisualOnlyConciseSubject(masterDNA)
+          : masterDNA
       const lighting = keyframes[index]?.lighting || ''
       const timeRange = `${startSec}s-${endSec}s`
 
       const affiliateSceneOpening = `Create a vertical 9:16 realistic TikTok Shop affiliate fashion video using Keyframe ${index + 1} as the start frame and Keyframe ${index + 2} as the end frame.`
-      const sceneFullPrompt = [
-        ...(useTikTokShopAffiliateTemplateSkill
-          ? [
-            affiliateSceneOpening,
-            `START FRAME: Keyframe ${index + 1} - ${startPose}`,
-            `END FRAME: Keyframe ${index + 2} - ${endPose}`,
-          ]
-          : []),
-        `SUBJECT: ${sceneSubject}`,
-        ...(ootdSceneReviewStyle
-          ? [
-            'SCENE MODE: standalone OOTD review clip from START FRAME to END FRAME; no need to connect action continuously with previous or next scene.',
-            `REVIEW ANGLE: ${ootdSceneReviewStyle.label} - ${ootdSceneReviewStyle.directive}`,
-            `START FRAME: ${startPose}`,
-            `END FRAME: ${endPose}`,
-            ...(isFreeStyleProductReviewTemplateScenario
-              ? [
-                `START FACING: ${startFacing}`,
-                `END FACING: ${endFacing}`,
-                'FREESTYLE DIRECTION LOCK: START FACING and END FACING must be different, with a visible product-review turn/pivot between them.',
-              ]
-              : []),
-          ]
-          : []),
-        `ACTION: ${narrative}`,
-        finalComposition ? `COMPOSITION: ${finalComposition}` : '',
-        `CAMERA: ${useTikTokShopAffiliateTemplateSkill
-          ? `Smooth controlled pull-back from Keyframe ${index + 1} to the visibly wider Keyframe ${index + 2}; preserve the established camera angle, keep the face readable, and never push in or reverse direction.`
-          : cameraMovement}`,
-        lighting ? `LIGHTING: ${lighting}` : '',
-        locationFlow ? `LOCATION FLOW: ${locationFlow}` : '',
-        ...(useTikTokShopAffiliateTemplateSkill
-          ? [
-            'PRODUCT FOCUS: preserve the exact hero product and emphasize the scene-specific fit, material, construction, or styling proof.',
-            `CAMERA DISTANCE: KF${index + 2} must be visibly wider than KF${index + 1}. Follow the locked sequence KF1 mid-thigh-to-head -> KF2 knee-up -> KF3 near-full-body -> KF4 complete head-to-toe -> KF5 widest full-body with modest background context. No push-in, tighter end frame, distance reversal, or extreme distant wide shot.`,
-            'BACKGROUND REALISM: keep the selected real environment stable and believable; no CGI, fantasy, fake showroom, artificial mirror reflection, or venue change.',
-            'MOTION: smooth, minimal, clean, realistic TikTok affiliate product-demo movement.',
-            'AUDIO/PERFORMANCE: no voice-over, dialogue, narration, text overlay, sales copy, talking, lip-sync, articulated dialogue, or spoken CTA.',
-            'CLEAN FRAME: no visible text, caption, logo, watermark, or random typography.',
-          ]
-          : []),
-        ...(shouldEnforceConciseVisualOnlyAction && templateScenarioId
-          ? buildOotdTemplateSilentFitCheckVeoLocks(!isFrontCameraTemplate)
-          : []),
-      ].filter(Boolean).join('\n')
+      const affiliateFrameLabels = [
+        'KF1 mid-thigh-to-head close hero with a large clear face',
+        'KF2 knee-up product proof',
+        'KF3 near-full-body three-quarter fit proof',
+        'KF4 complete head-to-toe side/back proof',
+        'KF5 widest full-body final display with modest background context',
+      ]
+      const affiliateSceneAction = useTikTokShopAffiliateTemplateSkill
+        ? sanitizeVisualOnlyConciseSceneNarrative(narrative)
+        : narrative
+      const affiliateCameraMovement = `Slow controlled pull-back from ${affiliateFrameLabels[index]} to ${affiliateFrameLabels[index + 1]}; preserve the camera angle and end visibly wider.`
+      const sceneFullPrompt = useTikTokShopAffiliateTemplateSkill
+        ? [
+          affiliateSceneOpening,
+          `ACTION: ${affiliateSceneAction}`,
+          `CAMERA: ${affiliateCameraMovement}`,
+          'LOCKS: Same adult model, exact hero product, same real background, and consistent lighting.',
+          'CLEAN: No outfit/background change, push-in, camera jump, text, logo, watermark, talking, or lip-sync.',
+        ].join('\n')
+        : [
+          `SUBJECT: ${sceneSubject}`,
+          ...(ootdSceneReviewStyle
+            ? [
+              'SCENE MODE: standalone OOTD review clip from START FRAME to END FRAME; no need to connect action continuously with previous or next scene.',
+              `REVIEW ANGLE: ${ootdSceneReviewStyle.label} - ${ootdSceneReviewStyle.directive}`,
+              `START FRAME: ${startPose}`,
+              `END FRAME: ${endPose}`,
+              ...(isFreeStyleProductReviewTemplateScenario
+                ? [
+                  `START FACING: ${startFacing}`,
+                  `END FACING: ${endFacing}`,
+                  'FREESTYLE DIRECTION LOCK: START FACING and END FACING must be different, with a visible product-review turn/pivot between them.',
+                ]
+                : []),
+            ]
+            : []),
+          `ACTION: ${narrative}`,
+          finalComposition ? `COMPOSITION: ${finalComposition}` : '',
+          `CAMERA: ${cameraMovement}`,
+          lighting ? `LIGHTING: ${lighting}` : '',
+          locationFlow ? `LOCATION FLOW: ${locationFlow}` : '',
+          ...(shouldEnforceConciseVisualOnlyAction && templateScenarioId
+            ? buildOotdTemplateSilentFitCheckVeoLocks(!isFrontCameraTemplate)
+            : []),
+        ].filter(Boolean).join('\n')
 
       return {
         index,
         timeRange,
         subject: sceneSubject,
-        narrative,
+        narrative: affiliateSceneAction,
         startPose,
         endPose,
-        composition: finalComposition,
-        cameraMovement,
-        lighting,
-        locationFlow,
+        composition: useTikTokShopAffiliateTemplateSkill ? '' : finalComposition,
+        cameraMovement: useTikTokShopAffiliateTemplateSkill ? affiliateCameraMovement : cameraMovement,
+        lighting: useTikTokShopAffiliateTemplateSkill ? '' : lighting,
+        locationFlow: useTikTokShopAffiliateTemplateSkill ? '' : locationFlow,
         fullPrompt: sceneFullPrompt,
       }
     })
