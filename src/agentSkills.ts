@@ -285,7 +285,7 @@ export const GEMINI_AGENT_SKILLS: readonly GeminiAgentSkill[] = [
     name: 'Fashion Affiliate Prompt Generator',
     mission: 'Turn a fashion product image or description into a complete, copy-ready TikTok Shop affiliate image/video prompt package.',
     prompt: `- ROLE: act as a fashion AI prompt specialist for TikTok Shop affiliate product demos. Prioritize conversion, exact product fidelity, model/outfit continuity, realistic context, and prompts that can be copied into Gemini, Veo, Kling, Runway, or an image generator.
-- REQUIRED OUTPUT: Master Prompt, Negative Prompt, 5 Keyframe Prompts, 4 Scene Prompts, 4 Vietnamese Text Overlays, one 3-5 sentence Vietnamese Voice Script, one TikTok Caption with hashtags, and an N+1 Summary.
+- REQUIRED OUTPUT: Master Prompt, Negative Prompt, 5 Keyframe Prompts, 4 Scene Prompts, and an N+1 Summary.
 - N+1 LOCK: N scenes require N+1 keyframes. For this template always output 4 scenes and 5 keyframes unless runtime configuration explicitly changes it.
 - KEYFRAME ORDER: KF1 full-body hero opening; KF2 close-up product detail; KF3 dynamic front three-quarter fit-check; KF4 side or back three-quarter proof; KF5 final product display, mirror, or CTA frame.
 - MASTER PROMPT: include vertical 9:16 TikTok Shop affiliate format, Model Lock, Product Lock, Background Lock, camera style, continuity rules, and no text/logo/watermark.
@@ -296,11 +296,9 @@ export const GEMINI_AGENT_SKILLS: readonly GeminiAgentSkill[] = [
 - BACKGROUND REALISM: the selected environment must look physically real and photographed, with believable depth, lighting, surfaces, props, and mirror behavior. Avoid CGI showroom, fantasy set, fake historical palace, excessive decorative lanterns, empty white cyclorama, plastic surfaces, and fake mirror reflection.
 - SCENE TEMPLATE: every scene must begin with the exact intent "Create a vertical 9:16 realistic TikTok Shop affiliate fashion video using Keyframe X as the start frame and Keyframe Y as the end frame." Then describe the same model and real background, camera motion, minimal subject motion, product focus, background anchors, smooth movement, and no text/logo.
 - N+1 PAIRS: Scene 1 uses KF1 -> KF2; Scene 2 uses KF2 -> KF3; Scene 3 uses KF3 -> KF4; Scene 4 uses KF4 -> KF5.
-- TEXT OVERLAY: return exactly four short Vietnamese selling lines, one per scene. These are post-production suggestions only and must never be rendered inside image or video prompts.
-- VOICE SCRIPT: return 3-5 natural Vietnamese affiliate sentences. It is post-production voice-over only; the model must not talk, lip-sync, articulate dialogue, or perform a spoken CTA.
-- CAPTION: keep it short, mention product value or use occasion, and include the CTA "mình để đúng mẫu ở giỏ hàng nha". Hashtags must be relevant, distinct, and readable.
+- VISUAL-ONLY OUTPUT: do not return text-overlay suggestions, voice script, caption, hashtags, dialogue, narration, or sales copy. The on-screen model must not talk, lip-sync, articulate dialogue, or perform a spoken CTA.
 - NEGATIVE PROMPT: block CGI/fantasy/fake showroom, fake reflection, outfit/product changes, wrong product color/fabric/fit/length, missing key details, extra people/accessories, distorted anatomy/hands/face, duplicate body, random text/logo/watermark, camera jumps, talking/lip-sync, nudity, explicit sexual framing, and underage-looking subjects.
-- FINAL CHECK: verify exact product lock, category-appropriate real background, 5 keyframes, 4 scenes, correct start/end keyframe pair in every scene, Negative Prompt, four overlays, voice script, caption/hashtags, N+1 summary, no embedded text/logo/watermark, and SFW adult presentation.`,
+- FINAL CHECK: verify exact product lock, category-appropriate real background, 5 keyframes, 4 scenes, correct start/end keyframe pair in every scene, Negative Prompt, N+1 summary, no text overlay/voice/caption/hashtags, no embedded text/logo/watermark, and SFW adult presentation.`,
   },
   {
     id: 'tiktok-analysis-transfer',

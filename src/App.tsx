@@ -64,10 +64,6 @@ interface AffiliateNPlusOneRow {
 interface AffiliatePackage {
   productAnalysis: AffiliateProductAnalysis
   negativePrompt: string
-  textOverlays: string[]
-  voiceScript: string[]
-  caption: string
-  hashtags: string[]
   nPlusOneSummary: AffiliateNPlusOneRow[]
 }
 
@@ -1291,11 +1287,11 @@ const OOTD_TEMPLATE_DEFAULT_SCENARIO_ID: OotdTemplateScenarioId = 'classic_mirro
 
 const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION = 32
 const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ASPECT_RATIO: '9:16' = '9:16'
-const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL = 'TikTok Affiliate Fashion Prompt Agent'
-const TIKTOK_SHOP_AFFILIATE_TEMPLATE_PRODUCT_BRIEF = `TikTok Shop Affiliate Fashion Prompt Agent core.
+const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LABEL = 'Fashion Affiliate Prompt Generator'
+const TIKTOK_SHOP_AFFILIATE_TEMPLATE_PRODUCT_BRIEF = `Fashion Affiliate Prompt Generator core.
 - Build a high-converting fashion product demo / fitcheck video for TikTok Shop affiliate.
 - Use N+1 keyframe algorithm: 4 video scenes = 5 keyframes. Never write scenes without keyframes.
-- Required output order inside the prompt package intent: product analysis -> master consistency lock -> negative prompt -> keyframe prompts -> scene prompts -> text overlay suggestions -> voice-over direction -> caption/hashtag direction -> N+1 summary.
+- Required output order inside the prompt package intent: product analysis -> master consistency lock -> negative prompt -> keyframe prompts -> scene prompts -> N+1 summary.
 - Default structure: Scene 1 opening/hook full-body front view; Scene 2 product detail/fabric/waistline/texture; Scene 3 fit/shape/full-body 3/4 angle; Scene 4 side/back/final CTA product display.
 - Product lock: the hero product is the current PRODUCT input image. Preserve exact color, fabric, length, waistline, silhouette, texture, shine level, seam/hem/trim details, and styling position.
 - Model lock: if FACE input exists, preserve the same adult female model, facial likeness, hairstyle, makeup, accessories, shoes, and natural body proportions across all keyframes/scenes.
@@ -1303,17 +1299,16 @@ const TIKTOK_SHOP_AFFILIATE_TEMPLATE_PRODUCT_BRIEF = `TikTok Shop Affiliate Fash
 - Boutique details: polished tile or wood floor, cream-beige walls, ceiling track/recessed retail lights, full-length mirror with believable reflection, clothing racks with real garments, fitting-room curtain/corner, small display table or shelves, natural depth, slightly lived-in but clean layout.
 - Camera style: vertical 9:16, natural smartphone creator fashion content, stable realistic lens perspective, clear product visibility, authentic in-store atmosphere, not overly cinematic or glossy.
 - Motion: smooth, minimal, realistic, product-focused; slow push-in/pull-back, gentle turn, soft pose change, light fabric touch, small weight shift, final pose hold.
-- Text overlay: short Vietnamese product-focused overlays, one per scene, realistic wording only; no exaggerated universal claims.
-- Voice/caption: natural Vietnamese TikTok affiliate voice script and short sales-oriented caption direction are allowed; avoid fake personal experience unless supplied.
+- Visual-only output: no text overlay suggestions, voice script, caption, hashtags, dialogue, narration, or sales copy.
 - Safety: SFW, adult model, no nudity, no explicit sexual framing, no underage-looking subject, no fake celebrity/influencer endorsement.
 - Negative prompt must block CGI showroom, fantasy retail interior, fake mirror reflection, white studio unless requested, outfit/product change, wrong fabric/color/length, extra people/accessories, distorted anatomy, warped face/hands, unrealistic camera jump, nudity, explicit sexual content.`
 
 const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'tiktokshop',
   detectedDurationSec: TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION,
-  hookStyle: 'Immediate full-body fashion product hook with clear product visibility and short Vietnamese overlay.',
+  hookStyle: 'Immediate full-body fashion product hook with clear product visibility and no text overlay.',
   narrativeStructure: 'N+1 affiliate product demo: full-body hook -> product detail proof -> 3/4 fit/shape proof -> side/back final display with TikTok Shop CTA.',
-  ctaStyle: 'Soft TikTok Shop affiliate CTA using text overlay/voice direction, no hard-sell spam or fake scarcity.',
+  ctaStyle: 'Visual-only final product display pose; no spoken CTA, caption, or sales copy.',
   colorGrade: 'real boutique retail lighting, cream-beige walls, natural skin tone, realistic fabric texture, high product readability',
   pacing: '4 controlled scenes / 5 keyframes, smooth smartphone creator pacing, minimal product-focused motion',
   sceneBeats: [
@@ -1359,7 +1354,7 @@ KF1 full-body front product hook -> Scene 1 -> KF2 product detail close-up.
 KF2 product detail close-up -> Scene 2 -> KF3 full-body 3/4 fit proof.
 KF3 full-body 3/4 fit proof -> Scene 3 -> KF4 clean side/back product silhouette.
 KF4 clean side/back product silhouette -> Scene 4 -> KF5 final full-body product display / soft CTA frame.
-Keep the real boutique background consistent, preserve the current product exactly, and write prompts mostly in English with concise Vietnamese overlay/voice/caption intent.`,
+Keep the real boutique background consistent, preserve the current product exactly, and keep the package visual-only with no voice/copy or text overlay.`,
   generatedAt: 0,
 }
 
@@ -7848,42 +7843,6 @@ const FASHION_AFFILIATE_NEGATIVE_PROMPT = [
   'no nudity, explicit sexual framing, fetish framing, or underage-looking subject',
 ].join(', ')
 
-function normalizeAffiliateVoiceScript(value: unknown): string[] {
-  const fromArray = toHistoryStringList(value, 5)
-  if (fromArray.length >= 3) return fromArray.slice(0, 5)
-
-  if (typeof value === 'string') {
-    const fromText = value
-      .split(/\r?\n|(?<=[.!?])\s+/)
-      .map((line) => line.replace(/^[-*\d.)\s]+/, '').trim())
-      .filter((line) => line.length > 0)
-      .slice(0, 5)
-    if (fromText.length >= 3) return fromText
-  }
-
-  return [
-    'Mẫu này lên form gọn và giữ được đúng tinh thần của sản phẩm.',
-    'Phần chất liệu và chi tiết được quay gần để mình nhìn rõ trước khi chọn.',
-    'Phối đi làm, đi cafe hoặc đi chơi đều dễ tùy đúng kiểu sản phẩm.',
-    'Mình để đúng mẫu ở giỏ hàng nha, bạn kiểm tra thêm màu và size phù hợp.',
-  ]
-}
-
-function normalizeAffiliateHashtags(value: unknown): string[] {
-  const normalized = toHistoryStringList(value, 12)
-    .map((tag) => tag.replace(/\s+/g, ''))
-    .map((tag) => (tag.startsWith('#') ? tag : `#${tag.replace(/^#+/, '')}`))
-    .filter((tag) => tag.length > 1)
-
-  const hashtags = Array.from(new Set(normalized))
-  const fallbacks = ['#tiktokshop', '#thoitrangnu', '#fitcheck', '#reviewsanpham', '#phoidonu']
-  for (const fallback of fallbacks) {
-    if (hashtags.length >= 8) break
-    if (!hashtags.includes(fallback)) hashtags.push(fallback)
-  }
-  return hashtags.slice(0, 12)
-}
-
 function normalizeAffiliatePackage(
   value: unknown,
   options?: {
@@ -7902,14 +7861,6 @@ function normalizeAffiliatePackage(
     options?.backgroundChoice || FASHION_AFFILIATE_DEFAULT_BACKGROUND,
   )
   const defaultProductType = options?.productType || 'fashion product detected from PRODUCT reference'
-  const rawOverlays = toHistoryStringList(record?.textOverlays, 4)
-  const overlayFallbacks = [
-    'Lên form gọn, nhìn rõ dáng',
-    'Cận chất liệu và chi tiết thật',
-    'Dễ phối cho nhiều hoàn cảnh',
-    'Mình để đúng mẫu ở giỏ hàng nha',
-  ]
-  const textOverlays = Array.from({ length: 4 }, (_, index) => rawOverlays[index] || overlayFallbacks[index])
   const rawSummary = Array.isArray(record?.nPlusOneSummary) ? record.nPlusOneSummary : []
   const nPlusOneSummary = Array.from({ length: 4 }, (_, index): AffiliateNPlusOneRow => {
     const row = toHistoryRecord(rawSummary[index]) || {}
@@ -7924,11 +7875,6 @@ function normalizeAffiliatePackage(
     }
   })
   const rawNegativePrompt = toHistoryString(record?.negativePrompt, '')
-  const rawCaption = toHistoryString(
-    record?.caption,
-    'Mẫu dễ phối và nhìn rõ form trong nhiều góc quay.',
-  )
-  const captionCta = 'mình để đúng mẫu ở giỏ hàng nha'
 
   return {
     productAnalysis: {
@@ -7949,12 +7895,6 @@ function normalizeAffiliatePackage(
     negativePrompt: rawNegativePrompt
       ? `${rawNegativePrompt}, ${FASHION_AFFILIATE_NEGATIVE_PROMPT}`
       : FASHION_AFFILIATE_NEGATIVE_PROMPT,
-    textOverlays,
-    voiceScript: normalizeAffiliateVoiceScript(record?.voiceScript),
-    caption: rawCaption.toLowerCase().includes(captionCta)
-      ? rawCaption
-      : `${rawCaption.replace(/[.!?\s]+$/, '')}, ${captionCta}.`,
-    hashtags: normalizeAffiliateHashtags(record?.hashtags),
     nPlusOneSummary,
   }
 }
@@ -7977,16 +7917,6 @@ function buildAffiliatePackageCopyText(affiliatePackage: AffiliatePackage): stri
     '',
     'NEGATIVE PROMPT',
     affiliatePackage.negativePrompt,
-    '',
-    'TEXT OVERLAYS',
-    ...affiliatePackage.textOverlays.map((overlay, index) => `Scene ${index + 1}: ${overlay}`),
-    '',
-    'VOICE SCRIPT',
-    ...affiliatePackage.voiceScript.map((line, index) => `${index + 1}. ${line}`),
-    '',
-    'TIKTOK CAPTION',
-    affiliatePackage.caption,
-    affiliatePackage.hashtags.join(' '),
     '',
     'N+1 SUMMARY',
     ...affiliatePackage.nPlusOneSummary.map(
@@ -9133,7 +9063,7 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
     : 'REAR MIRROR REFLECTION LOCK: inactive.'
 
   const noVoiceTrackPrompt = useTikTokShopAffiliateTemplateSkill
-    ? 'VISUAL PERFORMANCE / AUDIO LOCK: scene and keyframe prompts must contain no dialogue, no model speech, no lip-sync, no spoken CTA, and no speech-like mouth movement. Keep the mouth relaxed/closed at rest. A separate Vietnamese post-production voiceScript is required inside affiliatePackage and must never be performed by the on-screen model.'
+    ? 'VISUAL PERFORMANCE / AUDIO LOCK: scene and keyframe prompts must contain no dialogue, no model speech, no lip-sync, no spoken CTA, no narration, no on-screen typography, and no speech-like mouth movement. Keep the mouth relaxed/closed at rest. Return visual prompt data only.'
     : isFrontCameraTemplate
       ? 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual front-camera outfit presentation actions and optional on-screen text only. Keep the mouth relaxed/closed at rest and block talking-to-camera behavior.'
       : 'NO VOICE TRACK: do not script voiceover, dialogue, lip-sync cues, or spoken CTA. The video must communicate through visual mirror phone fit-check actions and optional on-screen text only. Keep the mouth relaxed/closed at rest and block talking-to-camera behavior.'
@@ -9197,12 +9127,12 @@ async function generatePromptPackageFromTikTokAnalysisWithGemini(
       'schema-qa',
     ],
     outputContract: useTikTokShopAffiliateTemplateSkill
-      ? `${keyframeCount} keyframes + ${sceneCount} N+1 scenes + complete affiliatePackage JSON`
+      ? `${keyframeCount} keyframes + ${sceneCount} N+1 scenes + visual-only affiliatePackage JSON`
       : `${keyframeCount} detached remix keyframes + ${sceneCount} scenes JSON`,
     runtimeNotes: [
       `Detected content type ${analysis.detectedContentType}; target duration ${duration}s; aspect ratio ${aspectRatio}.`,
       templateScenarioId ? `OOTD template scenario is active: ${templateScenarioId}.` : '',
-      useTikTokShopAffiliateTemplateSkill ? 'TikTok Shop Affiliate Fashion Prompt Agent core skill is active.' : '',
+      useTikTokShopAffiliateTemplateSkill ? 'Fashion Affiliate Prompt Generator core skill is active.' : '',
       useTikTokShopAffiliateTemplateSkill ? `Product-category background profile: ${affiliateBackgroundProfile}.` : '',
       `Template camera format: ${templateCameraFormat}.`,
       shouldEnforceRearMirrorReflection ? 'Rear mirror/reflection lock is active.' : '',
@@ -9239,10 +9169,6 @@ ${buildOotdTemplateSceneReviewStylePlan(sceneCount)}`
       "backgroundChoice": "..."
     },
     "negativePrompt": "...",
-    "textOverlays": ["Vietnamese scene 1", "Vietnamese scene 2", "Vietnamese scene 3", "Vietnamese scene 4"],
-    "voiceScript": ["Vietnamese sentence 1", "Vietnamese sentence 2", "Vietnamese sentence 3", "Vietnamese CTA sentence"],
-    "caption": "Vietnamese caption ending with: mình để đúng mẫu ở giỏ hàng nha",
-    "hashtags": ["#tiktokshop", "..."],
     "nPlusOneSummary": [
       { "sceneIndex": 1, "startKeyframe": 1, "endKeyframe": 2, "purpose": "..." },
       { "sceneIndex": 2, "startKeyframe": 2, "endKeyframe": 3, "purpose": "..." },
@@ -9330,8 +9256,8 @@ ${useTikTokShopAffiliateTemplateSkill
 - BACKGROUND SELECTOR LOCK: ${hasBackgroundLocationReference ? 'the uploaded BACKGROUND image overrides automatic selection' : `choose one real setting from ${affiliateBackgroundProfile}`}. Keep the choice in productAnalysis.backgroundChoice.
 - KEYFRAME LOCK: output exactly KF1 hero full body, KF2 product detail close-up, KF3 front three-quarter dynamic fit-check, KF4 side/back three-quarter proof, and KF5 final product display/CTA frame.
 - N+1 SCENE LOCK: Scene 1 KF1->KF2; Scene 2 KF2->KF3; Scene 3 KF3->KF4; Scene 4 KF4->KF5.
-- POST-PRODUCTION COPY LOCK: return exactly four short Vietnamese textOverlays, one 3-5 sentence Vietnamese voiceScript, caption ending with "mình để đúng mẫu ở giỏ hàng nha", and relevant hashtags.
-- VISUAL CLEAN-FRAME LOCK: text overlays and voice script are post-production metadata only. Never render text/logo/watermark inside keyframe or scene prompts; model never talks or lip-syncs.`
+- VISUAL-ONLY PACKAGE LOCK: affiliatePackage may contain only productAnalysis, negativePrompt, and nPlusOneSummary.
+- VISUAL CLEAN-FRAME LOCK: never render text/logo/watermark inside keyframe or scene prompts; model never talks or lip-syncs.`
   : ''}
 
 SCENE CAMERA MOVEMENT TAXONOMY (MANDATORY):
@@ -9812,7 +9738,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
             'PRODUCT FOCUS: preserve the exact hero product and emphasize the scene-specific fit, material, construction, or styling proof.',
             'BACKGROUND REALISM: keep the selected real environment stable and believable; no CGI, fantasy, fake showroom, artificial mirror reflection, or venue change.',
             'MOTION: smooth, minimal, clean, realistic TikTok affiliate product-demo movement.',
-            'AUDIO/PERFORMANCE: post-production voice-over is separate; on-screen model does not talk, lip-sync, articulate dialogue, or perform a spoken CTA.',
+            'AUDIO/PERFORMANCE: no voice-over, dialogue, narration, text overlay, sales copy, talking, lip-sync, articulated dialogue, or spoken CTA.',
             'CLEAN FRAME: no visible text, caption, logo, watermark, or random typography.',
           ]
           : []),
@@ -13838,10 +13764,10 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
       `Detail hint: ${activeProductCategoryOption.detailHint}`,
       backgroundRule,
       `Background selector result: ${affiliateBackgroundProfile}.`,
-      'Core skill mode: TikTok Shop Affiliate Fashion Prompt Agent. Use this core skill instead of OOTD fit-check scenario rules.',
+      'Core skill mode: Fashion Affiliate Prompt Generator. Use this core skill instead of OOTD fit-check scenario rules.',
       'N+1 lock: target exactly 4 scenes and 5 keyframes for the default affiliate fashion template.',
       'Scene chain: KF1 full-body front hook -> KF2 product detail close-up -> KF3 full-body 3/4 fit proof -> KF4 clean side/back silhouette -> KF5 final product display / soft CTA.',
-      'Output writing rule: prompts mostly in English for image/video tools; Vietnamese only for text overlay, voice script direction, caption, and CTA wording.',
+      'Output writing rule: prompts in English for image/video tools; no text overlay, voice script, caption, hashtags, narration, dialogue, or sales copy.',
     ].join('\n')
 
     setGenerationMode('video_prompt')
@@ -14033,7 +13959,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
           `Affiliate Mode: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
           `Sales Template: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
           '',
-          '── CHARACTER DNA ──',
+          result.affiliatePackage ? '── MASTER PROMPT ──' : '── CHARACTER DNA ──',
           result.masterDNA,
           '',
           '── KEYFRAME IMAGE PROMPTS ──',
@@ -14141,7 +14067,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
           `AFFILIATE MODE: ${(result.affiliateModeUsed || FIXED_AFFILIATE_MODE).toUpperCase()}`,
           `SALES TEMPLATE: ${(result.salesTemplateUsed || FIXED_SALES_TEMPLATE).toUpperCase()}`,
           '',
-          'CHARACTER DNA:', result.masterDNA, '',
+          result.affiliatePackage ? 'MASTER PROMPT:' : 'CHARACTER DNA:', result.masterDNA, '',
           'KEYFRAME PROMPTS:', ...result.keyframes.map(kf => appendKeyframeCopySafetyRule(kf.fullPrompt)), '',
           'SCENE PROMPTS:', ...result.scenes.map(sc => sc.fullPrompt),
           ...(result.createImagePrompt ? ['', 'CREATE IMAGE PROMPT:', result.createImagePrompt] : []),
@@ -14494,8 +14420,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                   Content type: TIKTOKSHOP{'\n'}
                   Background priority: uploaded background {'>'} category selector {'>'} real boutique fallback{'\n'}
                   Selected background profile: {activeFashionAffiliateBackgroundProfile}{'\n'}
-                  Camera: vertical smartphone creator style, stable, product-readable{'\n'}
-                  Voice/copy: 4 Vietnamese overlays + post-production voice script + caption/hashtags; model does not talk or lip-sync
+                  Camera: vertical smartphone creator style, stable, product-readable
                 </div>
 
                 <div className="prompt-text" style={{ whiteSpace: 'pre-wrap' }}>
@@ -15754,51 +15679,6 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                         </div>
                         <div className="prompt-card-body">
                           <div className="prompt-text">{affiliatePackage.negativePrompt}</div>
-                        </div>
-                      </div>
-
-                      <div className="prompt-card">
-                        <div className="prompt-card-header">
-                          <div className="prompt-card-badge" style={{ color: 'var(--accent-cyan)' }}>
-                            <MessageSquare size={14} /> Text Overlay Gợi Ý
-                          </div>
-                          <CopyButton text={affiliatePackage.textOverlays.map((line, index) => `Scene ${index + 1}: ${line}`).join('\n')} />
-                        </div>
-                        <div className="prompt-card-body">
-                          <div className="prompt-text">
-                            {affiliatePackage.textOverlays.map((line, index) => `Scene ${index + 1}: ${line}`).join('\n')}
-                            {'\n\n'}POST-PRODUCTION ONLY: không nhúng text vào prompt ảnh/video.
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="prompt-card">
-                        <div className="prompt-card-header">
-                          <div className="prompt-card-badge" style={{ color: 'var(--accent-amber)' }}>
-                            <FileText size={14} /> Voice Script Hậu Kỳ
-                          </div>
-                          <CopyButton text={affiliatePackage.voiceScript.join('\n')} />
-                        </div>
-                        <div className="prompt-card-body">
-                          <div className="prompt-text">
-                            {affiliatePackage.voiceScript.map((line, index) => `${index + 1}. ${line}`).join('\n')}
-                            {'\n\n'}Model không nói hoặc lip-sync; script dùng để lồng tiếng hậu kỳ.
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="prompt-card">
-                        <div className="prompt-card-header">
-                          <div className="prompt-card-badge" style={{ color: 'var(--accent-emerald)' }}>
-                            <Sparkles size={14} /> Caption & Hashtag
-                          </div>
-                          <CopyButton text={`${affiliatePackage.caption}\n${affiliatePackage.hashtags.join(' ')}`} />
-                        </div>
-                        <div className="prompt-card-body">
-                          <div className="prompt-text">
-                            <strong>CAPTION:</strong> {affiliatePackage.caption}
-                            {'\n'}<strong>HASHTAGS:</strong> {affiliatePackage.hashtags.join(' ')}
-                          </div>
                         </div>
                       </div>
 
