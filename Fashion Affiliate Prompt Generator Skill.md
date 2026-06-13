@@ -69,11 +69,13 @@ Gồm:
 
 Mặc định:
 
-* KF1: full body / hero opening
-* KF2: close-up product detail
-* KF3: 3/4 front dynamic fitcheck
-* KF4: side view hoặc back 3/4
-* KF5: final product display / mirror / CTA frame
+* KF1: closest hero opening, model framed from mid-thigh to head so the face is large and clear
+* KF2: slightly wider knee-up product proof
+* KF3: wider near-full-body 3/4 front fitcheck
+* KF4: complete head-to-toe side view or back 3/4
+* KF5: widest full-body final product display with modest background context
+
+Camera progression lock: KF1 is the closest frame. KF2 through KF5 must widen progressively, with every keyframe visibly wider than the previous keyframe. Every scene uses a smooth pull-back; no later keyframe may push in or become tighter.
 
 ### 4) 4 Scene Prompts Theo N+1
 

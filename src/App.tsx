@@ -1292,13 +1292,13 @@ const TIKTOK_SHOP_AFFILIATE_TEMPLATE_PRODUCT_BRIEF = `Fashion Affiliate Prompt G
 - Build a high-converting fashion product demo / fitcheck video for TikTok Shop affiliate.
 - Use N+1 keyframe algorithm: 4 video scenes = 5 keyframes. Never write scenes without keyframes.
 - Required output order inside the prompt package intent: product analysis -> master consistency lock -> negative prompt -> keyframe prompts -> scene prompts -> N+1 summary.
-- Default structure: Scene 1 opening/hook full-body front view; Scene 2 product detail/fabric/waistline/texture; Scene 3 fit/shape/full-body 3/4 angle; Scene 4 side/back/final CTA product display.
+- Default structure: KF1 closest hero hook from mid-thigh to head; then progressively widen KF2 through KF5 until the final full-body product display. Every scene pulls the camera back smoothly and each end keyframe is wider than its start keyframe.
 - Product lock: the hero product is the current PRODUCT input image. Preserve exact color, fabric, length, waistline, silhouette, texture, shine level, seam/hem/trim details, and styling position.
 - Model lock: if FACE input exists, preserve the same adult female model, facial likeness, hairstyle, makeup, accessories, shoes, and natural body proportions across all keyframes/scenes.
 - Boutique background default: use a real women's clothing boutique interior commonly seen in TikTok affiliate fitcheck videos. It must look authentic and photographed in real life, not CGI, not fantasy retail, not empty white studio.
 - Boutique details: polished tile or wood floor, cream-beige walls, ceiling track/recessed retail lights, full-length mirror with believable reflection, clothing racks with real garments, fitting-room curtain/corner, small display table or shelves, natural depth, slightly lived-in but clean layout.
 - Camera style: vertical 9:16, natural smartphone creator fashion content, stable realistic lens perspective, clear product visibility, authentic in-store atmosphere, not overly cinematic or glossy.
-- Camera distance lock: model stands close to the camera and occupies roughly 80-90% of frame height. Full-body frames still preserve head-to-toe visibility with minimal top/bottom margin; detail frames may move closer. No distant wide shot or excessive empty background.
+- Camera distance lock: KF1 is closest, framed from mid-thigh to the top of the head so the face is large and clear. KF2 is knee-up, KF3 is near-full-body, KF4 is complete head-to-toe, and KF5 is the widest full-body frame with a modest amount of background. The framing must widen monotonically from KF1 through KF5; no later keyframe may be tighter than the previous one.
 - Motion: smooth, minimal, realistic, product-focused; slow push-in/pull-back, gentle turn, soft pose change, light fabric touch, small weight shift, final pose hold.
 - Visual-only output: no text overlay suggestions, voice script, caption, hashtags, dialogue, narration, or sales copy.
 - Safety: SFW, adult model, no nudity, no explicit sexual framing, no underage-looking subject, no fake celebrity/influencer endorsement.
@@ -1307,8 +1307,8 @@ const TIKTOK_SHOP_AFFILIATE_TEMPLATE_PRODUCT_BRIEF = `Fashion Affiliate Prompt G
 const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
   detectedContentType: 'tiktokshop',
   detectedDurationSec: TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_DURATION,
-  hookStyle: 'Immediate full-body fashion product hook with clear product visibility and no text overlay.',
-  narrativeStructure: 'N+1 affiliate product demo: full-body hook -> product detail proof -> 3/4 fit/shape proof -> side/back final display with TikTok Shop CTA.',
+  hookStyle: 'Immediate mid-thigh-to-head fashion product hook with a large, clear face and no text overlay.',
+  narrativeStructure: 'N+1 affiliate product demo with progressive camera widening: mid-thigh hero hook -> knee-up product proof -> near-full-body 3/4 fit proof -> full-body side/back proof -> widest final display.',
   ctaStyle: 'Visual-only final product display pose; no spoken CTA, caption, or sales copy.',
   colorGrade: 'real boutique retail lighting, cream-beige walls, natural skin tone, realistic fabric texture, high product readability',
   pacing: '4 controlled scenes / 5 keyframes, smooth smartphone creator pacing, minimal product-focused motion',
@@ -1316,45 +1316,45 @@ const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
     {
       index: 1,
       timestamp: '0-8s',
-      beatName: 'OPENING HOOK / FULL BODY',
-      description: 'Show a full-body front view of the adult model wearing the hero product inside a real boutique, with immediate product readability.',
+      beatName: 'CLOSE HERO HOOK / PULL-BACK',
+      description: 'Begin with the adult model framed from mid-thigh to the top of the head so the face is large and clear, then pull back smoothly toward a knee-up product-proof frame.',
       contextHint: 'Authentic women fashion boutique, polished floor, cream-beige wall, clothing racks, retail lights, real store depth.',
-      cameraHint: 'Vertical smartphone full-body front view with model standing close to camera, roughly 80-90% frame-height occupancy, minimal head/foot margins, stable framing, and a small elegant pose.',
+      cameraHint: 'KF1 starts closest to camera with a mid-thigh-to-head crop and clear facial detail; end at KF2 with a visibly wider knee-up frame. Smooth pull-back only, no push-in.',
       narrationHint: 'Short Vietnamese hook about the product being easy to style / worth checking in the TikTok Shop cart.',
     },
     {
       index: 2,
       timestamp: '8-16s',
-      beatName: 'PRODUCT DETAIL / FABRIC PROOF',
-      description: 'Move into product detail: fabric, waistline, texture, tailoring, shine, stretch, drape, seam or construction.',
+      beatName: 'KNEE-UP PRODUCT PROOF / WIDEN',
+      description: 'Keep fabric, waistline, texture, tailoring and construction readable while widening from the knee-up frame into a near-full-body view.',
       contextHint: 'Same boutique background softly visible, mirror/rack/store fixture anchors stay believable.',
-      cameraHint: 'Close camera distance; chest/waist-to-thigh or exact product-detail crop, slow controlled push, hand lightly touches fabric.',
+      cameraHint: 'KF2 is knee-up and wider than KF1; pull back gradually to KF3 near-full-body framing. Never crop tighter than the start frame.',
       narrationHint: 'Vietnamese proof line about material/fit/detail without exaggerated claim.',
     },
     {
       index: 3,
       timestamp: '16-24s',
-      beatName: 'FIT / SHAPE / 3-4 ANGLE',
-      description: 'Show how the product looks on body from a flattering 3/4 angle, with fit and silhouette clarity.',
+      beatName: 'NEAR-FULL FIT PROOF / WIDEN',
+      description: 'Show the product from a flattering 3/4 angle while widening from near-full-body framing into a complete head-to-toe view.',
       contextHint: 'Same real boutique, stable depth, no artificial showroom or fantasy lighting.',
-      cameraHint: 'Close full-body 3/4 view with model visually dominant at roughly 80-90% frame height, minimal empty margins, gentle body turn or small weight shift.',
+      cameraHint: 'KF3 is near-full-body and wider than KF2; pull back to KF4 complete head-to-toe framing with minimal margins.',
       narrationHint: 'Vietnamese use-case line: easy to pair, suitable for work/cafe/date/daily styling as appropriate.',
     },
     {
       index: 4,
       timestamp: '24-32s',
-      beatName: 'SIDE/BACK / FINAL CTA',
-      description: 'End with side/back/final product display pose suitable for affiliate CTA, keeping the product as hero.',
+      beatName: 'FULL-BODY PROOF / WIDEST FINAL',
+      description: 'Begin with a complete head-to-toe side or back three-quarter proof, then widen slightly for the final product display while keeping the model dominant.',
       contextHint: 'Same boutique lighting and store anchors, clean but real and slightly lived-in.',
-      cameraHint: 'Close camera distance for the final full-body or side/back display, model fills roughly 80-90% frame height, stable final pose hold.',
+      cameraHint: 'KF4 is complete head-to-toe; KF5 is the widest full-body frame with modest background context. Use a subtle final pull-back, never an extreme distant wide shot.',
       narrationHint: 'Soft CTA: the exact model/product is in the TikTok Shop cart; invite viewer to check color/size/deal.',
     },
   ],
   generatedScript: `Use this TikTok Shop affiliate N+1 video structure:
-KF1 full-body front product hook -> Scene 1 -> KF2 product detail close-up.
-KF2 product detail close-up -> Scene 2 -> KF3 full-body 3/4 fit proof.
-KF3 full-body 3/4 fit proof -> Scene 3 -> KF4 clean side/back product silhouette.
-KF4 clean side/back product silhouette -> Scene 4 -> KF5 final full-body product display / soft CTA frame.
+KF1 closest mid-thigh-to-head front hero hook -> Scene 1 smooth pull-back -> KF2 wider knee-up product proof.
+KF2 knee-up product proof -> Scene 2 smooth pull-back -> KF3 wider near-full-body 3/4 fit proof.
+KF3 near-full-body 3/4 fit proof -> Scene 3 smooth pull-back -> KF4 complete head-to-toe side/back silhouette.
+KF4 complete head-to-toe silhouette -> Scene 4 subtle pull-back -> KF5 widest full-body final product display.
 Keep the real boutique background consistent, preserve the current product exactly, and keep the package visual-only with no voice/copy or text overlay.`,
   generatedAt: 0,
 }
@@ -9255,8 +9255,9 @@ ${useTikTokShopAffiliateTemplateSkill
   ? `- FASHION AFFILIATE OUTPUT LOCK: analyze the exact visible product and return affiliatePackage with all required fields.
 - MASTER PROMPT LOCK: masterDNA must explicitly contain FORMAT 9:16, MODEL LOCK, PRODUCT LOCK, BACKGROUND LOCK, CAMERA STYLE, CONTINUITY RULE, and NO TEXT/LOGO/WATERMARK.
 - BACKGROUND SELECTOR LOCK: ${hasBackgroundLocationReference ? 'the uploaded BACKGROUND image overrides automatic selection' : `choose one real setting from ${affiliateBackgroundProfile}`}. Keep the choice in productAnalysis.backgroundChoice.
-- CAMERA DISTANCE LOCK: model stands close to the camera and fills roughly 80-90% of frame height. Preserve head-to-toe visibility in full-body keyframes using minimal headroom and footroom; allow tighter framing for the product-detail keyframe. No distant wide shot or excessive empty background.
-- KEYFRAME LOCK: output exactly KF1 hero full body, KF2 product detail close-up, KF3 front three-quarter dynamic fit-check, KF4 side/back three-quarter proof, and KF5 final product display/CTA frame.
+- CAMERA DISTANCE LOCK: KF1 is the closest frame and shows the model from mid-thigh to the top of the head so the face is large, sharp, and clearly recognizable. KF2 is a visibly wider knee-up frame; KF3 widens to near-full-body; KF4 widens to complete head-to-toe; KF5 is the widest full-body frame with modest background context. Framing must widen monotonically from KF1 through KF5. No later keyframe may be tighter than the previous keyframe.
+- KEYFRAME LOCK: output exactly KF1 closest mid-thigh-to-head hero hook, KF2 wider knee-up product proof, KF3 wider near-full-body front three-quarter fit-check, KF4 complete head-to-toe side/back three-quarter proof, and KF5 widest full-body final product display.
+- CAMERA MOTION LOCK: every scene uses a smooth controlled pull-back from its start keyframe to its wider end keyframe. Never push in, zoom in, or reverse the widening progression.
 - N+1 SCENE LOCK: Scene 1 KF1->KF2; Scene 2 KF2->KF3; Scene 3 KF3->KF4; Scene 4 KF4->KF5.
 - VISUAL-ONLY PACKAGE LOCK: affiliatePackage may contain only productAnalysis, negativePrompt, and nPlusOneSummary.
 - VISUAL CLEAN-FRAME LOCK: never render text/logo/watermark inside keyframe or scene prompts; model never talks or lip-syncs.`
@@ -9537,19 +9538,26 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
       }
 
       if (useTikTokShopAffiliateTemplateSkill) {
+        const affiliateProgressiveFrameRule = [
+          'KF1 DISTANCE OVERRIDE: closest hero frame, crop from mid-thigh to the top of the head. Keep the face large, sharp, unobstructed, and clearly recognizable; do not show the lower legs or feet.',
+          'KF2 DISTANCE OVERRIDE: widen slightly from KF1 to a knee-up frame. The model must appear visibly smaller than in KF1 while the face and product remain clear.',
+          'KF3 DISTANCE OVERRIDE: widen again to a near-full-body frame. The model must appear visibly smaller than in KF2, with most of the legs now visible.',
+          'KF4 DISTANCE OVERRIDE: widen to a complete head-to-toe frame with minimal margins. The model must appear visibly smaller than in KF3.',
+          'KF5 DISTANCE OVERRIDE: use the widest frame in the sequence, keeping the complete model visible with modest real-background context. The model must appear visibly smaller than in KF4 but remain the dominant subject; never use an extreme distant wide shot.',
+        ][index] || 'Keep the indexed framing wider than the previous keyframe while the model remains the dominant subject.'
         finalAction = appendSentenceIfMissing(
           finalAction,
-          'The model stands close to the camera while keeping the hero product clearly readable.',
+          index === 0
+            ? 'The model stands closest to the camera for a face-forward hero opening while keeping the hero product clearly readable.'
+            : 'The model remains the dominant subject as the camera position widens progressively from the previous keyframe.',
         )
         finalCamera = appendSentenceIfMissing(
           finalCamera,
-          index === 1
-            ? 'Use a close product-detail distance with a controlled crop around the relevant garment or accessory area; never fall back to a distant wide view.'
-            : 'Keep the model close to the camera at roughly 80-90% frame-height occupancy; preserve head-to-toe visibility for full-body framing with minimal headroom and footroom, and avoid excessive empty background.',
+          `${affiliateProgressiveFrameRule} This distance override takes precedence over any earlier generic full-body, close-up, or crop instruction while preserving the requested camera angle.`,
         )
         finalStyle = appendSentenceIfMissing(
           finalStyle,
-          'Use subject-dominant TikTok affiliate framing with the model visibly close to the camera, not distant in the environment.',
+          'Use a strict monotonic framing progression: KF1 is closest and every subsequent keyframe is visibly wider than the previous one, with no distance reversal.',
         )
       }
 
@@ -9599,7 +9607,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         '[MODEL LOCK]: Preserve the same adult model, face, hairstyle, makeup, natural proportions, shoes, and accessories across every keyframe and scene.',
         '[PRODUCT LOCK]: Preserve the exact hero product color, fabric, fit, length, silhouette, pattern, waist/hem/collar/slit, seams, trim, hardware, closure, texture, and styling position from PRODUCT reference.',
         `[BACKGROUND LOCK]: ${hasBackgroundLocationReference ? 'Use the uploaded BACKGROUND reference as the environment anchor.' : `Use one real product-appropriate setting from: ${affiliateBackgroundProfile}.`} Keep physically believable depth, surfaces, props, lighting, and mirror behavior; no venue drift.`,
-        '[CAMERA STYLE]: Stable realistic vertical smartphone creator framing. Model stands close to the camera and occupies roughly 80-90% of frame height; full-body frames keep head-to-toe visibility with minimal headroom and footroom, detail frames may be tighter, and distant wide shots are prohibited.',
+        '[CAMERA STYLE]: Stable realistic vertical smartphone creator framing with a strict progressive pull-back. KF1 is closest and cropped from mid-thigh to head for a large clear face; KF2 is knee-up; KF3 is near-full-body; KF4 is complete head-to-toe; KF5 is the widest full-body frame with modest background context. Each keyframe must be visibly wider than the previous one, with no push-in or distance reversal.',
         '[CONTINUITY RULE]: Same model, product, outfit, background anchors, lighting logic, and camera axis across the N+1 chain.',
         '[CLEAN FRAME LOCK]: No visible text, logo, watermark, random typography, dialogue, talking, or lip-sync in generated visuals.',
       ].join('\n')
@@ -9718,7 +9726,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         : useTikTokShopAffiliateTemplateSkill
           ? appendSentenceIfMissing(
             composition,
-            'Camera-distance lock: model stands close to camera and remains subject-dominant at roughly 80-90% frame-height occupancy; full-body views retain head-to-toe visibility with minimal margins.',
+            `Progressive-distance lock: Scene ${index + 1} starts at KF${index + 1} and smoothly pulls back to the visibly wider KF${index + 2}. Preserve the camera angle while widening; never push in or end tighter than the start frame.`,
           )
           : composition
       const sceneSubject = shouldEnforceConciseVisualOnlyAction
@@ -9754,13 +9762,15 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           : []),
         `ACTION: ${narrative}`,
         finalComposition ? `COMPOSITION: ${finalComposition}` : '',
-        `CAMERA: ${cameraMovement}`,
+        `CAMERA: ${useTikTokShopAffiliateTemplateSkill
+          ? `Smooth controlled pull-back from Keyframe ${index + 1} to the visibly wider Keyframe ${index + 2}; preserve the established camera angle, keep the face readable, and never push in or reverse direction.`
+          : cameraMovement}`,
         lighting ? `LIGHTING: ${lighting}` : '',
         locationFlow ? `LOCATION FLOW: ${locationFlow}` : '',
         ...(useTikTokShopAffiliateTemplateSkill
           ? [
             'PRODUCT FOCUS: preserve the exact hero product and emphasize the scene-specific fit, material, construction, or styling proof.',
-            'CAMERA DISTANCE: model remains close to the camera and visually dominant; use roughly 80-90% frame-height occupancy for full-body views with minimal head/foot margins, and a tighter distance for product detail. No distant wide shot.',
+            `CAMERA DISTANCE: KF${index + 2} must be visibly wider than KF${index + 1}. Follow the locked sequence KF1 mid-thigh-to-head -> KF2 knee-up -> KF3 near-full-body -> KF4 complete head-to-toe -> KF5 widest full-body with modest background context. No push-in, tighter end frame, distance reversal, or extreme distant wide shot.`,
             'BACKGROUND REALISM: keep the selected real environment stable and believable; no CGI, fantasy, fake showroom, artificial mirror reflection, or venue change.',
             'MOTION: smooth, minimal, clean, realistic TikTok affiliate product-demo movement.',
             'AUDIO/PERFORMANCE: no voice-over, dialogue, narration, text overlay, sales copy, talking, lip-sync, articulated dialogue, or spoken CTA.',
@@ -13791,8 +13801,8 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
       `Background selector result: ${affiliateBackgroundProfile}.`,
       'Core skill mode: Fashion Affiliate Prompt Generator. Use this core skill instead of OOTD fit-check scenario rules.',
       'N+1 lock: target exactly 4 scenes and 5 keyframes for the default affiliate fashion template.',
-      'Scene chain: KF1 full-body front hook -> KF2 product detail close-up -> KF3 full-body 3/4 fit proof -> KF4 clean side/back silhouette -> KF5 final product display / soft CTA.',
-      'Camera distance rule: model stands close to the camera and occupies roughly 80-90% of frame height. Preserve head-to-toe visibility with minimal headroom and footroom in full-body frames, use a tighter product-detail frame, and never use a distant wide shot or excessive empty background.',
+      'Scene chain: KF1 closest mid-thigh-to-head hero hook -> KF2 wider knee-up product proof -> KF3 wider near-full-body 3/4 fit proof -> KF4 complete head-to-toe side/back silhouette -> KF5 widest full-body final product display.',
+      'Camera distance rule: KF1 is closest so the face is large and clear. From KF2 through KF5, every keyframe must be visibly wider than the previous one. Every scene uses a smooth pull-back; never push in, reverse the distance progression, or use an extreme distant wide shot.',
       'Output writing rule: prompts in English for image/video tools; no text overlay, voice script, caption, hashtags, narration, dialogue, or sales copy.',
     ].join('\n')
 
@@ -14446,7 +14456,7 @@ ${buildOotdTemplateSceneReviewStylePlan(DURATIONS.find((entry) => entry.value ==
                   Content type: TIKTOKSHOP{'\n'}
                   Background priority: uploaded background {'>'} category selector {'>'} real boutique fallback{'\n'}
                   Selected background profile: {activeFashionAffiliateBackgroundProfile}{'\n'}
-                  Camera: model close to camera, 80-90% frame height, stable and product-readable
+                  Camera: KF1 mid-thigh-to-head close hero; KF2-KF5 progressively widen to the widest full-body frame
                 </div>
 
                 <div className="prompt-text" style={{ whiteSpace: 'pre-wrap' }}>
