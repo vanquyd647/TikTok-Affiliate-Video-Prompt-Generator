@@ -85,7 +85,7 @@ Mỗi scene phải ghi rõ:
 Create a vertical 9:16 realistic TikTok Shop affiliate fashion video using Keyframe X as the start frame and Keyframe Y as the end frame.
 ```
 
-Scene prompt phải ngắn gọn đúng 5 dòng: câu mở đầu, `ACTION`, `CAMERA`, `LOCKS`, `CLEAN`. Không lặp lại Master Prompt, Model Lock, Product Lock, Background Lock, Camera Style hoặc Continuity Rule trong từng scene.
+Scene prompt phải ngắn gọn, chỉ gồm câu mở đầu, `ACTION`, `CAMERA STYLE`, `LIGHTING`. `ACTION` chỉ là một câu ngắn miêu tả chuyển động vật lý của model, không chứa camera, background, lighting, chuỗi keyframe, product lock, model lock, negative prompt hoặc compliance notes vì các chi tiết này đã có ở ảnh input/keyframe.
 
 ### 5) Text Overlay
 

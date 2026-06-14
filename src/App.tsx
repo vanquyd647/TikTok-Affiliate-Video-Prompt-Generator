@@ -1350,12 +1350,9 @@ const TIKTOK_SHOP_AFFILIATE_TEMPLATE_LOCKED_ANALYSIS: TikTokAnalysisResult = {
       narrationHint: 'Soft CTA: the exact model/product is in the TikTok Shop cart; invite viewer to check color/size/deal.',
     },
   ],
-  generatedScript: `Use this TikTok Shop affiliate N+1 video structure:
-KF1 closest mid-thigh-to-head front hero hook -> Scene 1 smooth pull-back -> KF2 wider knee-up product proof.
-KF2 knee-up product proof -> Scene 2 smooth pull-back -> KF3 wider near-full-body 3/4 fit proof.
-KF3 near-full-body 3/4 fit proof -> Scene 3 smooth pull-back -> KF4 complete head-to-toe side/back silhouette.
-KF4 complete head-to-toe silhouette -> Scene 4 subtle pull-back -> KF5 widest full-body final product display.
-Keep the real boutique background consistent, preserve the current product exactly, and keep the package visual-only with no voice/copy or text overlay.`,
+  generatedScript: `TikTok Shop affiliate frame progression:
+KF1 close hero -> KF2 knee-up -> KF3 near-full-body -> KF4 head-to-toe -> KF5 widest full-body.
+Scene ACTION must stay short and physical only; camera widening belongs in CAMERA STYLE.`,
   generatedAt: 0,
 }
 
@@ -3991,6 +3988,16 @@ function normalizePromptWhitespace(value: string): string {
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([,.;:!?])/g, '$1')
     .trim()
+}
+
+function compactAffiliateSceneLine(value: string, fallback: string): string {
+  const normalized = normalizePromptWhitespace(value)
+  if (!normalized) return fallback
+  const firstSentence = normalized
+    .split(/[.!?]/)
+    .map((sentence) => sentence.trim())
+    .find((sentence) => sentence.length > 0)
+  return firstSentence || fallback
 }
 
 function removeOotdMirrorHandheldDevicePhrases(value: string): string {
@@ -9730,7 +9737,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
           )
           : composition
       const sceneSubject = useTikTokShopAffiliateTemplateSkill
-        ? 'Same locked adult model wearing the exact locked hero product in the same locked real background.'
+        ? ''
         : shouldEnforceConciseVisualOnlyAction
           ? sanitizeVisualOnlyConciseSubject(masterDNA)
           : masterDNA
@@ -9745,17 +9752,26 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         'KF4 complete head-to-toe side/back proof',
         'KF5 widest full-body final display with modest background context',
       ]
+      const affiliateActionLines = [
+        'Model holds a close hero pose with one small natural styling gesture.',
+        'Model lightly adjusts the product for fit and material proof.',
+        'Model makes a slow three-quarter turn for silhouette proof.',
+        'Model settles into a clean final display pose.',
+      ]
       const affiliateSceneAction = useTikTokShopAffiliateTemplateSkill
-        ? sanitizeVisualOnlyConciseSceneNarrative(narrative)
+        ? affiliateActionLines[index] || 'Model performs one simple product-demo movement.'
         : narrative
       const affiliateCameraMovement = `Slow controlled pull-back from ${affiliateFrameLabels[index]} to ${affiliateFrameLabels[index + 1]}; preserve the camera angle and end visibly wider.`
+      const affiliateLighting = compactAffiliateSceneLine(
+        lighting,
+        'Use natural realistic lighting from the input keyframes.',
+      )
       const sceneFullPrompt = useTikTokShopAffiliateTemplateSkill
         ? [
           affiliateSceneOpening,
           `ACTION: ${affiliateSceneAction}`,
-          `CAMERA: ${affiliateCameraMovement}`,
-          'LOCKS: Same adult model, exact hero product, same real background, and consistent lighting.',
-          'CLEAN: No outfit/background change, push-in, camera jump, text, logo, watermark, talking, or lip-sync.',
+          `CAMERA STYLE: ${affiliateCameraMovement}`,
+          `LIGHTING: ${affiliateLighting}`,
         ].join('\n')
         : [
           `SUBJECT: ${sceneSubject}`,
@@ -9793,7 +9809,7 @@ Counts must match exactly: keyframes=${keyframeCount}, scenes=${sceneCount}.`
         endPose,
         composition: useTikTokShopAffiliateTemplateSkill ? '' : finalComposition,
         cameraMovement: useTikTokShopAffiliateTemplateSkill ? affiliateCameraMovement : cameraMovement,
-        lighting: useTikTokShopAffiliateTemplateSkill ? '' : lighting,
+        lighting: useTikTokShopAffiliateTemplateSkill ? affiliateLighting : lighting,
         locationFlow: useTikTokShopAffiliateTemplateSkill ? '' : locationFlow,
         fullPrompt: sceneFullPrompt,
       }
